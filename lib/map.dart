@@ -1,6 +1,6 @@
 import 'dart:async';
 import 'dart:developer';
-
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
@@ -132,8 +132,8 @@ class _MyAppState extends State<MyApp> {
     return MaterialApp(
       home: Scaffold(
         appBar: AppBar(
-          title: Text('Fläg'),
-          backgroundColor: Colors.green[700],
+          title: Image.asset("assets/images/logo2.png", width: 40, height: 60, alignment: Alignment.bottomCenter,),
+          //backgroundColor: Colors.green[700],
             actions: <Widget>[
               IconButton(
                 iconSize: 45,
@@ -141,7 +141,12 @@ class _MyAppState extends State<MyApp> {
                 onPressed: () {},
               )]
         ),
-        body: w
+        body: w,
+        floatingActionButton: FloatingActionButton(
+            child: Icon(Icons.add),
+            onPressed: () {
+
+            })
       ),
     );
   }

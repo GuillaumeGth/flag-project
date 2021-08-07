@@ -32,6 +32,7 @@ dependencies:
   geolocator: ^7.4.0
   ansicolor: ^2.0.1
   permission_handler: ^8.1.4+2
+  location: ^4.3.0
 
 dev_dependencies:
   flutter_test:

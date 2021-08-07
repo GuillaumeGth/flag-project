@@ -1,10 +1,12 @@
+import 'dart:async';
+import 'dart:developer';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:ansicolor/ansicolor.dart';
-import 'package:geolocator/geolocator.dart';
 import 'package:permission_handler/permission_handler.dart';
-
+import 'package:location/location.dart';
 void main() => runApp(MyApp());
 
 class MyApp extends StatefulWidget {
@@ -18,22 +20,34 @@ class Logger{
   }
 }
 class _MyAppState extends State<MyApp> {
+  late StreamSubscription _locationSubscription;
   late String _mapStyle;
-  late LatLng? _center;
-  late Position position;
+  late LatLng _center;
+  late Location _locationTracker = Location();
   late GoogleMapController mapController;
-
+  late Marker marker;
+  late Circle circle;
   void _onMapCreated(GoogleMapController controller) {
-    print("gza");
     mapController = controller;
-    print(_mapStyle);
     mapController.setMapStyle(_mapStyle);
+    getLocation();
+  }
+  initMap() async {
+    if (await Permission.location.request().isGranted) {
+      loadStyle();
+      _locationTracker.getLocation().then((location){
+        LatLng c = LocationDataToLatLtn(location);
+        setState(() {
+          _center = c;
+          updateMarker(_center);
+        });
+      });
+    }
   }
   @override
   void initState() {
     super.initState();
-    loadStyle();
-    getLocation();
+    initMap();
   }
   loadStyle() async {
     await rootBundle.loadString('assets/styles/map_style.txt').then((string) {
@@ -42,13 +56,51 @@ class _MyAppState extends State<MyApp> {
         });
       });
   }
+  LocationDataToLatLtn (LocationData location){
+    return LatLng(location.latitude as double, location.longitude as double);
+  }
+  GetCurrentLatLng() {
+    _locationTracker.getLocation().then((location){
+      LatLng latLng = LocationDataToLatLtn(location);
+      return latLng;
+    });
+  }
   getLocation () async {
-    if (await Permission.location.request().isGranted) {
-      position = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
-      setState(() {
-        _center = LatLng(position.latitude, position.longitude);
-      });
-    }
+    LatLng latLng = await _locationTracker.getLocation().then((location){
+      LatLng latLng = LocationDataToLatLtn(location);
+      return latLng;
+    });
+    setState(() {
+      _center = latLng;
+    });
+    _locationSubscription = _locationTracker.onLocationChanged.listen((newLocalData) {
+      print("new location");
+      mapController.animateCamera(
+          CameraUpdate.newCameraPosition(new CameraPosition(
+              target: latLng,
+              tilt: 0
+          )));
+          updateMarker(LocationDataToLatLtn(newLocalData));
+    });
+  }
+  void updateMarker(LatLng latLng) {
+    this.setState(() {
+      marker = Marker(
+          markerId: MarkerId("userMarker"),
+          position: latLng,
+          draggable: false,
+          zIndex: 2,
+          flat: true,
+          anchor: Offset(0.5, 0.5));
+      circle = Circle(
+          circleId: CircleId("perimeter"),
+          radius: 50,
+          zIndex: 1,
+          strokeColor: Colors.blue,
+          strokeWidth: 2,
+          center: latLng,
+          fillColor: Colors.blue.withAlpha(70));
+    });
   }
   @override
   void dispose(){
@@ -57,12 +109,6 @@ class _MyAppState extends State<MyApp> {
   }
   @override
   Widget build(BuildContext context) {
-    List<Marker> customMarkers = [];
-    Marker m = Marker(
-        markerId: MarkerId("UserMarker"),
-        position: _center as LatLng
-    );
-    customMarkers.add(m);
     Widget w;
     if (_center == null){
       w = Text("Loading");
@@ -70,14 +116,15 @@ class _MyAppState extends State<MyApp> {
     else {
       print(_center);
       w = GoogleMap(
-        markers: customMarkers.toSet(),
+        markers: Set.of([marker]),
+        circles: Set.of([circle]),
         zoomControlsEnabled: false,
         scrollGesturesEnabled: false,
         mapType: MapType.normal,
         minMaxZoomPreference: MinMaxZoomPreference(17, 19),
         onMapCreated: _onMapCreated,
         initialCameraPosition: CameraPosition(
-          target: _center as LatLng,
+          target: _center,
           zoom: 18.0,
         ),
       );

@@ -1,4 +1,4 @@
-#Fri Aug 06 13:09:30 CEST 2021
+#Sat Aug 07 20:39:35 CEST 2021
 base.0=/Users/guillaumezarb/Documents/GitHub/flag_project/build/app/intermediates/dex/debug/mergeDexDebug/classes.dex
 renamed.0=classes.dex
 path.0=classes.dex

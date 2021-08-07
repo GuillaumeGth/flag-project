@@ -2,6 +2,12 @@
   "configVersion": 2,
   "packages": [
     {
+      "name": "ansicolor",
+      "rootUri": "file:///Applications/flutter/.pub-cache/hosted/pub.dartlang.org/ansicolor-2.0.1",
+      "packageUri": "lib/",
+      "languageVersion": "2.12"
+    },
+    {
       "name": "async",
       "rootUri": "file:///Applications/flutter/.pub-cache/hosted/pub.dartlang.org/async-2.6.1",
       "packageUri": "lib/",
@@ -68,6 +74,42 @@
       "languageVersion": "2.12"
     },
     {
+      "name": "flutter_web_plugins",
+      "rootUri": "file:///Applications/flutter/packages/flutter_web_plugins",
+      "packageUri": "lib/",
+      "languageVersion": "2.12"
+    },
+    {
+      "name": "geolocator",
+      "rootUri": "file:///Applications/flutter/.pub-cache/hosted/pub.dartlang.org/geolocator-7.4.0",
+      "packageUri": "lib/",
+      "languageVersion": "2.12"
+    },
+    {
+      "name": "geolocator_android",
+      "rootUri": "file:///Applications/flutter/.pub-cache/hosted/pub.dartlang.org/geolocator_android-1.0.0",
+      "packageUri": "lib/",
+      "languageVersion": "2.12"
+    },
+    {
+      "name": "geolocator_apple",
+      "rootUri": "file:///Applications/flutter/.pub-cache/hosted/pub.dartlang.org/geolocator_apple-1.0.0",
+      "packageUri": "lib/",
+      "languageVersion": "2.12"
+    },
+    {
+      "name": "geolocator_platform_interface",
+      "rootUri": "file:///Applications/flutter/.pub-cache/hosted/pub.dartlang.org/geolocator_platform_interface-2.3.2",
+      "packageUri": "lib/",
+      "languageVersion": "2.12"
+    },
+    {
+      "name": "geolocator_web",
+      "rootUri": "file:///Applications/flutter/.pub-cache/hosted/pub.dartlang.org/geolocator_web-2.0.6",
+      "packageUri": "lib/",
+      "languageVersion": "2.12"
+    },
+    {
       "name": "google_maps_flutter",
       "rootUri": "file:///Applications/flutter/.pub-cache/hosted/pub.dartlang.org/google_maps_flutter-2.0.6",
       "packageUri": "lib/",
@@ -76,6 +118,12 @@
     {
       "name": "google_maps_flutter_platform_interface",
       "rootUri": "file:///Applications/flutter/.pub-cache/hosted/pub.dartlang.org/google_maps_flutter_platform_interface-2.1.0",
+      "packageUri": "lib/",
+      "languageVersion": "2.12"
+    },
+    {
+      "name": "js",
+      "rootUri": "file:///Applications/flutter/.pub-cache/hosted/pub.dartlang.org/js-0.6.3",
       "packageUri": "lib/",
       "languageVersion": "2.12"
     },
@@ -94,6 +142,18 @@
     {
       "name": "path",
       "rootUri": "file:///Applications/flutter/.pub-cache/hosted/pub.dartlang.org/path-1.8.0",
+      "packageUri": "lib/",
+      "languageVersion": "2.12"
+    },
+    {
+      "name": "permission_handler",
+      "rootUri": "file:///Applications/flutter/.pub-cache/hosted/pub.dartlang.org/permission_handler-8.1.4+2",
+      "packageUri": "lib/",
+      "languageVersion": "2.12"
+    },
+    {
+      "name": "permission_handler_platform_interface",
+      "rootUri": "file:///Applications/flutter/.pub-cache/hosted/pub.dartlang.org/permission_handler_platform_interface-3.6.1",
       "packageUri": "lib/",
       "languageVersion": "2.12"
     },
@@ -170,7 +230,7 @@
       "languageVersion": "2.12"
     }
   ],
-  "generated": "2021-08-06T11:04:03.554998Z",
+  "generated": "2021-08-07T14:47:25.403035Z",
   "generator": "pub",
   "generatorVersion": "2.13.4"
 }

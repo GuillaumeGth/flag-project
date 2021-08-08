@@ -33,6 +33,7 @@ dependencies:
   ansicolor: ^2.0.1
   permission_handler: ^8.1.4+2
   location: ^4.3.0
+  flutter_contacts: ^1.1.0+3
 
 dev_dependencies:
   flutter_test:

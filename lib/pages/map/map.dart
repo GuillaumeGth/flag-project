@@ -7,7 +7,9 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:ansicolor/ansicolor.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:location/location.dart';
-void main() => runApp(MyApp());
+import '../../components/appBar/app_bar.dart';
+import '../contacts/contact.dart';
+void main() => runApp(App());
 
 class MyApp extends StatefulWidget {
   @override
@@ -27,15 +29,19 @@ class _MyAppState extends State<MyApp> {
   late GoogleMapController mapController;
   late Marker marker;
   late Circle circle;
+
   void _onMapCreated(GoogleMapController controller) {
     mapController = controller;
     mapController.setMapStyle(_mapStyle);
     getLocation();
   }
+
   initMap() async {
-    if (await Permission.location.request().isGranted) {
+    if (await Permission.location
+        .request()
+        .isGranted) {
       loadStyle();
-      _locationTracker.getLocation().then((location){
+      _locationTracker.getLocation().then((location) {
         LatLng c = LocationDataToLatLtn(location);
         setState(() {
           _center = c;
@@ -44,45 +50,52 @@ class _MyAppState extends State<MyApp> {
       });
     }
   }
+
   @override
   void initState() {
     super.initState();
     initMap();
   }
+
   loadStyle() async {
     await rootBundle.loadString('assets/styles/map_style.txt').then((string) {
-        setState(() {
-          _mapStyle = string;
-        });
+      setState(() {
+        _mapStyle = string;
       });
+    });
   }
-  LocationDataToLatLtn (LocationData location){
+
+  LocationDataToLatLtn(LocationData location) {
     return LatLng(location.latitude as double, location.longitude as double);
   }
+
   GetCurrentLatLng() {
-    _locationTracker.getLocation().then((location){
+    _locationTracker.getLocation().then((location) {
       LatLng latLng = LocationDataToLatLtn(location);
       return latLng;
     });
   }
-  getLocation () async {
-    LatLng latLng = await _locationTracker.getLocation().then((location){
+
+  getLocation() async {
+    LatLng latLng = await _locationTracker.getLocation().then((location) {
       LatLng latLng = LocationDataToLatLtn(location);
       return latLng;
     });
     setState(() {
       _center = latLng;
     });
-    _locationSubscription = _locationTracker.onLocationChanged.listen((newLocalData) {
-      print("new location");
-      mapController.animateCamera(
-          CameraUpdate.newCameraPosition(new CameraPosition(
-              target: latLng,
-              tilt: 0
-          )));
+    _locationSubscription =
+        _locationTracker.onLocationChanged.listen((newLocalData) {
+          print("new location");
+          mapController.animateCamera(
+              CameraUpdate.newCameraPosition(new CameraPosition(
+                  target: latLng,
+                  tilt: 0
+              )));
           updateMarker(LocationDataToLatLtn(newLocalData));
-    });
+        });
   }
+
   void updateMarker(LatLng latLng) {
     this.setState(() {
       marker = Marker(
@@ -102,25 +115,24 @@ class _MyAppState extends State<MyApp> {
           fillColor: Colors.blue.withAlpha(70));
     });
   }
+
   @override
-  void dispose(){
+  void dispose() {
     mapController.dispose();
     super.dispose();
   }
+
   @override
   Widget build(BuildContext context) {
     Widget w;
-    if (_center == null){
-      w = Text("Loading");
-    }
-    else {
-      print(_center);
+    {
       w = GoogleMap(
         markers: Set.of([marker]),
         circles: Set.of([circle]),
         zoomControlsEnabled: false,
         scrollGesturesEnabled: false,
         mapType: MapType.normal,
+        zoomGesturesEnabled: false,
         minMaxZoomPreference: MinMaxZoomPreference(17, 19),
         onMapCreated: _onMapCreated,
         initialCameraPosition: CameraPosition(
@@ -131,23 +143,25 @@ class _MyAppState extends State<MyApp> {
     }
     return MaterialApp(
       home: Scaffold(
-        appBar: AppBar(
-          title: Image.asset("assets/images/logo2.png", width: 40, height: 60, alignment: Alignment.bottomCenter,),
-          //backgroundColor: Colors.green[700],
-            actions: <Widget>[
-              IconButton(
-                iconSize: 45,
-                icon: const Icon(Icons.menu),
-                onPressed: () {},
-              )]
-        ),
-        body: w,
-        floatingActionButton: FloatingActionButton(
-            child: Icon(Icons.add),
-            onPressed: () {
-
-            })
+          appBar: AppBarComponent(),
+          body: w,
+          floatingActionButton: FloatingActionButton(
+              child: Icon(Icons.add),
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => ContactsList()),
+                );
+              })
       ),
+    );
+  }
+}
+class App extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+        home: MyApp()
     );
   }
 }

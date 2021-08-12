@@ -1,0 +1,22 @@
+[
+    {
+        "merged": "/Users/guillaumezarb/Documents/GitHub/flag_project/build/sqflite/intermediates/merged_res/release/drawable-xhdpi-v4/notification_bg_normal.9.png",
+        "source": "/Users/guillaumezarb/.gradle/caches/transforms-3/88d9978de93266982a20df0bd15f59e3/transformed/core-1.1.0/res/drawable-xhdpi-v4/notification_bg_normal.9.png"
+    },
+    {
+        "merged": "/Users/guillaumezarb/Documents/GitHub/flag_project/build/sqflite/intermediates/merged_res/release/drawable-xhdpi-v4/notification_bg_normal_pressed.9.png",
+        "source": "/Users/guillaumezarb/.gradle/caches/transforms-3/88d9978de93266982a20df0bd15f59e3/transformed/core-1.1.0/res/drawable-xhdpi-v4/notification_bg_normal_pressed.9.png"
+    },
+    {
+        "merged": "/Users/guillaumezarb/Documents/GitHub/flag_project/build/sqflite/intermediates/merged_res/release/drawable-xhdpi-v4/notification_bg_low_normal.9.png",
+        "source": "/Users/guillaumezarb/.gradle/caches/transforms-3/88d9978de93266982a20df0bd15f59e3/transformed/core-1.1.0/res/drawable-xhdpi-v4/notification_bg_low_normal.9.png"
+    },
+    {
+        "merged": "/Users/guillaumezarb/Documents/GitHub/flag_project/build/sqflite/intermediates/merged_res/release/drawable-xhdpi-v4/notification_bg_low_pressed.9.png",
+        "source": "/Users/guillaumezarb/.gradle/caches/transforms-3/88d9978de93266982a20df0bd15f59e3/transformed/core-1.1.0/res/drawable-xhdpi-v4/notification_bg_low_pressed.9.png"
+    },
+    {
+        "merged": "/Users/guillaumezarb/Documents/GitHub/flag_project/build/sqflite/intermediates/merged_res/release/drawable-xhdpi-v4/notify_panel_notification_icon_bg.png",
+        "source": "/Users/guillaumezarb/.gradle/caches/transforms-3/88d9978de93266982a20df0bd15f59e3/transformed/core-1.1.0/res/drawable-xhdpi-v4/notify_panel_notification_icon_bg.png"
+    }
+]

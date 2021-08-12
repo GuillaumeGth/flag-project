@@ -12,7 +12,7 @@ class PageComponent extends StatelessWidget {
   @override
   Widget build(BuildContext context) => MaterialApp(
       home: Scaffold(
-        appBar: AppBarComponent(),
+        appBar: CustomAppBar(),
         body: body,
         floatingActionButton: floating,
       )

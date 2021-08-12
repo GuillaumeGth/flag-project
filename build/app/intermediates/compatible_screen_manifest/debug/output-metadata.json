@@ -1,10 +1,10 @@
 {
-  "version": 2,
+  "version": 3,
   "artifactType": {
     "type": "COMPATIBLE_SCREEN_MANIFEST",
     "kind": "Directory"
   },
-  "applicationId": "com.example.flutter_project",
+  "applicationId": "com.flag.flag_project",
   "variantName": "debug",
   "elements": []
 }

@@ -1,0 +1,26 @@
+[
+    {
+        "merged": "/Users/guillaumezarb/Documents/GitHub/flag_project/build/permission_handler/intermediates/merged_res/release/layout/notification_template_part_time.xml",
+        "source": "/Users/guillaumezarb/.gradle/caches/transforms-3/88d9978de93266982a20df0bd15f59e3/transformed/core-1.1.0/res/layout/notification_template_part_time.xml"
+    },
+    {
+        "merged": "/Users/guillaumezarb/Documents/GitHub/flag_project/build/permission_handler/intermediates/merged_res/release/layout/notification_action_tombstone.xml",
+        "source": "/Users/guillaumezarb/.gradle/caches/transforms-3/88d9978de93266982a20df0bd15f59e3/transformed/core-1.1.0/res/layout/notification_action_tombstone.xml"
+    },
+    {
+        "merged": "/Users/guillaumezarb/Documents/GitHub/flag_project/build/permission_handler/intermediates/merged_res/release/layout/notification_template_icon_group.xml",
+        "source": "/Users/guillaumezarb/.gradle/caches/transforms-3/88d9978de93266982a20df0bd15f59e3/transformed/core-1.1.0/res/layout/notification_template_icon_group.xml"
+    },
+    {
+        "merged": "/Users/guillaumezarb/Documents/GitHub/flag_project/build/permission_handler/intermediates/merged_res/release/layout/notification_action.xml",
+        "source": "/Users/guillaumezarb/.gradle/caches/transforms-3/88d9978de93266982a20df0bd15f59e3/transformed/core-1.1.0/res/layout/notification_action.xml"
+    },
+    {
+        "merged": "/Users/guillaumezarb/Documents/GitHub/flag_project/build/permission_handler/intermediates/merged_res/release/layout/notification_template_part_chronometer.xml",
+        "source": "/Users/guillaumezarb/.gradle/caches/transforms-3/88d9978de93266982a20df0bd15f59e3/transformed/core-1.1.0/res/layout/notification_template_part_chronometer.xml"
+    },
+    {
+        "merged": "/Users/guillaumezarb/Documents/GitHub/flag_project/build/permission_handler/intermediates/merged_res/release/layout/custom_dialog.xml",
+        "source": "/Users/guillaumezarb/.gradle/caches/transforms-3/88d9978de93266982a20df0bd15f59e3/transformed/core-1.1.0/res/layout/custom_dialog.xml"
+    }
+]

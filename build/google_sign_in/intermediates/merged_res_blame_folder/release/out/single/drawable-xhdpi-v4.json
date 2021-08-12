@@ -1,0 +1,50 @@
+[
+    {
+        "merged": "/Users/guillaumezarb/Documents/GitHub/flag_project/build/google_sign_in/intermediates/merged_res/release/drawable-xhdpi-v4/googleg_standard_color_18.png",
+        "source": "/Users/guillaumezarb/.gradle/caches/transforms-3/46dbd02bd9b52d042696db4e0abb8766/transformed/jetified-play-services-base-16.0.1/res/drawable-xhdpi-v4/googleg_standard_color_18.png"
+    },
+    {
+        "merged": "/Users/guillaumezarb/Documents/GitHub/flag_project/build/google_sign_in/intermediates/merged_res/release/drawable-xhdpi-v4/notification_bg_low_pressed.9.png",
+        "source": "/Users/guillaumezarb/.gradle/caches/transforms-3/88d9978de93266982a20df0bd15f59e3/transformed/core-1.1.0/res/drawable-xhdpi-v4/notification_bg_low_pressed.9.png"
+    },
+    {
+        "merged": "/Users/guillaumezarb/Documents/GitHub/flag_project/build/google_sign_in/intermediates/merged_res/release/drawable-xhdpi-v4/common_full_open_on_phone.png",
+        "source": "/Users/guillaumezarb/.gradle/caches/transforms-3/46dbd02bd9b52d042696db4e0abb8766/transformed/jetified-play-services-base-16.0.1/res/drawable-xhdpi-v4/common_full_open_on_phone.png"
+    },
+    {
+        "merged": "/Users/guillaumezarb/Documents/GitHub/flag_project/build/google_sign_in/intermediates/merged_res/release/drawable-xhdpi-v4/notification_bg_low_normal.9.png",
+        "source": "/Users/guillaumezarb/.gradle/caches/transforms-3/88d9978de93266982a20df0bd15f59e3/transformed/core-1.1.0/res/drawable-xhdpi-v4/notification_bg_low_normal.9.png"
+    },
+    {
+        "merged": "/Users/guillaumezarb/Documents/GitHub/flag_project/build/google_sign_in/intermediates/merged_res/release/drawable-xhdpi-v4/notify_panel_notification_icon_bg.png",
+        "source": "/Users/guillaumezarb/.gradle/caches/transforms-3/88d9978de93266982a20df0bd15f59e3/transformed/core-1.1.0/res/drawable-xhdpi-v4/notify_panel_notification_icon_bg.png"
+    },
+    {
+        "merged": "/Users/guillaumezarb/Documents/GitHub/flag_project/build/google_sign_in/intermediates/merged_res/release/drawable-xhdpi-v4/common_google_signin_btn_text_light_normal_background.9.png",
+        "source": "/Users/guillaumezarb/.gradle/caches/transforms-3/46dbd02bd9b52d042696db4e0abb8766/transformed/jetified-play-services-base-16.0.1/res/drawable-xhdpi-v4/common_google_signin_btn_text_light_normal_background.9.png"
+    },
+    {
+        "merged": "/Users/guillaumezarb/Documents/GitHub/flag_project/build/google_sign_in/intermediates/merged_res/release/drawable-xhdpi-v4/common_google_signin_btn_icon_light_normal_background.9.png",
+        "source": "/Users/guillaumezarb/.gradle/caches/transforms-3/46dbd02bd9b52d042696db4e0abb8766/transformed/jetified-play-services-base-16.0.1/res/drawable-xhdpi-v4/common_google_signin_btn_icon_light_normal_background.9.png"
+    },
+    {
+        "merged": "/Users/guillaumezarb/Documents/GitHub/flag_project/build/google_sign_in/intermediates/merged_res/release/drawable-xhdpi-v4/notification_bg_normal_pressed.9.png",
+        "source": "/Users/guillaumezarb/.gradle/caches/transforms-3/88d9978de93266982a20df0bd15f59e3/transformed/core-1.1.0/res/drawable-xhdpi-v4/notification_bg_normal_pressed.9.png"
+    },
+    {
+        "merged": "/Users/guillaumezarb/Documents/GitHub/flag_project/build/google_sign_in/intermediates/merged_res/release/drawable-xhdpi-v4/common_google_signin_btn_icon_dark_normal_background.9.png",
+        "source": "/Users/guillaumezarb/.gradle/caches/transforms-3/46dbd02bd9b52d042696db4e0abb8766/transformed/jetified-play-services-base-16.0.1/res/drawable-xhdpi-v4/common_google_signin_btn_icon_dark_normal_background.9.png"
+    },
+    {
+        "merged": "/Users/guillaumezarb/Documents/GitHub/flag_project/build/google_sign_in/intermediates/merged_res/release/drawable-xhdpi-v4/common_google_signin_btn_text_dark_normal_background.9.png",
+        "source": "/Users/guillaumezarb/.gradle/caches/transforms-3/46dbd02bd9b52d042696db4e0abb8766/transformed/jetified-play-services-base-16.0.1/res/drawable-xhdpi-v4/common_google_signin_btn_text_dark_normal_background.9.png"
+    },
+    {
+        "merged": "/Users/guillaumezarb/Documents/GitHub/flag_project/build/google_sign_in/intermediates/merged_res/release/drawable-xhdpi-v4/notification_bg_normal.9.png",
+        "source": "/Users/guillaumezarb/.gradle/caches/transforms-3/88d9978de93266982a20df0bd15f59e3/transformed/core-1.1.0/res/drawable-xhdpi-v4/notification_bg_normal.9.png"
+    },
+    {
+        "merged": "/Users/guillaumezarb/Documents/GitHub/flag_project/build/google_sign_in/intermediates/merged_res/release/drawable-xhdpi-v4/googleg_disabled_color_18.png",
+        "source": "/Users/guillaumezarb/.gradle/caches/transforms-3/46dbd02bd9b52d042696db4e0abb8766/transformed/jetified-play-services-base-16.0.1/res/drawable-xhdpi-v4/googleg_disabled_color_18.png"
+    }
+]

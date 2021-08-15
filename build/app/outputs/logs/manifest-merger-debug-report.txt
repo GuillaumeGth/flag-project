@@ -16,7 +16,6 @@ MERGED from [:path_provider] /Users/guillaumezarb/Documents/GitHub/flag_project/
 MERGED from [:location] /Users/guillaumezarb/Documents/GitHub/flag_project/build/location/intermediates/merged_manifest/debug/AndroidManifest.xml:2:1-18:12
 MERGED from [:permission_handler] /Users/guillaumezarb/Documents/GitHub/flag_project/build/permission_handler/intermediates/merged_manifest/debug/AndroidManifest.xml:2:1-7:12
 MERGED from [:google_sign_in] /Users/guillaumezarb/Documents/GitHub/flag_project/build/google_sign_in/intermediates/merged_manifest/debug/AndroidManifest.xml:2:1-9:12
-MERGED from [:flutter_contacts] /Users/guillaumezarb/Documents/GitHub/flag_project/build/flutter_contacts/intermediates/merged_manifest/debug/AndroidManifest.xml:2:1-7:12
 MERGED from [androidx.multidex:multidex:2.0.0] /Users/guillaumezarb/.gradle/caches/transforms-3/dc10a38f71fe433549bf3935eea77700/transformed/multidex-2.0.0/AndroidManifest.xml:17:1-22:12
 MERGED from [com.google.firebase:firebase-analytics-ktx:19.0.0] /Users/guillaumezarb/.gradle/caches/transforms-3/ab410998e6b52be22ea7bc0ba058581f/transformed/jetified-firebase-analytics-ktx-19.0.0/AndroidManifest.xml:2:1-17:12
 MERGED from [com.google.firebase:firebase-common-ktx:20.0.0] /Users/guillaumezarb/.gradle/caches/transforms-3/db33b4dfdb71d0291166febae2c302a4/transformed/jetified-firebase-common-ktx-20.0.0/AndroidManifest.xml:2:1-21:12
@@ -244,8 +243,6 @@ MERGED from [:permission_handler] /Users/guillaumezarb/Documents/GitHub/flag_pro
 MERGED from [:permission_handler] /Users/guillaumezarb/Documents/GitHub/flag_project/build/permission_handler/intermediates/merged_manifest/debug/AndroidManifest.xml:5:5-44
 MERGED from [:google_sign_in] /Users/guillaumezarb/Documents/GitHub/flag_project/build/google_sign_in/intermediates/merged_manifest/debug/AndroidManifest.xml:5:5-44
 MERGED from [:google_sign_in] /Users/guillaumezarb/Documents/GitHub/flag_project/build/google_sign_in/intermediates/merged_manifest/debug/AndroidManifest.xml:5:5-44
-MERGED from [:flutter_contacts] /Users/guillaumezarb/Documents/GitHub/flag_project/build/flutter_contacts/intermediates/merged_manifest/debug/AndroidManifest.xml:5:5-44
-MERGED from [:flutter_contacts] /Users/guillaumezarb/Documents/GitHub/flag_project/build/flutter_contacts/intermediates/merged_manifest/debug/AndroidManifest.xml:5:5-44
 MERGED from [androidx.multidex:multidex:2.0.0] /Users/guillaumezarb/.gradle/caches/transforms-3/dc10a38f71fe433549bf3935eea77700/transformed/multidex-2.0.0/AndroidManifest.xml:20:5-43
 MERGED from [androidx.multidex:multidex:2.0.0] /Users/guillaumezarb/.gradle/caches/transforms-3/dc10a38f71fe433549bf3935eea77700/transformed/multidex-2.0.0/AndroidManifest.xml:20:5-43
 MERGED from [com.google.firebase:firebase-analytics-ktx:19.0.0] /Users/guillaumezarb/.gradle/caches/transforms-3/ab410998e6b52be22ea7bc0ba058581f/transformed/jetified-firebase-analytics-ktx-19.0.0/AndroidManifest.xml:5:5-44

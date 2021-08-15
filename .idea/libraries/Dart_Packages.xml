@@ -2,6 +2,69 @@
   <library name="Dart Packages" type="DartPackagesLibraryType">
     <properties>
       <option name="packageNameToDirsMap">
+        <entry key="amplify_analytics_plugin_interface">
+          <value>
+            <list>
+              <option value="/Applications/flutter/.pub-cache/hosted/pub.dartlang.org/amplify_analytics_plugin_interface-0.2.2/lib" />
+            </list>
+          </value>
+        </entry>
+        <entry key="amplify_api">
+          <value>
+            <list>
+              <option value="/Applications/flutter/.pub-cache/hosted/pub.dartlang.org/amplify_api-0.2.2/lib" />
+            </list>
+          </value>
+        </entry>
+        <entry key="amplify_api_plugin_interface">
+          <value>
+            <list>
+              <option value="/Applications/flutter/.pub-cache/hosted/pub.dartlang.org/amplify_api_plugin_interface-0.2.2/lib" />
+            </list>
+          </value>
+        </entry>
+        <entry key="amplify_auth_plugin_interface">
+          <value>
+            <list>
+              <option value="/Applications/flutter/.pub-cache/hosted/pub.dartlang.org/amplify_auth_plugin_interface-0.2.2/lib" />
+            </list>
+          </value>
+        </entry>
+        <entry key="amplify_core">
+          <value>
+            <list>
+              <option value="/Applications/flutter/.pub-cache/hosted/pub.dartlang.org/amplify_core-0.2.2/lib" />
+            </list>
+          </value>
+        </entry>
+        <entry key="amplify_datastore">
+          <value>
+            <list>
+              <option value="/Applications/flutter/.pub-cache/hosted/pub.dartlang.org/amplify_datastore-0.2.2/lib" />
+            </list>
+          </value>
+        </entry>
+        <entry key="amplify_datastore_plugin_interface">
+          <value>
+            <list>
+              <option value="/Applications/flutter/.pub-cache/hosted/pub.dartlang.org/amplify_datastore_plugin_interface-0.2.2/lib" />
+            </list>
+          </value>
+        </entry>
+        <entry key="amplify_flutter">
+          <value>
+            <list>
+              <option value="/Applications/flutter/.pub-cache/hosted/pub.dartlang.org/amplify_flutter-0.2.2/lib" />
+            </list>
+          </value>
+        </entry>
+        <entry key="amplify_storage_plugin_interface">
+          <value>
+            <list>
+              <option value="/Applications/flutter/.pub-cache/hosted/pub.dartlang.org/amplify_storage_plugin_interface-0.2.2/lib" />
+            </list>
+          </value>
+        </entry>
         <entry key="ansicolor">
           <value>
             <list>
@@ -86,6 +149,20 @@
             </list>
           </value>
         </entry>
+        <entry key="date_time_format">
+          <value>
+            <list>
+              <option value="/Applications/flutter/.pub-cache/hosted/pub.dartlang.org/date_time_format-2.0.1/lib" />
+            </list>
+          </value>
+        </entry>
+        <entry key="dio">
+          <value>
+            <list>
+              <option value="/Applications/flutter/.pub-cache/hosted/pub.dartlang.org/dio-4.0.0/lib" />
+            </list>
+          </value>
+        </entry>
         <entry key="fake_async">
           <value>
             <list>
@@ -167,13 +244,6 @@
           <value>
             <list>
               <option value="/Applications/flutter/.pub-cache/hosted/pub.dartlang.org/flutter_cache_manager-3.1.2/lib" />
-            </list>
-          </value>
-        </entry>
-        <entry key="flutter_contacts">
-          <value>
-            <list>
-              <option value="/Applications/flutter/.pub-cache/hosted/pub.dartlang.org/flutter_contacts-1.1.0+3/lib" />
             </list>
           </value>
         </entry>
@@ -607,6 +677,15 @@
       </option>
     </properties>
     <CLASSES>
+      <root url="file:///Applications/flutter/.pub-cache/hosted/pub.dartlang.org/amplify_analytics_plugin_interface-0.2.2/lib" />
+      <root url="file:///Applications/flutter/.pub-cache/hosted/pub.dartlang.org/amplify_api-0.2.2/lib" />
+      <root url="file:///Applications/flutter/.pub-cache/hosted/pub.dartlang.org/amplify_api_plugin_interface-0.2.2/lib" />
+      <root url="file:///Applications/flutter/.pub-cache/hosted/pub.dartlang.org/amplify_auth_plugin_interface-0.2.2/lib" />
+      <root url="file:///Applications/flutter/.pub-cache/hosted/pub.dartlang.org/amplify_core-0.2.2/lib" />
+      <root url="file:///Applications/flutter/.pub-cache/hosted/pub.dartlang.org/amplify_datastore-0.2.2/lib" />
+      <root url="file:///Applications/flutter/.pub-cache/hosted/pub.dartlang.org/amplify_datastore_plugin_interface-0.2.2/lib" />
+      <root url="file:///Applications/flutter/.pub-cache/hosted/pub.dartlang.org/amplify_flutter-0.2.2/lib" />
+      <root url="file:///Applications/flutter/.pub-cache/hosted/pub.dartlang.org/amplify_storage_plugin_interface-0.2.2/lib" />
       <root url="file:///Applications/flutter/.pub-cache/hosted/pub.dartlang.org/ansicolor-2.0.1/lib" />
       <root url="file:///Applications/flutter/.pub-cache/hosted/pub.dartlang.org/async-2.6.1/lib" />
       <root url="file:///Applications/flutter/.pub-cache/hosted/pub.dartlang.org/boolean_selector-2.1.0/lib" />
@@ -619,6 +698,8 @@
       <root url="file:///Applications/flutter/.pub-cache/hosted/pub.dartlang.org/collection-1.15.0/lib" />
       <root url="file:///Applications/flutter/.pub-cache/hosted/pub.dartlang.org/crypto-3.0.1/lib" />
       <root url="file:///Applications/flutter/.pub-cache/hosted/pub.dartlang.org/cupertino_icons-1.0.3/lib" />
+      <root url="file:///Applications/flutter/.pub-cache/hosted/pub.dartlang.org/date_time_format-2.0.1/lib" />
+      <root url="file:///Applications/flutter/.pub-cache/hosted/pub.dartlang.org/dio-4.0.0/lib" />
       <root url="file:///Applications/flutter/.pub-cache/hosted/pub.dartlang.org/fake_async-1.2.0/lib" />
       <root url="file:///Applications/flutter/.pub-cache/hosted/pub.dartlang.org/ffi-1.1.2/lib" />
       <root url="file:///Applications/flutter/.pub-cache/hosted/pub.dartlang.org/file-6.1.2/lib" />
@@ -630,7 +711,6 @@
       <root url="file:///Applications/flutter/.pub-cache/hosted/pub.dartlang.org/firebase_core_web-1.1.0/lib" />
       <root url="file:///Applications/flutter/.pub-cache/hosted/pub.dartlang.org/flutter_blurhash-0.6.0/lib" />
       <root url="file:///Applications/flutter/.pub-cache/hosted/pub.dartlang.org/flutter_cache_manager-3.1.2/lib" />
-      <root url="file:///Applications/flutter/.pub-cache/hosted/pub.dartlang.org/flutter_contacts-1.1.0+3/lib" />
       <root url="file:///Applications/flutter/.pub-cache/hosted/pub.dartlang.org/flutter_plugin_android_lifecycle-2.0.2/lib" />
       <root url="file:///Applications/flutter/.pub-cache/hosted/pub.dartlang.org/geolocator-7.4.0/lib" />
       <root url="file:///Applications/flutter/.pub-cache/hosted/pub.dartlang.org/geolocator_android-1.0.0/lib" />

@@ -33,13 +33,16 @@ dependencies:
   ansicolor: ^2.0.1
   permission_handler: ^8.1.4+2
   location: ^4.3.0
-  flutter_contacts: ^1.1.0+3
   google_sign_in: ^5.0.7
   firebase_auth: ^3.0.1
   shared_preferences: ^2.0.6
   provider: ^5.0.0
   http: ^0.13.3
   cached_network_image: ^3.1.0
+  amplify_api: ^0.2.2
+  amplify_datastore: ^0.2.2
+  amplify_flutter: ^0.2.2
+  dio: ^4.0.0
 
 dev_dependencies:
   flutter_test:

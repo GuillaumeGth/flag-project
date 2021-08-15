@@ -2,6 +2,60 @@
   "configVersion": 2,
   "packages": [
     {
+      "name": "amplify_analytics_plugin_interface",
+      "rootUri": "file:///Applications/flutter/.pub-cache/hosted/pub.dartlang.org/amplify_analytics_plugin_interface-0.2.2",
+      "packageUri": "lib/",
+      "languageVersion": "2.12"
+    },
+    {
+      "name": "amplify_api",
+      "rootUri": "file:///Applications/flutter/.pub-cache/hosted/pub.dartlang.org/amplify_api-0.2.2",
+      "packageUri": "lib/",
+      "languageVersion": "2.12"
+    },
+    {
+      "name": "amplify_api_plugin_interface",
+      "rootUri": "file:///Applications/flutter/.pub-cache/hosted/pub.dartlang.org/amplify_api_plugin_interface-0.2.2",
+      "packageUri": "lib/",
+      "languageVersion": "2.12"
+    },
+    {
+      "name": "amplify_auth_plugin_interface",
+      "rootUri": "file:///Applications/flutter/.pub-cache/hosted/pub.dartlang.org/amplify_auth_plugin_interface-0.2.2",
+      "packageUri": "lib/",
+      "languageVersion": "2.12"
+    },
+    {
+      "name": "amplify_core",
+      "rootUri": "file:///Applications/flutter/.pub-cache/hosted/pub.dartlang.org/amplify_core-0.2.2",
+      "packageUri": "lib/",
+      "languageVersion": "2.12"
+    },
+    {
+      "name": "amplify_datastore",
+      "rootUri": "file:///Applications/flutter/.pub-cache/hosted/pub.dartlang.org/amplify_datastore-0.2.2",
+      "packageUri": "lib/",
+      "languageVersion": "2.12"
+    },
+    {
+      "name": "amplify_datastore_plugin_interface",
+      "rootUri": "file:///Applications/flutter/.pub-cache/hosted/pub.dartlang.org/amplify_datastore_plugin_interface-0.2.2",
+      "packageUri": "lib/",
+      "languageVersion": "2.12"
+    },
+    {
+      "name": "amplify_flutter",
+      "rootUri": "file:///Applications/flutter/.pub-cache/hosted/pub.dartlang.org/amplify_flutter-0.2.2",
+      "packageUri": "lib/",
+      "languageVersion": "2.12"
+    },
+    {
+      "name": "amplify_storage_plugin_interface",
+      "rootUri": "file:///Applications/flutter/.pub-cache/hosted/pub.dartlang.org/amplify_storage_plugin_interface-0.2.2",
+      "packageUri": "lib/",
+      "languageVersion": "2.12"
+    },
+    {
       "name": "ansicolor",
       "rootUri": "file:///Applications/flutter/.pub-cache/hosted/pub.dartlang.org/ansicolor-2.0.1",
       "packageUri": "lib/",
@@ -74,6 +128,18 @@
       "languageVersion": "2.12"
     },
     {
+      "name": "date_time_format",
+      "rootUri": "file:///Applications/flutter/.pub-cache/hosted/pub.dartlang.org/date_time_format-2.0.1",
+      "packageUri": "lib/",
+      "languageVersion": "2.12"
+    },
+    {
+      "name": "dio",
+      "rootUri": "file:///Applications/flutter/.pub-cache/hosted/pub.dartlang.org/dio-4.0.0",
+      "packageUri": "lib/",
+      "languageVersion": "2.12"
+    },
+    {
       "name": "fake_async",
       "rootUri": "file:///Applications/flutter/.pub-cache/hosted/pub.dartlang.org/fake_async-1.2.0",
       "packageUri": "lib/",
@@ -142,12 +208,6 @@
     {
       "name": "flutter_cache_manager",
       "rootUri": "file:///Applications/flutter/.pub-cache/hosted/pub.dartlang.org/flutter_cache_manager-3.1.2",
-      "packageUri": "lib/",
-      "languageVersion": "2.12"
-    },
-    {
-      "name": "flutter_contacts",
-      "rootUri": "file:///Applications/flutter/.pub-cache/hosted/pub.dartlang.org/flutter_contacts-1.1.0+3",
       "packageUri": "lib/",
       "languageVersion": "2.12"
     },
@@ -524,7 +584,7 @@
       "languageVersion": "2.12"
     }
   ],
-  "generated": "2021-08-11T14:23:09.904052Z",
+  "generated": "2021-08-15T15:00:39.231523Z",
   "generator": "pub",
   "generatorVersion": "2.13.4"
 }

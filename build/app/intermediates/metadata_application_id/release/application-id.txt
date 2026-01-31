@@ -1,1 +1,0 @@
-com.flag.flag_project

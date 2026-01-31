@@ -1,2 +1,0 @@
-co/quis/flutter_contacts/BuildConfig.java
- co.quis.flutter_contacts.BuildConfig

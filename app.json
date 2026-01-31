@@ -1,0 +1,66 @@
+{
+  "expo": {
+    "name": "Flag",
+    "slug": "flag-app",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./src/assets/icon.png",
+    "scheme": "flag",
+    "userInterfaceStyle": "automatic",
+    "splash": {
+      "image": "./src/assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
+    "assetBundlePatterns": ["**/*"],
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.flagapp.app",
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "Flag utilise votre position pour afficher les messages autour de vous.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "Flag utilise votre position en arrière-plan pour vous notifier quand vous êtes proche d'un message.",
+        "NSCameraUsageDescription": "Flag utilise la caméra pour prendre des photos à joindre aux messages.",
+        "NSMicrophoneUsageDescription": "Flag utilise le micro pour enregistrer des messages audio."
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./src/assets/adaptive-icon.png",
+        "backgroundColor": "#ffffff"
+      },
+      "package": "com.flagapp.app",
+      "permissions": [
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_BACKGROUND_LOCATION",
+        "CAMERA",
+        "RECORD_AUDIO",
+        "RECEIVE_BOOT_COMPLETED",
+        "VIBRATE"
+      ]
+    },
+    "plugins": [
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Flag utilise votre position pour vous notifier des messages proches.",
+          "isAndroidBackgroundLocationEnabled": true,
+          "isIosBackgroundLocationEnabled": true
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./src/assets/notification-icon.png",
+          "color": "#4A90D9"
+        }
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Flag utilise la caméra pour les photos."
+        }
+      ]
+    ]
+  }
+}

@@ -1,5 +1,26 @@
 import { supabase } from './supabase';
-import { Message, MessageWithSender, Coordinates, UndiscoveredMessageMeta, UndiscoveredMessageMapMeta } from '@/types';
+import { Message, MessageWithSender, Coordinates, User, UndiscoveredMessageMeta, UndiscoveredMessageMapMeta } from '@/types';
+
+// Default Flag Bot user ID (created via seed.sql)
+export const FLAG_BOT_ID = '00000000-0000-0000-0000-000000000001';
+
+// Fetch all users (for recipient selection)
+export async function fetchAllUsers(): Promise<User[]> {
+  const { data: userData } = await supabase.auth.getUser();
+
+  const { data, error } = await supabase
+    .from('users')
+    .select('*')
+    .order('display_name', { ascending: true });
+
+  if (error) {
+    console.error('Error fetching users:', error);
+    return [];
+  }
+
+  // Filter out current user
+  return (data || []).filter(user => user.id !== userData.user?.id);
+}
 
 // Fetch messages for current user (as recipient)
 export async function fetchMyMessages(): Promise<MessageWithSender[]> {

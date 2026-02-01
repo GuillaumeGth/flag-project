@@ -15,6 +15,7 @@ import InboxScreen from '@/screens/InboxScreen';
 import ProfileScreen from '@/screens/ProfileScreen';
 import CreateMessageScreen from '@/screens/CreateMessageScreen';
 import ReadMessageScreen from '@/screens/ReadMessageScreen';
+import SelectRecipientScreen from '@/screens/SelectRecipientScreen';
 
 // Register background task
 import './src/tasks/backgroundLocation';
@@ -94,6 +95,11 @@ function AppNavigator() {
             name="ReadMessage"
             component={ReadMessageScreen}
             options={{ presentation: 'card' }}
+          />
+          <Stack.Screen
+            name="SelectRecipient"
+            component={SelectRecipientScreen}
+            options={{ presentation: 'modal' }}
           />
         </>
       ) : (

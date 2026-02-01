@@ -12,7 +12,9 @@
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
-    "assetBundlePatterns": ["**/*"],
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.flagapp.app",
@@ -29,6 +31,11 @@
         "backgroundColor": "#ffffff"
       },
       "package": "com.flagapp.app",
+      "config": {
+        "googleMaps": {
+          "apiKey": "AIzaSyDrlGiPT_Wt94CvbjeHRn_CzKIp1Pw9OeY"
+        }
+      },
       "permissions": [
         "ACCESS_COARSE_LOCATION",
         "ACCESS_FINE_LOCATION",
@@ -60,7 +67,8 @@
         {
           "cameraPermission": "Flag utilise la caméra pour les photos."
         }
-      ]
+      ],
+      "expo-web-browser"
     ]
   }
 }

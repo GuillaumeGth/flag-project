@@ -1,5 +1,6 @@
 import React from 'react';
 import { StatusBar } from 'expo-status-bar';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
@@ -44,12 +45,12 @@ function MainTabs() {
         tabBarActiveTintColor: '#4A90D9',
         tabBarInactiveTintColor: '#999',
         tabBarStyle: {
-          paddingBottom: 8,
           paddingTop: 8,
-          height: 60,
+          minHeight: 60,
         },
         tabBarLabelStyle: {
           fontSize: 12,
+          marginBottom: 4,
         },
       })}
     >
@@ -104,13 +105,15 @@ function AppNavigator() {
 
 export default function App() {
   return (
-    <AuthProvider>
-      <LocationProvider>
-        <NavigationContainer>
-          <AppNavigator />
-          <StatusBar style="auto" />
-        </NavigationContainer>
-      </LocationProvider>
-    </AuthProvider>
+    <SafeAreaProvider>
+      <AuthProvider>
+        <LocationProvider>
+          <NavigationContainer>
+            <AppNavigator />
+            <StatusBar style="dark" />
+          </NavigationContainer>
+        </LocationProvider>
+      </AuthProvider>
+    </SafeAreaProvider>
   );
 }

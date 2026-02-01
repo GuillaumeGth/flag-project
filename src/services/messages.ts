@@ -1,5 +1,5 @@
 import { supabase } from './supabase';
-import { Message, MessageWithSender, Coordinates, UndiscoveredMessageMeta } from '@/types';
+import { Message, MessageWithSender, Coordinates, UndiscoveredMessageMeta, UndiscoveredMessageMapMeta } from '@/types';
 
 // Fetch messages for current user (as recipient)
 export async function fetchMyMessages(): Promise<MessageWithSender[]> {
@@ -99,6 +99,49 @@ export async function fetchUndiscoveredMessagesMetadata(): Promise<UndiscoveredM
   }
 
   return data || [];
+}
+
+// Fetch only location metadata for map markers (no content for security)
+export async function fetchUndiscoveredMessagesForMap(): Promise<UndiscoveredMessageMapMeta[]> {
+  const { data: userData } = await supabase.auth.getUser();
+  if (!userData.user) return [];
+
+  const { data, error } = await supabase
+    .from('messages')
+    .select('id, location, created_at')
+    .eq('recipient_id', userData.user.id)
+    .eq('is_read', false)
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    console.error('Error fetching undiscovered messages for map:', error);
+    return [];
+  }
+
+  return data || [];
+}
+
+// Fetch a single message by ID with full content
+export async function fetchMessageById(messageId: string): Promise<MessageWithSender | null> {
+  const { data, error } = await supabase
+    .from('messages')
+    .select(`
+      *,
+      sender:users!sender_id (
+        id,
+        display_name,
+        avatar_url
+      )
+    `)
+    .eq('id', messageId)
+    .single();
+
+  if (error) {
+    console.error('Error fetching message by id:', error);
+    return null;
+  }
+
+  return data;
 }
 
 // Send a new message

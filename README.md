@@ -52,6 +52,48 @@ npx expo start
    npx expo start
    ```
 
+## Configuration Google OAuth
+
+### Google Cloud Console
+
+1. Aller sur [Google Cloud Console](https://console.cloud.google.com)
+2. APIs & Services > Identifiants > Créer des identifiants > ID client OAuth
+3. Créer deux clients OAuth :
+   - **Web** : pour Supabase (noter le Client ID et Client Secret)
+   - **Android** :
+     - Nom du package : `com.flagapp.app`
+     - Empreinte SHA-1 : obtenir avec `keytool -keystore android/app/debug.keystore -list -v` (mot de passe : `android`)
+
+### Supabase
+
+1. Authentication > Providers > Google
+2. Activer Google et renseigner :
+   - Client ID (Web)
+   - Client Secret (Web)
+3. Copier l'URL de callback Supabase
+
+### Application
+
+Ajouter dans `app.json` :
+```json
+"expo": {
+  "scheme": "com.flagapp.app",
+  "plugins": [
+    [
+      "@react-native-google-signin/google-signin",
+      {
+        "iosUrlScheme": "com.googleusercontent.apps.VOTRE_IOS_CLIENT_ID"
+      }
+    ]
+  ]
+}
+```
+
+Ajouter dans `.env` :
+```
+EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID=votre_web_client_id
+```
+
 ## Structure du projet
 
 ```

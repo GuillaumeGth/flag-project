@@ -2,7 +2,7 @@
 CREATE EXTENSION IF NOT EXISTS postgis;
 
 -- Users table (extends Supabase auth.users)
-CREATE TABLE public.users (
+CREATE TABLE IF NOT EXISTS public.users (
     id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
     display_name TEXT,
     avatar_url TEXT,
@@ -15,18 +15,21 @@ CREATE TABLE public.users (
 -- Enable RLS
 ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;
 
--- Users can read their own data and other users' public info
+-- Users policies (drop if exists, then create)
+DROP POLICY IF EXISTS "Users can view all users" ON public.users;
 CREATE POLICY "Users can view all users" ON public.users
     FOR SELECT USING (true);
 
+DROP POLICY IF EXISTS "Users can update own profile" ON public.users;
 CREATE POLICY "Users can update own profile" ON public.users
     FOR UPDATE USING (auth.uid() = id);
 
+DROP POLICY IF EXISTS "Users can insert own profile" ON public.users;
 CREATE POLICY "Users can insert own profile" ON public.users
     FOR INSERT WITH CHECK (auth.uid() = id);
 
 -- Messages table
-CREATE TABLE public.messages (
+CREATE TABLE IF NOT EXISTS public.messages (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     sender_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
     recipient_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
@@ -43,24 +46,26 @@ CREATE TABLE public.messages (
 -- Enable RLS
 ALTER TABLE public.messages ENABLE ROW LEVEL SECURITY;
 
--- Users can view messages they sent or received
+-- Messages policies (drop if exists, then create)
+DROP POLICY IF EXISTS "Users can view own messages" ON public.messages;
 CREATE POLICY "Users can view own messages" ON public.messages
     FOR SELECT USING (
         auth.uid() = sender_id OR auth.uid() = recipient_id
     );
 
--- Users can send messages
+DROP POLICY IF EXISTS "Users can send messages" ON public.messages;
 CREATE POLICY "Users can send messages" ON public.messages
     FOR INSERT WITH CHECK (auth.uid() = sender_id);
 
--- Users can update messages they received (to mark as read)
+DROP POLICY IF EXISTS "Recipients can update messages" ON public.messages;
 CREATE POLICY "Recipients can update messages" ON public.messages
     FOR UPDATE USING (auth.uid() = recipient_id);
 
--- Index for faster queries
-CREATE INDEX messages_recipient_idx ON public.messages(recipient_id);
-CREATE INDEX messages_sender_idx ON public.messages(sender_id);
-CREATE INDEX messages_location_idx ON public.messages USING GIST(location);
+-- Indexes (create if not exists)
+CREATE INDEX IF NOT EXISTS messages_recipient_idx ON public.messages(recipient_id);
+CREATE INDEX IF NOT EXISTS messages_sender_idx ON public.messages(sender_id);
+CREATE INDEX IF NOT EXISTS messages_location_idx ON public.messages USING GIST(location);
+DROP INDEX IF EXISTS messages_unread_idx;
 CREATE INDEX messages_unread_idx ON public.messages(recipient_id) WHERE is_read = FALSE;
 
 -- Function to auto-create user profile on signup
@@ -73,26 +78,66 @@ BEGIN
         NEW.email,
         NEW.phone,
         COALESCE(NEW.raw_user_meta_data->>'display_name', NEW.email, NEW.phone)
-    );
+    )
+    ON CONFLICT (id) DO NOTHING;
     RETURN NEW;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- Trigger on auth.users
-CREATE OR REPLACE TRIGGER on_auth_user_created
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
+CREATE TRIGGER on_auth_user_created
     AFTER INSERT ON auth.users
     FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
+
+-- Function to send welcome message from Flag Bot to new users
+CREATE OR REPLACE FUNCTION public.send_welcome_message()
+RETURNS TRIGGER AS $$
+DECLARE
+    bot_user_id UUID := '00000000-0000-0000-0000-000000000001';
+BEGIN
+    -- Only send if Flag Bot exists and this isn't the Flag Bot itself
+    IF NEW.id != bot_user_id AND EXISTS (SELECT 1 FROM public.users WHERE id = bot_user_id) THEN
+        INSERT INTO public.messages (
+            sender_id,
+            recipient_id,
+            content_type,
+            text_content,
+            location,
+            radius,
+            is_read
+        ) VALUES (
+            bot_user_id,
+            NEW.id,
+            'text',
+            'Bienvenue sur Flag ! Je suis Flag Bot, ton assistant. Tu peux m''envoyer des messages pour tester l''application. Bonne découverte !',
+            ST_SetSRID(ST_MakePoint(2.3522, 48.8566), 4326)::geography,
+            30,
+            false
+        );
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Trigger to send welcome message after user profile is created
+DROP TRIGGER IF EXISTS on_user_created_send_welcome ON public.users;
+CREATE TRIGGER on_user_created_send_welcome
+    AFTER INSERT ON public.users
+    FOR EACH ROW EXECUTE FUNCTION public.send_welcome_message();
 
 -- Storage bucket for media
 INSERT INTO storage.buckets (id, name, public)
 VALUES ('media', 'media', true)
 ON CONFLICT (id) DO NOTHING;
 
--- Storage policies
+-- Storage policies (drop if exists, then create)
+DROP POLICY IF EXISTS "Authenticated users can upload media" ON storage.objects;
 CREATE POLICY "Authenticated users can upload media"
 ON storage.objects FOR INSERT
 WITH CHECK (bucket_id = 'media' AND auth.role() = 'authenticated');
 
+DROP POLICY IF EXISTS "Anyone can view media" ON storage.objects;
 CREATE POLICY "Anyone can view media"
 ON storage.objects FOR SELECT
 USING (bucket_id = 'media');

@@ -16,6 +16,7 @@ import ProfileScreen from '@/screens/ProfileScreen';
 import CreateMessageScreen from '@/screens/CreateMessageScreen';
 import ReadMessageScreen from '@/screens/ReadMessageScreen';
 import SelectRecipientScreen from '@/screens/SelectRecipientScreen';
+import ConversationScreen from '@/screens/ConversationScreen';
 
 // Register background task
 import './src/tasks/backgroundLocation';
@@ -28,6 +29,7 @@ function MainTabs() {
     <Tab.Navigator
       screenOptions={({ route }) => ({
         headerShown: false,
+        tabBarShowLabel: false,
         tabBarIcon: ({ focused, color, size }) => {
           let iconName: keyof typeof Ionicons.glyphMap;
 
@@ -49,27 +51,11 @@ function MainTabs() {
           paddingTop: 8,
           minHeight: 60,
         },
-        tabBarLabelStyle: {
-          fontSize: 12,
-          marginBottom: 4,
-        },
       })}
     >
-      <Tab.Screen
-        name="Map"
-        component={MapScreen}
-        options={{ tabBarLabel: 'Carte' }}
-      />
-      <Tab.Screen
-        name="Inbox"
-        component={InboxScreen}
-        options={{ tabBarLabel: 'Messages' }}
-      />
-      <Tab.Screen
-        name="Profile"
-        component={ProfileScreen}
-        options={{ tabBarLabel: 'Profil' }}
-      />
+      <Tab.Screen name="Map" component={MapScreen} />
+      <Tab.Screen name="Inbox" component={InboxScreen} />
+      <Tab.Screen name="Profile" component={ProfileScreen} />
     </Tab.Navigator>
   );
 }
@@ -100,6 +86,11 @@ function AppNavigator() {
             name="SelectRecipient"
             component={SelectRecipientScreen}
             options={{ presentation: 'modal' }}
+          />
+          <Stack.Screen
+            name="Conversation"
+            component={ConversationScreen}
+            options={{ presentation: 'card' }}
           />
         </>
       ) : (

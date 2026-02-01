@@ -10,67 +10,43 @@ import {
   Image,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { fetchReadMessages, fetchUndiscoveredMessagesMetadata } from '@/services/messages';
-import { MessageWithSender, UndiscoveredMessageMeta } from '@/types';
-
-// Discovered message has full content
-interface DiscoveredMessage extends MessageWithSender {
-  isDiscovered: true;
-}
-
-// Undiscovered message has only metadata (no content for security)
-interface UndiscoveredMessage extends UndiscoveredMessageMeta {
-  isDiscovered: false;
-}
-
-type MessageItem = DiscoveredMessage | UndiscoveredMessage;
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { fetchConversations, FLAG_BOT_ID } from '@/services/messages';
+import { Conversation } from '@/types';
 
 interface Props {
   navigation: any;
 }
 
 export default function InboxScreen({ navigation }: Props) {
-  const [messages, setMessages] = useState<MessageItem[]>([]);
+  const insets = useSafeAreaInsets();
+  const [conversations, setConversations] = useState<Conversation[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
-    loadMessages();
+    loadConversations();
   }, []);
 
-  const loadMessages = async () => {
+  // Refresh when screen comes into focus
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('focus', () => {
+      loadConversations();
+    });
+    return unsubscribe;
+  }, [navigation]);
+
+  const loadConversations = async () => {
     setLoading(true);
-    const [readMessages, undiscoveredMeta] = await Promise.all([
-      fetchReadMessages(),
-      fetchUndiscoveredMessagesMetadata(),
-    ]);
-
-    const discovered: DiscoveredMessage[] = readMessages.map(m => ({ ...m, isDiscovered: true as const }));
-    const undiscovered: UndiscoveredMessage[] = undiscoveredMeta.map(m => ({ ...m, isDiscovered: false as const }));
-
-    const allMessages: MessageItem[] = [...discovered, ...undiscovered].sort(
-      (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-    );
-
-    setMessages(allMessages);
+    const data = await fetchConversations();
+    setConversations(data);
     setLoading(false);
   };
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    const [readMessages, undiscoveredMeta] = await Promise.all([
-      fetchReadMessages(),
-      fetchUndiscoveredMessagesMetadata(),
-    ]);
-
-    const discovered: DiscoveredMessage[] = readMessages.map(m => ({ ...m, isDiscovered: true as const }));
-    const undiscovered: UndiscoveredMessage[] = undiscoveredMeta.map(m => ({ ...m, isDiscovered: false as const }));
-
-    const allMessages: MessageItem[] = [...discovered, ...undiscovered].sort(
-      (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-    );
-
-    setMessages(allMessages);
+    const data = await fetchConversations();
+    setConversations(data);
     setRefreshing(false);
   }, []);
 
@@ -88,7 +64,7 @@ export default function InboxScreen({ navigation }: Props) {
     } else if (days === 1) {
       return 'Hier';
     } else if (days < 7) {
-      return date.toLocaleDateString('fr-FR', { weekday: 'long' });
+      return date.toLocaleDateString('fr-FR', { weekday: 'short' });
     } else {
       return date.toLocaleDateString('fr-FR', {
         day: 'numeric',
@@ -97,62 +73,72 @@ export default function InboxScreen({ navigation }: Props) {
     }
   };
 
-  const getContentPreview = (message: MessageItem) => {
-    if (!message.isDiscovered) {
-      return 'Message non découvert';
-    }
-    switch (message.content_type) {
+  const getMessagePreview = (conversation: Conversation) => {
+    const { lastMessage } = conversation;
+    const prefix = lastMessage.is_from_me ? 'Vous: ' : '';
+
+    switch (lastMessage.content_type) {
       case 'photo':
-        return '📷 Photo';
+        return `${prefix}Photo`;
       case 'audio':
-        return '🎤 Audio';
+        return `${prefix}Audio`;
       default:
-        return message.text_content?.substring(0, 50) + (message.text_content && message.text_content.length > 50 ? '...' : '') || '';
+        const text = lastMessage.text_content || '';
+        const truncated = text.length > 40 ? text.substring(0, 40) + '...' : text;
+        return `${prefix}${truncated}`;
     }
   };
 
-  const renderItem = ({ item }: { item: MessageItem }) => {
-    const isBlurred = !item.isDiscovered;
-
-    const handlePress = () => {
-      if (item.isDiscovered) {
-        navigation.navigate('ReadMessage', { message: item });
-      }
-    };
+  const renderConversation = ({ item }: { item: Conversation }) => {
+    const isBot = item.id === FLAG_BOT_ID;
+    const hasUnread = item.unreadCount > 0;
 
     return (
       <TouchableOpacity
-        style={[styles.messageItem, isBlurred && styles.messageItemBlurred]}
-        onPress={handlePress}
-        activeOpacity={isBlurred ? 1 : 0.7}
+        style={styles.conversationItem}
+        onPress={() => navigation.navigate('Conversation', {
+          otherUserId: item.id,
+          otherUserName: item.otherUser.display_name || 'Utilisateur',
+        })}
+        activeOpacity={0.7}
       >
-        <View style={[styles.avatar, isBlurred && styles.avatarBlurred]}>
-          {item.isDiscovered && item.sender?.avatar_url ? (
-            <Image source={{ uri: item.sender.avatar_url }} style={styles.avatarImage} />
+        <View style={[styles.avatar, isBot && styles.botAvatar]}>
+          {item.otherUser.avatar_url ? (
+            <Image source={{ uri: item.otherUser.avatar_url }} style={styles.avatarImage} />
           ) : (
-            <Ionicons name="person" size={24} color={isBlurred ? '#ccc' : '#999'} />
+            <Ionicons
+              name={isBot ? 'flag' : 'person'}
+              size={24}
+              color={isBot ? '#4A90D9' : '#999'}
+            />
           )}
         </View>
 
-        <View style={styles.messageContent}>
-          <View style={styles.messageHeader}>
-            <Text style={[styles.senderName, isBlurred && styles.textBlurred]}>
-              {item.isDiscovered ? (item.sender?.display_name || 'Utilisateur') : '••••••••'}
+        <View style={styles.conversationContent}>
+          <View style={styles.conversationHeader}>
+            <Text style={[styles.userName, hasUnread && styles.userNameUnread]}>
+              {item.otherUser.display_name || 'Utilisateur'}
             </Text>
-            <Text style={[styles.date, isBlurred && styles.textBlurred]}>
-              {formatDate(item.isDiscovered && item.read_at ? item.read_at : item.created_at)}
+            <Text style={[styles.date, hasUnread && styles.dateUnread]}>
+              {formatDate(item.lastMessage.created_at)}
             </Text>
           </View>
-          <Text style={[styles.preview, isBlurred && styles.previewBlurred]} numberOfLines={1}>
-            {getContentPreview(item)}
-          </Text>
+          <View style={styles.previewRow}>
+            <Text
+              style={[styles.preview, hasUnread && styles.previewUnread]}
+              numberOfLines={1}
+            >
+              {getMessagePreview(item)}
+            </Text>
+            {hasUnread && (
+              <View style={styles.unreadBadge}>
+                <Text style={styles.unreadCount}>
+                  {item.unreadCount > 9 ? '9+' : item.unreadCount}
+                </Text>
+              </View>
+            )}
+          </View>
         </View>
-
-        {isBlurred ? (
-          <Ionicons name="lock-closed" size={18} color="#ccc" />
-        ) : (
-          <Ionicons name="chevron-forward" size={20} color="#ccc" />
-        )}
       </TouchableOpacity>
     );
   };
@@ -166,24 +152,36 @@ export default function InboxScreen({ navigation }: Props) {
   }
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { paddingTop: insets.top }]}>
       <View style={styles.header}>
         <Text style={styles.title}>Messages</Text>
+        <TouchableOpacity
+          style={styles.newMessageButton}
+          onPress={() => navigation.navigate('SelectRecipient')}
+        >
+          <Ionicons name="create-outline" size={24} color="#4A90D9" />
+        </TouchableOpacity>
       </View>
 
-      {messages.length === 0 ? (
+      {conversations.length === 0 ? (
         <View style={styles.emptyContainer}>
-          <Ionicons name="mail-outline" size={64} color="#ccc" />
-          <Text style={styles.emptyText}>Aucun message</Text>
+          <Ionicons name="chatbubbles-outline" size={64} color="#ccc" />
+          <Text style={styles.emptyText}>Aucune conversation</Text>
           <Text style={styles.emptySubtext}>
-            Vos conversations apparaîtront ici
+            Commencez une conversation en appuyant sur le bouton +
           </Text>
+          <TouchableOpacity
+            style={styles.startButton}
+            onPress={() => navigation.navigate('SelectRecipient')}
+          >
+            <Text style={styles.startButtonText}>Nouvelle conversation</Text>
+          </TouchableOpacity>
         </View>
       ) : (
         <FlatList
-          data={messages}
+          data={conversations}
           keyExtractor={(item) => item.id}
-          renderItem={renderItem}
+          renderItem={renderConversation}
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
           }
@@ -205,9 +203,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingTop: 56,
-    paddingBottom: 16,
+    paddingVertical: 16,
     borderBottomWidth: 1,
     borderBottomColor: '#eee',
   },
@@ -216,10 +216,13 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#333',
   },
+  newMessageButton: {
+    padding: 8,
+  },
   listContent: {
     paddingVertical: 8,
   },
-  messageItem: {
+  conversationItem: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 16,
@@ -228,40 +231,73 @@ const styles = StyleSheet.create({
     borderBottomColor: '#f0f0f0',
   },
   avatar: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
     backgroundColor: '#f0f0f0',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
   },
-  avatarImage: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+  botAvatar: {
+    backgroundColor: '#e8f4fd',
   },
-  messageContent: {
+  avatarImage: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+  },
+  conversationContent: {
     flex: 1,
   },
-  messageHeader: {
+  conversationHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 4,
   },
-  senderName: {
+  userName: {
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: '500',
     color: '#333',
+  },
+  userNameUnread: {
+    fontWeight: '700',
   },
   date: {
     fontSize: 12,
     color: '#999',
   },
+  dateUnread: {
+    color: '#4A90D9',
+  },
+  previewRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
   preview: {
+    flex: 1,
     fontSize: 14,
     color: '#666',
+  },
+  previewUnread: {
+    color: '#333',
+    fontWeight: '500',
+  },
+  unreadBadge: {
+    backgroundColor: '#4A90D9',
+    borderRadius: 10,
+    minWidth: 20,
+    height: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 6,
+    marginLeft: 8,
+  },
+  unreadCount: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '600',
   },
   emptyContainer: {
     flex: 1,
@@ -280,19 +316,17 @@ const styles = StyleSheet.create({
     color: '#999',
     textAlign: 'center',
     marginTop: 8,
+    marginBottom: 24,
   },
-  messageItemBlurred: {
-    backgroundColor: '#fafafa',
-    opacity: 0.8,
+  startButton: {
+    backgroundColor: '#4A90D9',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 24,
   },
-  avatarBlurred: {
-    backgroundColor: '#e8e8e8',
-  },
-  textBlurred: {
-    color: '#bbb',
-  },
-  previewBlurred: {
-    color: '#ccc',
-    fontStyle: 'italic',
+  startButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
   },
 });

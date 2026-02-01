@@ -1,5 +1,5 @@
 import { supabase } from './supabase';
-import { Message, MessageWithSender, Coordinates, User, UndiscoveredMessageMeta, UndiscoveredMessageMapMeta } from '@/types';
+import { Message, MessageWithSender, Coordinates, User, UndiscoveredMessageMeta, UndiscoveredMessageMapMeta, Conversation, MessageWithUsers } from '@/types';
 
 // Default Flag Bot user ID (created via seed.sql)
 export const FLAG_BOT_ID = '00000000-0000-0000-0000-000000000001';
@@ -20,6 +20,91 @@ export async function fetchAllUsers(): Promise<User[]> {
 
   // Filter out current user
   return (data || []).filter(user => user.id !== userData.user?.id);
+}
+
+// Fetch all conversations for current user
+export async function fetchConversations(): Promise<Conversation[]> {
+  const { data: userData } = await supabase.auth.getUser();
+  if (!userData.user) return [];
+
+  const currentUserId = userData.user.id;
+
+  // Fetch all messages where user is sender or recipient
+  const { data: messages, error } = await supabase
+    .from('messages')
+    .select(`
+      *,
+      sender:users!sender_id (id, display_name, avatar_url),
+      recipient:users!recipient_id (id, display_name, avatar_url)
+    `)
+    .or(`sender_id.eq.${currentUserId},recipient_id.eq.${currentUserId}`)
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    console.error('Error fetching conversations:', error);
+    return [];
+  }
+
+  // Group messages by conversation (other user)
+  const conversationsMap = new Map<string, Conversation>();
+
+  for (const msg of messages || []) {
+    const isFromMe = msg.sender_id === currentUserId;
+    const otherUserId = isFromMe ? msg.recipient_id : msg.sender_id;
+    const otherUser = isFromMe ? msg.recipient : msg.sender;
+
+    if (!conversationsMap.has(otherUserId)) {
+      // Count unread messages from this user
+      const unreadCount = (messages || []).filter(
+        m => m.sender_id === otherUserId && m.recipient_id === currentUserId && !m.is_read
+      ).length;
+
+      conversationsMap.set(otherUserId, {
+        id: otherUserId,
+        otherUser: {
+          id: otherUser.id,
+          display_name: otherUser.display_name,
+          avatar_url: otherUser.avatar_url,
+        },
+        lastMessage: {
+          id: msg.id,
+          content_type: msg.content_type,
+          text_content: msg.text_content,
+          created_at: msg.created_at,
+          is_read: msg.is_read,
+          is_from_me: isFromMe,
+        },
+        unreadCount,
+      });
+    }
+  }
+
+  return Array.from(conversationsMap.values());
+}
+
+// Fetch all messages for a specific conversation
+export async function fetchConversationMessages(otherUserId: string): Promise<MessageWithUsers[]> {
+  const { data: userData } = await supabase.auth.getUser();
+  if (!userData.user) return [];
+
+  const currentUserId = userData.user.id;
+
+  const { data, error } = await supabase
+    .from('messages')
+    .select(`
+      *,
+      sender:users!sender_id (id, display_name, avatar_url),
+      recipient:users!recipient_id (id, display_name, avatar_url)
+    `)
+    .or(`and(sender_id.eq.${currentUserId},recipient_id.eq.${otherUserId}),and(sender_id.eq.${otherUserId},recipient_id.eq.${currentUserId})`)
+    .order('created_at', { ascending: true });
+
+  if (error) {
+    console.error('Error fetching conversation messages:', error);
+    return [];
+  }
+
+  return data || [];
 }
 
 // Fetch messages for current user (as recipient)
@@ -129,7 +214,12 @@ export async function fetchUndiscoveredMessagesForMap(): Promise<UndiscoveredMes
 
   const { data, error } = await supabase
     .from('messages')
-    .select('id, location, created_at')
+    .select(`
+      id,
+      location,
+      created_at,
+      sender:users!sender_id (id, display_name, avatar_url)
+    `)
     .eq('recipient_id', userData.user.id)
     .eq('is_read', false)
     .order('created_at', { ascending: false });

@@ -1,13 +1,15 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 import {
   View,
   StyleSheet,
   TouchableOpacity,
   Text,
   ActivityIndicator,
+  Image,
+  Platform,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
+import MapView, { Marker } from 'react-native-maps';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocation } from '@/contexts/LocationContext';
 import { useAuth } from '@/contexts/AuthContext';
@@ -32,6 +34,7 @@ export default function MapScreen({ navigation }: Props) {
   const [messages, setMessages] = useState<UndiscoveredMessageMapMeta[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedMessage, setSelectedMessage] = useState<UndiscoveredMessageMapMeta | null>(null);
+  const [markersReady, setMarkersReady] = useState(false);
 
   // Request location permission on mount
   useEffect(() => {
@@ -47,7 +50,7 @@ export default function MapScreen({ navigation }: Props) {
   // Center on user when location changes
   useEffect(() => {
     if (userLocation && mapRef.current) {
-      console.log('Centering map on:', userLocation.latitude, userLocation.longitude);
+      console.log('DEBUG: User location:', userLocation.latitude, userLocation.longitude);
       mapRef.current.animateToRegion({
         latitude: userLocation.latitude,
         longitude: userLocation.longitude,
@@ -59,9 +62,12 @@ export default function MapScreen({ navigation }: Props) {
 
   const loadMessages = async () => {
     setLoading(true);
+    setMarkersReady(false);
     const data = await fetchUndiscoveredMessagesForMap();
+    console.log('DEBUG: Loaded', data.length, 'messages:', JSON.stringify(data));
     setMessages(data);
     setLoading(false);
+    setTimeout(() => setMarkersReady(true), 500);
   };
 
   const centerOnUser = () => {
@@ -75,27 +81,114 @@ export default function MapScreen({ navigation }: Props) {
     }
   };
 
-  const handleMarkerPress = (message: UndiscoveredMessageMapMeta) => {
+  const handleMarkerPress = useCallback((message: UndiscoveredMessageMapMeta) => {
     setSelectedMessage(message);
-  };
+  }, []);
 
-  const canReadMessage = (messageLocation: Coordinates): boolean => {
-    if (!userLocation) return false;
+  const getInitials = useCallback((name?: string): string => {
+    if (!name) return '?';
+    const parts = name.trim().split(' ');
+    if (parts.length >= 2) {
+      return (parts[0][0] + parts[1][0]).toUpperCase();
+    }
+    return name.substring(0, 2).toUpperCase();
+  }, []);
+
+  const canReadMessage = useCallback((messageLocation: Coordinates | null): boolean => {
+    if (!userLocation || !messageLocation) return false;
     return isWithinRadius(userLocation, messageLocation, 30);
+  }, [userLocation]);
+
+  // Parse WKB hex string to coordinates
+  const parseWKBHex = (wkbHex: string): Coordinates | null => {
+    try {
+      // WKB Point with SRID format:
+      // 01 (little endian) + 01000020 (Point with SRID) + E6100000 (SRID 4326) + 16 bytes coords
+      // or without SRID: 01 + 01000000 (Point) + 16 bytes coords
+      if (wkbHex.length < 42) return null; // Minimum for point without SRID
+
+      const isLittleEndian = wkbHex.substring(0, 2) === '01';
+      const typeHex = wkbHex.substring(2, 10);
+
+      let coordStart = 10;
+      // Check if SRID is present (0x20 flag in type)
+      if (typeHex === '01000020' || typeHex === '20000001') {
+        coordStart = 18; // Skip SRID (4 bytes = 8 hex chars)
+      }
+
+      // Parse longitude (8 bytes = 16 hex chars)
+      const lngHex = wkbHex.substring(coordStart, coordStart + 16);
+      // Parse latitude (8 bytes = 16 hex chars)
+      const latHex = wkbHex.substring(coordStart + 16, coordStart + 32);
+
+      const hexToDouble = (hex: string, littleEndian: boolean): number => {
+        const bytes = [];
+        for (let i = 0; i < hex.length; i += 2) {
+          bytes.push(parseInt(hex.substring(i, i + 2), 16));
+        }
+        if (littleEndian) bytes.reverse();
+        const buffer = new ArrayBuffer(8);
+        const view = new DataView(buffer);
+        bytes.forEach((b, i) => view.setUint8(i, b));
+        return view.getFloat64(0, false);
+      };
+
+      const lng = hexToDouble(lngHex, isLittleEndian);
+      const lat = hexToDouble(latHex, isLittleEndian);
+
+      if (!isNaN(lng) && !isNaN(lat) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180) {
+        return { longitude: lng, latitude: lat };
+      }
+    } catch (e) {
+      console.error('WKB parse error:', e);
+    }
+    return null;
   };
 
-  const getMessageLocation = (message: UndiscoveredMessageMapMeta): Coordinates => {
-    // Parse PostGIS POINT format or use direct coordinates
-    if (typeof message.location === 'string') {
-      const match = message.location.match(/POINT\(([^ ]+) ([^)]+)\)/);
-      if (match) {
-        return {
-          longitude: parseFloat(match[1]),
-          latitude: parseFloat(match[2]),
-        };
+  const getMessageLocation = (message: UndiscoveredMessageMapMeta): Coordinates | null => {
+    if (!message.location) return null;
+
+    // Handle GeoJSON format from PostGIS (Supabase returns geography as GeoJSON)
+    // Format: { type: "Point", coordinates: [longitude, latitude] }
+    if (typeof message.location === 'object') {
+      const loc = message.location as any;
+
+      // GeoJSON Point format
+      if (loc.type === 'Point' && Array.isArray(loc.coordinates) && loc.coordinates.length >= 2) {
+        const lng = loc.coordinates[0];
+        const lat = loc.coordinates[1];
+        if (typeof lng === 'number' && typeof lat === 'number' && !isNaN(lng) && !isNaN(lat)) {
+          return { longitude: lng, latitude: lat };
+        }
+      }
+
+      // Direct coordinates format { latitude, longitude }
+      if (typeof loc.latitude === 'number' && typeof loc.longitude === 'number' &&
+          !isNaN(loc.latitude) && !isNaN(loc.longitude)) {
+        return { longitude: loc.longitude, latitude: loc.latitude };
       }
     }
-    return message.location as Coordinates;
+
+    if (typeof message.location === 'string') {
+      // Handle WKB hex format (PostGIS internal format)
+      // Starts with 01 (little endian) or 00 (big endian)
+      if (/^[0-9A-Fa-f]+$/.test(message.location) && message.location.length >= 42) {
+        const coords = parseWKBHex(message.location);
+        if (coords) return coords;
+      }
+
+      // Handle WKT POINT string format (fallback)
+      const match = message.location.match(/POINT\(([^ ]+) ([^)]+)\)/);
+      if (match) {
+        const lng = parseFloat(match[1]);
+        const lat = parseFloat(match[2]);
+        if (!isNaN(lng) && !isNaN(lat)) {
+          return { longitude: lng, latitude: lat };
+        }
+      }
+    }
+
+    return null;
   };
 
   if (locationLoading || !userLocation) {
@@ -126,7 +219,6 @@ export default function MapScreen({ navigation }: Props) {
       <MapView
         ref={mapRef}
         style={styles.map}
-        provider={PROVIDER_GOOGLE}
         initialRegion={
           userLocation
             ? {
@@ -145,18 +237,34 @@ export default function MapScreen({ navigation }: Props) {
         zoomEnabled={false}
         rotateEnabled={false}
         pitchEnabled={false}
+        moveOnMarkerPress={false}
       >
         {messages.map((message) => {
           const location = getMessageLocation(message);
+          console.log('DEBUG marker:', message.id, 'location:', location, 'raw:', message.location);
+          if (!location) return null;
           const isReadable = canReadMessage(location);
+          const sender = message.sender;
 
           return (
             <Marker
               key={message.id}
               coordinate={location}
               onPress={() => handleMarkerPress(message)}
-              pinColor={isReadable ? '#4A90D9' : '#999'}
-            />
+            >
+              <View style={styles.markerContainer}>
+                <View style={[styles.customMarker, isReadable ? styles.markerReadable : styles.markerUnreadable]}>
+                  {sender?.avatar_url ? (
+                    <Image source={{ uri: sender.avatar_url }} style={styles.markerAvatar} />
+                  ) : (
+                    <Text style={styles.markerInitials} numberOfLines={1}>
+                      {getInitials(sender?.display_name)}
+                    </Text>
+                  )}
+                </View>
+                <View style={[styles.markerPointer, isReadable ? styles.pointerReadable : styles.pointerUnreadable]} />
+              </View>
+            </Marker>
           );
         })}
       </MapView>
@@ -182,7 +290,7 @@ export default function MapScreen({ navigation }: Props) {
         style={[styles.createButton, { bottom: 24 }]}
         onPress={() => navigation.navigate('CreateMessage')}
       >
-        <Ionicons name="add" size={32} color="#fff" />
+        <Ionicons name="paper-plane" size={28} color="#fff" />
       </TouchableOpacity>
 
       {/* Selected message card */}
@@ -190,8 +298,18 @@ export default function MapScreen({ navigation }: Props) {
         <View style={[styles.messageCard, { bottom: 24 }]}>
           <View style={styles.messageCardHeader}>
             <View style={styles.messageCardTitle}>
-              <Ionicons name="mail-unread" size={20} color="#4A90D9" style={{ marginRight: 8 }} />
-              <Text style={styles.senderName}>Message non découvert</Text>
+              {selectedMessage.sender?.avatar_url ? (
+                <Image source={{ uri: selectedMessage.sender.avatar_url }} style={styles.cardAvatar} />
+              ) : (
+                <View style={styles.cardAvatarPlaceholder}>
+                  <Text style={styles.cardAvatarInitials}>
+                    {getInitials(selectedMessage.sender?.display_name)}
+                  </Text>
+                </View>
+              )}
+              <Text style={styles.senderName}>
+                {selectedMessage.sender?.display_name || 'Inconnu'}
+              </Text>
             </View>
             <TouchableOpacity onPress={() => setSelectedMessage(null)}>
               <Ionicons name="close" size={24} color="#666" />
@@ -321,6 +439,26 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#333',
   },
+  cardAvatar: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    marginRight: 10,
+  },
+  cardAvatarPlaceholder: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#4A90D9',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 10,
+  },
+  cardAvatarInitials: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '700',
+  },
   readButton: {
     backgroundColor: '#4A90D9',
     borderRadius: 8,
@@ -336,5 +474,58 @@ const styles = StyleSheet.create({
     color: '#999',
     fontSize: 14,
     textAlign: 'center',
+  },
+  markerContainer: {
+    alignItems: 'center',
+    width: 60,
+    height: 70,
+  },
+  customMarker: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 3,
+    borderColor: '#fff',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 3,
+    elevation: 5,
+  },
+  markerReadable: {
+    backgroundColor: '#4A90D9',
+  },
+  markerUnreadable: {
+    backgroundColor: '#999',
+  },
+  markerAvatar: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+  },
+  markerInitials: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#fff',
+    textAlign: 'center',
+    includeFontPadding: false,
+  },
+  markerPointer: {
+    width: 0,
+    height: 0,
+    borderLeftWidth: 10,
+    borderRightWidth: 10,
+    borderTopWidth: 12,
+    borderLeftColor: 'transparent',
+    borderRightColor: 'transparent',
+    marginTop: -4,
+  },
+  pointerReadable: {
+    borderTopColor: '#4A90D9',
+  },
+  pointerUnreadable: {
+    borderTopColor: '#999',
   },
 });

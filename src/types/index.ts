@@ -49,6 +49,7 @@ export interface UndiscoveredMessageMapMeta {
   id: string;
   location: string | Coordinates; // PostGIS POINT or Coordinates
   created_at: string;
+  sender?: Pick<User, 'id' | 'display_name' | 'avatar_url'>;
 }
 
 // For map markers
@@ -57,6 +58,27 @@ export interface MapMarker {
   coordinate: Coordinates;
   is_readable: boolean; // within 30m radius
   sender_name?: string;
+}
+
+// Conversation type for inbox display
+export interface Conversation {
+  id: string; // other user's id
+  otherUser: Pick<User, 'id' | 'display_name' | 'avatar_url'>;
+  lastMessage: {
+    id: string;
+    content_type: MessageContentType;
+    text_content?: string;
+    created_at: string;
+    is_read: boolean;
+    is_from_me: boolean;
+  };
+  unreadCount: number;
+}
+
+// Message with both sender and recipient info
+export interface MessageWithUsers extends Message {
+  sender: Pick<User, 'id' | 'display_name' | 'avatar_url'>;
+  recipient: Pick<User, 'id' | 'display_name' | 'avatar_url'>;
 }
 
 // Auth state

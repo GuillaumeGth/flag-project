@@ -19,10 +19,10 @@ interface Props {
   navigation: any;
 }
 
-// 200m radius = ~0.0036 latitudeDelta (400m visible area)
-const VISIBLE_RADIUS_METERS = 200;
-const LAT_DELTA_FOR_200M = 0.0036;
-const LNG_DELTA_FOR_200M = 0.0036;
+// 500m radius = ~0.009 latitudeDelta (1km visible area)
+const VISIBLE_RADIUS_METERS = 500;
+const LAT_DELTA = 0.009;
+const LNG_DELTA = 0.009;
 
 export default function MapScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets();
@@ -51,8 +51,8 @@ export default function MapScreen({ navigation }: Props) {
       mapRef.current.animateToRegion({
         latitude: userLocation.latitude,
         longitude: userLocation.longitude,
-        latitudeDelta: LAT_DELTA_FOR_200M,
-        longitudeDelta: LNG_DELTA_FOR_200M,
+        latitudeDelta: LAT_DELTA,
+        longitudeDelta: LNG_DELTA,
       }, 500);
     }
   }, [userLocation]);
@@ -69,8 +69,8 @@ export default function MapScreen({ navigation }: Props) {
       mapRef.current.animateToRegion({
         latitude: userLocation.latitude,
         longitude: userLocation.longitude,
-        latitudeDelta: LAT_DELTA_FOR_200M,
-        longitudeDelta: LNG_DELTA_FOR_200M,
+        latitudeDelta: LAT_DELTA,
+        longitudeDelta: LNG_DELTA,
       }, 300);
     }
   };
@@ -138,8 +138,8 @@ export default function MapScreen({ navigation }: Props) {
             ? {
                 latitude: userLocation.latitude,
                 longitude: userLocation.longitude,
-                latitudeDelta: LAT_DELTA_FOR_200M,
-                longitudeDelta: LNG_DELTA_FOR_200M,
+                latitudeDelta: LAT_DELTA,
+                longitudeDelta: LNG_DELTA,
               }
             : undefined
         }

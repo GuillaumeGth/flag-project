@@ -6,7 +6,8 @@ import {
   Text,
   ActivityIndicator,
 } from 'react-native';
-import MapView, { Marker, Circle, PROVIDER_GOOGLE } from 'react-native-maps';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocation } from '@/contexts/LocationContext';
 import { useAuth } from '@/contexts/AuthContext';
@@ -18,17 +19,43 @@ interface Props {
   navigation: any;
 }
 
+// 200m radius = ~0.0036 latitudeDelta (400m visible area)
+const VISIBLE_RADIUS_METERS = 200;
+const LAT_DELTA_FOR_200M = 0.0036;
+const LNG_DELTA_FOR_200M = 0.0036;
+
 export default function MapScreen({ navigation }: Props) {
-  const { current: userLocation, loading: locationLoading, refreshLocation } = useLocation();
+  const insets = useSafeAreaInsets();
+  const { current: userLocation, loading: locationLoading, refreshLocation, requestPermission, permission } = useLocation();
   const { user } = useAuth();
   const mapRef = useRef<MapView>(null);
   const [messages, setMessages] = useState<MessageWithSender[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedMessage, setSelectedMessage] = useState<MessageWithSender | null>(null);
 
+  // Request location permission on mount
+  useEffect(() => {
+    if (permission !== 'granted') {
+      requestPermission();
+    }
+  }, []);
+
   useEffect(() => {
     loadMessages();
   }, []);
+
+  // Center on user when location changes
+  useEffect(() => {
+    if (userLocation && mapRef.current) {
+      console.log('Centering map on:', userLocation.latitude, userLocation.longitude);
+      mapRef.current.animateToRegion({
+        latitude: userLocation.latitude,
+        longitude: userLocation.longitude,
+        latitudeDelta: LAT_DELTA_FOR_200M,
+        longitudeDelta: LNG_DELTA_FOR_200M,
+      }, 500);
+    }
+  }, [userLocation]);
 
   const loadMessages = async () => {
     setLoading(true);
@@ -42,9 +69,9 @@ export default function MapScreen({ navigation }: Props) {
       mapRef.current.animateToRegion({
         latitude: userLocation.latitude,
         longitude: userLocation.longitude,
-        latitudeDelta: 0.01,
-        longitudeDelta: 0.01,
-      });
+        latitudeDelta: LAT_DELTA_FOR_200M,
+        longitudeDelta: LNG_DELTA_FOR_200M,
+      }, 300);
     }
   };
 
@@ -77,17 +104,31 @@ export default function MapScreen({ navigation }: Props) {
     return message.location as Coordinates;
   };
 
-  if (locationLoading) {
+  if (locationLoading || !userLocation) {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#4A90D9" />
-        <Text style={styles.loadingText}>Localisation en cours...</Text>
+        <Text style={styles.loadingText}>
+          {permission !== 'granted'
+            ? 'Autorisation de localisation requise...'
+            : 'Localisation en cours...'}
+        </Text>
+        {permission !== 'granted' && (
+          <TouchableOpacity
+            style={styles.permissionButton}
+            onPress={requestPermission}
+          >
+            <Text style={styles.permissionButtonText}>Autoriser la localisation</Text>
+          </TouchableOpacity>
+        )}
       </View>
     );
   }
 
   return (
     <View style={styles.container}>
+      {/* Status bar spacer */}
+      <View style={{ height: insets.top, backgroundColor: '#f5f5f5' }} />
       <MapView
         ref={mapRef}
         style={styles.map}
@@ -97,45 +138,43 @@ export default function MapScreen({ navigation }: Props) {
             ? {
                 latitude: userLocation.latitude,
                 longitude: userLocation.longitude,
-                latitudeDelta: 0.01,
-                longitudeDelta: 0.01,
+                latitudeDelta: LAT_DELTA_FOR_200M,
+                longitudeDelta: LNG_DELTA_FOR_200M,
               }
             : undefined
         }
         showsUserLocation
         showsMyLocationButton={false}
+        minZoomLevel={16}
+        maxZoomLevel={18}
+        scrollEnabled={false}
+        zoomEnabled={false}
+        rotateEnabled={false}
+        pitchEnabled={false}
       >
         {messages.map((message) => {
           const location = getMessageLocation(message);
           const isReadable = canReadMessage(location);
 
           return (
-            <React.Fragment key={message.id}>
-              <Circle
-                center={location}
-                radius={30}
-                fillColor={isReadable ? 'rgba(74, 144, 217, 0.2)' : 'rgba(150, 150, 150, 0.2)'}
-                strokeColor={isReadable ? '#4A90D9' : '#999'}
-                strokeWidth={2}
-              />
-              <Marker
-                coordinate={location}
-                onPress={() => handleMarkerPress(message)}
-                pinColor={isReadable ? '#4A90D9' : '#999'}
-              />
-            </React.Fragment>
+            <Marker
+              key={message.id}
+              coordinate={location}
+              onPress={() => handleMarkerPress(message)}
+              pinColor={isReadable ? '#4A90D9' : '#999'}
+            />
           );
         })}
       </MapView>
 
       {/* Center on user button */}
-      <TouchableOpacity style={styles.centerButton} onPress={centerOnUser}>
+      <TouchableOpacity style={[styles.centerButton, { top: insets.top + 16 }]} onPress={centerOnUser}>
         <Ionicons name="locate" size={24} color="#4A90D9" />
       </TouchableOpacity>
 
       {/* Refresh button */}
       <TouchableOpacity
-        style={styles.refreshButton}
+        style={[styles.refreshButton, { top: insets.top + 76 }]}
         onPress={() => {
           refreshLocation();
           loadMessages();
@@ -146,7 +185,7 @@ export default function MapScreen({ navigation }: Props) {
 
       {/* Create message button */}
       <TouchableOpacity
-        style={styles.createButton}
+        style={[styles.createButton, { bottom: 24 }]}
         onPress={() => navigation.navigate('CreateMessage')}
       >
         <Ionicons name="add" size={32} color="#fff" />
@@ -154,7 +193,7 @@ export default function MapScreen({ navigation }: Props) {
 
       {/* Selected message card */}
       {selectedMessage && (
-        <View style={styles.messageCard}>
+        <View style={[styles.messageCard, { bottom: 24 }]}>
           <View style={styles.messageCardHeader}>
             <Text style={styles.senderName}>
               {selectedMessage.sender?.display_name || 'Utilisateur'}
@@ -196,10 +235,23 @@ const styles = StyleSheet.create({
     marginTop: 16,
     fontSize: 16,
     color: '#666',
+    textAlign: 'center',
+    paddingHorizontal: 32,
+  },
+  permissionButton: {
+    marginTop: 24,
+    backgroundColor: '#4A90D9',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 8,
+  },
+  permissionButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
   },
   centerButton: {
     position: 'absolute',
-    top: 60,
     right: 16,
     backgroundColor: '#fff',
     borderRadius: 25,
@@ -215,7 +267,6 @@ const styles = StyleSheet.create({
   },
   refreshButton: {
     position: 'absolute',
-    top: 120,
     right: 16,
     backgroundColor: '#fff',
     borderRadius: 25,
@@ -231,7 +282,6 @@ const styles = StyleSheet.create({
   },
   createButton: {
     position: 'absolute',
-    bottom: 32,
     right: 16,
     backgroundColor: '#4A90D9',
     borderRadius: 30,
@@ -247,7 +297,6 @@ const styles = StyleSheet.create({
   },
   messageCard: {
     position: 'absolute',
-    bottom: 32,
     left: 16,
     right: 92,
     backgroundColor: '#fff',

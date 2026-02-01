@@ -7,13 +7,26 @@ const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || '';
 // Custom storage using SecureStore for sensitive data
 const ExpoSecureStoreAdapter = {
   getItem: async (key: string): Promise<string | null> => {
-    return await SecureStore.getItemAsync(key);
+    try {
+      return await SecureStore.getItemAsync(key);
+    } catch (error) {
+      console.log('SecureStore getItem error:', error);
+      return null;
+    }
   },
   setItem: async (key: string, value: string): Promise<void> => {
-    await SecureStore.setItemAsync(key, value);
+    try {
+      await SecureStore.setItemAsync(key, value);
+    } catch (error) {
+      console.log('SecureStore setItem error:', error);
+    }
   },
   removeItem: async (key: string): Promise<void> => {
-    await SecureStore.deleteItemAsync(key);
+    try {
+      await SecureStore.deleteItemAsync(key);
+    } catch (error) {
+      console.log('SecureStore removeItem error:', error);
+    }
   },
 };
 

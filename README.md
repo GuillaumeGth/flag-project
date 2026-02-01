@@ -31,6 +31,27 @@ npx expo start
 3. Activer l'authentification par téléphone et Google dans Authentication > Providers
 4. Copier l'URL et la clé anon dans `.env`
 
+## Configuration Google Maps (Android)
+
+1. Créer un projet sur [Google Cloud Console](https://console.cloud.google.com)
+2. Activer l'API "Maps SDK for Android"
+3. Créer une clé API (Identifiants > Créer des identifiants > Clé API)
+4. Ajouter la clé dans `app.json` :
+   ```json
+   "android": {
+     "config": {
+       "googleMaps": {
+         "apiKey": "VOTRE_CLE_API"
+       }
+     }
+   }
+   ```
+5. Régénérer le projet natif et relancer :
+   ```bash
+   npx expo prebuild --clean
+   npx expo start
+   ```
+
 ## Structure du projet
 
 ```

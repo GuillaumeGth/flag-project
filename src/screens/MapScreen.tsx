@@ -19,10 +19,10 @@ interface Props {
   navigation: any;
 }
 
-// 250m radius = ~0.0045 latitudeDelta (500m visible area)
-const VISIBLE_RADIUS_METERS = 250;
-const LAT_DELTA = 0.0045;
-const LNG_DELTA = 0.0045;
+// 500m radius = ~0.009 latitudeDelta (1km visible area)
+const VISIBLE_RADIUS_METERS = 500;
+const LAT_DELTA = 0.009;
+const LNG_DELTA = 0.009;
 
 export default function MapScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets();

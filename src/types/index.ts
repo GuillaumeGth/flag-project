@@ -37,6 +37,13 @@ export interface MessageWithSender extends Message {
   sender: Pick<User, 'id' | 'display_name' | 'avatar_url'>;
 }
 
+// Metadata only for undiscovered messages (no content for security)
+export interface UndiscoveredMessageMeta {
+  id: string;
+  created_at: string;
+  is_read: boolean;
+}
+
 // For map markers
 export interface MapMarker {
   id: string;

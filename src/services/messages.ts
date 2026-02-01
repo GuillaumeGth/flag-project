@@ -1,5 +1,5 @@
 import { supabase } from './supabase';
-import { Message, MessageWithSender, Coordinates } from '@/types';
+import { Message, MessageWithSender, Coordinates, UndiscoveredMessageMeta } from '@/types';
 
 // Fetch messages for current user (as recipient)
 export async function fetchMyMessages(): Promise<MessageWithSender[]> {
@@ -75,6 +75,26 @@ export async function fetchReadMessages(): Promise<MessageWithSender[]> {
 
   if (error) {
     console.error('Error fetching read messages:', error);
+    return [];
+  }
+
+  return data || [];
+}
+
+// Fetch only metadata for undiscovered messages (no content for security)
+export async function fetchUndiscoveredMessagesMetadata(): Promise<UndiscoveredMessageMeta[]> {
+  const { data: userData } = await supabase.auth.getUser();
+  if (!userData.user) return [];
+
+  const { data, error } = await supabase
+    .from('messages')
+    .select('id, created_at, is_read')
+    .eq('recipient_id', userData.user.id)
+    .eq('is_read', false)
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    console.error('Error fetching undiscovered messages metadata:', error);
     return [];
   }
 

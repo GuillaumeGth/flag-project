@@ -10,19 +10,27 @@ import {
   Image,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { fetchReadMessages, fetchUnreadMessages } from '@/services/messages';
-import { MessageWithSender } from '@/types';
+import { fetchReadMessages, fetchUndiscoveredMessagesMetadata } from '@/services/messages';
+import { MessageWithSender, UndiscoveredMessageMeta } from '@/types';
 
-interface MessageWithStatus extends MessageWithSender {
-  isDiscovered: boolean;
+// Discovered message has full content
+interface DiscoveredMessage extends MessageWithSender {
+  isDiscovered: true;
 }
+
+// Undiscovered message has only metadata (no content for security)
+interface UndiscoveredMessage extends UndiscoveredMessageMeta {
+  isDiscovered: false;
+}
+
+type MessageItem = DiscoveredMessage | UndiscoveredMessage;
 
 interface Props {
   navigation: any;
 }
 
 export default function InboxScreen({ navigation }: Props) {
-  const [messages, setMessages] = useState<MessageWithStatus[]>([]);
+  const [messages, setMessages] = useState<MessageItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -32,15 +40,15 @@ export default function InboxScreen({ navigation }: Props) {
 
   const loadMessages = async () => {
     setLoading(true);
-    const [readMessages, unreadMessages] = await Promise.all([
+    const [readMessages, undiscoveredMeta] = await Promise.all([
       fetchReadMessages(),
-      fetchUnreadMessages(),
+      fetchUndiscoveredMessagesMetadata(),
     ]);
 
-    const readWithStatus: MessageWithStatus[] = readMessages.map(m => ({ ...m, isDiscovered: true }));
-    const unreadWithStatus: MessageWithStatus[] = unreadMessages.map(m => ({ ...m, isDiscovered: false }));
+    const discovered: DiscoveredMessage[] = readMessages.map(m => ({ ...m, isDiscovered: true as const }));
+    const undiscovered: UndiscoveredMessage[] = undiscoveredMeta.map(m => ({ ...m, isDiscovered: false as const }));
 
-    const allMessages = [...readWithStatus, ...unreadWithStatus].sort(
+    const allMessages: MessageItem[] = [...discovered, ...undiscovered].sort(
       (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
     );
 
@@ -50,15 +58,15 @@ export default function InboxScreen({ navigation }: Props) {
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    const [readMessages, unreadMessages] = await Promise.all([
+    const [readMessages, undiscoveredMeta] = await Promise.all([
       fetchReadMessages(),
-      fetchUnreadMessages(),
+      fetchUndiscoveredMessagesMetadata(),
     ]);
 
-    const readWithStatus: MessageWithStatus[] = readMessages.map(m => ({ ...m, isDiscovered: true }));
-    const unreadWithStatus: MessageWithStatus[] = unreadMessages.map(m => ({ ...m, isDiscovered: false }));
+    const discovered: DiscoveredMessage[] = readMessages.map(m => ({ ...m, isDiscovered: true as const }));
+    const undiscovered: UndiscoveredMessage[] = undiscoveredMeta.map(m => ({ ...m, isDiscovered: false as const }));
 
-    const allMessages = [...readWithStatus, ...unreadWithStatus].sort(
+    const allMessages: MessageItem[] = [...discovered, ...undiscovered].sort(
       (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
     );
 
@@ -89,7 +97,7 @@ export default function InboxScreen({ navigation }: Props) {
     }
   };
 
-  const getContentPreview = (message: MessageWithStatus) => {
+  const getContentPreview = (message: MessageItem) => {
     if (!message.isDiscovered) {
       return 'Message non découvert';
     }
@@ -103,7 +111,7 @@ export default function InboxScreen({ navigation }: Props) {
     }
   };
 
-  const renderItem = ({ item }: { item: MessageWithStatus }) => {
+  const renderItem = ({ item }: { item: MessageItem }) => {
     const isBlurred = !item.isDiscovered;
 
     const handlePress = () => {
@@ -119,7 +127,7 @@ export default function InboxScreen({ navigation }: Props) {
         activeOpacity={isBlurred ? 1 : 0.7}
       >
         <View style={[styles.avatar, isBlurred && styles.avatarBlurred]}>
-          {item.sender?.avatar_url && item.isDiscovered ? (
+          {item.isDiscovered && item.sender?.avatar_url ? (
             <Image source={{ uri: item.sender.avatar_url }} style={styles.avatarImage} />
           ) : (
             <Ionicons name="person" size={24} color={isBlurred ? '#ccc' : '#999'} />
@@ -129,10 +137,10 @@ export default function InboxScreen({ navigation }: Props) {
         <View style={styles.messageContent}>
           <View style={styles.messageHeader}>
             <Text style={[styles.senderName, isBlurred && styles.textBlurred]}>
-              {isBlurred ? '••••••••' : (item.sender?.display_name || 'Utilisateur')}
+              {item.isDiscovered ? (item.sender?.display_name || 'Utilisateur') : '••••••••'}
             </Text>
             <Text style={[styles.date, isBlurred && styles.textBlurred]}>
-              {formatDate(item.read_at || item.created_at)}
+              {formatDate(item.isDiscovered && item.read_at ? item.read_at : item.created_at)}
             </Text>
           </View>
           <Text style={[styles.preview, isBlurred && styles.previewBlurred]} numberOfLines={1}>

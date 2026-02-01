@@ -1,8 +1,11 @@
 import { supabase } from './supabase';
-import { Message, MessageWithSender, Coordinates } from '@/types';
+import { Message, MessageWithSender, Coordinates, UndiscoveredMessageMeta, UndiscoveredMessageMapMeta } from '@/types';
 
 // Fetch messages for current user (as recipient)
 export async function fetchMyMessages(): Promise<MessageWithSender[]> {
+  const { data: userData } = await supabase.auth.getUser();
+  if (!userData.user) return [];
+
   const { data, error } = await supabase
     .from('messages')
     .select(`
@@ -13,6 +16,7 @@ export async function fetchMyMessages(): Promise<MessageWithSender[]> {
         avatar_url
       )
     `)
+    .eq('recipient_id', userData.user.id)
     .order('created_at', { ascending: false });
 
   if (error) {
@@ -25,6 +29,9 @@ export async function fetchMyMessages(): Promise<MessageWithSender[]> {
 
 // Fetch unread messages for map display
 export async function fetchUnreadMessages(): Promise<MessageWithSender[]> {
+  const { data: userData } = await supabase.auth.getUser();
+  if (!userData.user) return [];
+
   const { data, error } = await supabase
     .from('messages')
     .select(`
@@ -35,6 +42,7 @@ export async function fetchUnreadMessages(): Promise<MessageWithSender[]> {
         avatar_url
       )
     `)
+    .eq('recipient_id', userData.user.id)
     .eq('is_read', false)
     .order('created_at', { ascending: false });
 
@@ -48,6 +56,9 @@ export async function fetchUnreadMessages(): Promise<MessageWithSender[]> {
 
 // Fetch read messages (inbox)
 export async function fetchReadMessages(): Promise<MessageWithSender[]> {
+  const { data: userData } = await supabase.auth.getUser();
+  if (!userData.user) return [];
+
   const { data, error } = await supabase
     .from('messages')
     .select(`
@@ -58,6 +69,7 @@ export async function fetchReadMessages(): Promise<MessageWithSender[]> {
         avatar_url
       )
     `)
+    .eq('recipient_id', userData.user.id)
     .eq('is_read', true)
     .order('read_at', { ascending: false });
 
@@ -67,6 +79,69 @@ export async function fetchReadMessages(): Promise<MessageWithSender[]> {
   }
 
   return data || [];
+}
+
+// Fetch only metadata for undiscovered messages (no content for security)
+export async function fetchUndiscoveredMessagesMetadata(): Promise<UndiscoveredMessageMeta[]> {
+  const { data: userData } = await supabase.auth.getUser();
+  if (!userData.user) return [];
+
+  const { data, error } = await supabase
+    .from('messages')
+    .select('id, created_at, is_read')
+    .eq('recipient_id', userData.user.id)
+    .eq('is_read', false)
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    console.error('Error fetching undiscovered messages metadata:', error);
+    return [];
+  }
+
+  return data || [];
+}
+
+// Fetch only location metadata for map markers (no content for security)
+export async function fetchUndiscoveredMessagesForMap(): Promise<UndiscoveredMessageMapMeta[]> {
+  const { data: userData } = await supabase.auth.getUser();
+  if (!userData.user) return [];
+
+  const { data, error } = await supabase
+    .from('messages')
+    .select('id, location, created_at')
+    .eq('recipient_id', userData.user.id)
+    .eq('is_read', false)
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    console.error('Error fetching undiscovered messages for map:', error);
+    return [];
+  }
+
+  return data || [];
+}
+
+// Fetch a single message by ID with full content
+export async function fetchMessageById(messageId: string): Promise<MessageWithSender | null> {
+  const { data, error } = await supabase
+    .from('messages')
+    .select(`
+      *,
+      sender:users!sender_id (
+        id,
+        display_name,
+        avatar_url
+      )
+    `)
+    .eq('id', messageId)
+    .single();
+
+  if (error) {
+    console.error('Error fetching message by id:', error);
+    return null;
+  }
+
+  return data;
 }
 
 // Send a new message

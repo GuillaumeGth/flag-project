@@ -10,15 +10,27 @@ import {
   Image,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { fetchReadMessages } from '@/services/messages';
-import { MessageWithSender } from '@/types';
+import { fetchReadMessages, fetchUndiscoveredMessagesMetadata } from '@/services/messages';
+import { MessageWithSender, UndiscoveredMessageMeta } from '@/types';
+
+// Discovered message has full content
+interface DiscoveredMessage extends MessageWithSender {
+  isDiscovered: true;
+}
+
+// Undiscovered message has only metadata (no content for security)
+interface UndiscoveredMessage extends UndiscoveredMessageMeta {
+  isDiscovered: false;
+}
+
+type MessageItem = DiscoveredMessage | UndiscoveredMessage;
 
 interface Props {
   navigation: any;
 }
 
 export default function InboxScreen({ navigation }: Props) {
-  const [messages, setMessages] = useState<MessageWithSender[]>([]);
+  const [messages, setMessages] = useState<MessageItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -28,15 +40,37 @@ export default function InboxScreen({ navigation }: Props) {
 
   const loadMessages = async () => {
     setLoading(true);
-    const data = await fetchReadMessages();
-    setMessages(data);
+    const [readMessages, undiscoveredMeta] = await Promise.all([
+      fetchReadMessages(),
+      fetchUndiscoveredMessagesMetadata(),
+    ]);
+
+    const discovered: DiscoveredMessage[] = readMessages.map(m => ({ ...m, isDiscovered: true as const }));
+    const undiscovered: UndiscoveredMessage[] = undiscoveredMeta.map(m => ({ ...m, isDiscovered: false as const }));
+
+    const allMessages: MessageItem[] = [...discovered, ...undiscovered].sort(
+      (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    );
+
+    setMessages(allMessages);
     setLoading(false);
   };
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    const data = await fetchReadMessages();
-    setMessages(data);
+    const [readMessages, undiscoveredMeta] = await Promise.all([
+      fetchReadMessages(),
+      fetchUndiscoveredMessagesMetadata(),
+    ]);
+
+    const discovered: DiscoveredMessage[] = readMessages.map(m => ({ ...m, isDiscovered: true as const }));
+    const undiscovered: UndiscoveredMessage[] = undiscoveredMeta.map(m => ({ ...m, isDiscovered: false as const }));
+
+    const allMessages: MessageItem[] = [...discovered, ...undiscovered].sort(
+      (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    );
+
+    setMessages(allMessages);
     setRefreshing(false);
   }, []);
 
@@ -63,7 +97,10 @@ export default function InboxScreen({ navigation }: Props) {
     }
   };
 
-  const getContentPreview = (message: MessageWithSender) => {
+  const getContentPreview = (message: MessageItem) => {
+    if (!message.isDiscovered) {
+      return 'Message non découvert';
+    }
     switch (message.content_type) {
       case 'photo':
         return '📷 Photo';
@@ -74,34 +111,51 @@ export default function InboxScreen({ navigation }: Props) {
     }
   };
 
-  const renderItem = ({ item }: { item: MessageWithSender }) => (
-    <TouchableOpacity
-      style={styles.messageItem}
-      onPress={() => navigation.navigate('ReadMessage', { message: item })}
-    >
-      <View style={styles.avatar}>
-        {item.sender?.avatar_url ? (
-          <Image source={{ uri: item.sender.avatar_url }} style={styles.avatarImage} />
-        ) : (
-          <Ionicons name="person" size={24} color="#999" />
-        )}
-      </View>
+  const renderItem = ({ item }: { item: MessageItem }) => {
+    const isBlurred = !item.isDiscovered;
 
-      <View style={styles.messageContent}>
-        <View style={styles.messageHeader}>
-          <Text style={styles.senderName}>
-            {item.sender?.display_name || 'Utilisateur'}
-          </Text>
-          <Text style={styles.date}>{formatDate(item.read_at || item.created_at)}</Text>
+    const handlePress = () => {
+      if (item.isDiscovered) {
+        navigation.navigate('ReadMessage', { message: item });
+      }
+    };
+
+    return (
+      <TouchableOpacity
+        style={[styles.messageItem, isBlurred && styles.messageItemBlurred]}
+        onPress={handlePress}
+        activeOpacity={isBlurred ? 1 : 0.7}
+      >
+        <View style={[styles.avatar, isBlurred && styles.avatarBlurred]}>
+          {item.isDiscovered && item.sender?.avatar_url ? (
+            <Image source={{ uri: item.sender.avatar_url }} style={styles.avatarImage} />
+          ) : (
+            <Ionicons name="person" size={24} color={isBlurred ? '#ccc' : '#999'} />
+          )}
         </View>
-        <Text style={styles.preview} numberOfLines={1}>
-          {getContentPreview(item)}
-        </Text>
-      </View>
 
-      <Ionicons name="chevron-forward" size={20} color="#ccc" />
-    </TouchableOpacity>
-  );
+        <View style={styles.messageContent}>
+          <View style={styles.messageHeader}>
+            <Text style={[styles.senderName, isBlurred && styles.textBlurred]}>
+              {item.isDiscovered ? (item.sender?.display_name || 'Utilisateur') : '••••••••'}
+            </Text>
+            <Text style={[styles.date, isBlurred && styles.textBlurred]}>
+              {formatDate(item.isDiscovered && item.read_at ? item.read_at : item.created_at)}
+            </Text>
+          </View>
+          <Text style={[styles.preview, isBlurred && styles.previewBlurred]} numberOfLines={1}>
+            {getContentPreview(item)}
+          </Text>
+        </View>
+
+        {isBlurred ? (
+          <Ionicons name="lock-closed" size={18} color="#ccc" />
+        ) : (
+          <Ionicons name="chevron-forward" size={20} color="#ccc" />
+        )}
+      </TouchableOpacity>
+    );
+  };
 
   if (loading) {
     return (
@@ -114,15 +168,15 @@ export default function InboxScreen({ navigation }: Props) {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.title}>Messages lus</Text>
+        <Text style={styles.title}>Messages</Text>
       </View>
 
       {messages.length === 0 ? (
         <View style={styles.emptyContainer}>
-          <Ionicons name="mail-open-outline" size={64} color="#ccc" />
-          <Text style={styles.emptyText}>Aucun message lu</Text>
+          <Ionicons name="mail-outline" size={64} color="#ccc" />
+          <Text style={styles.emptyText}>Aucun message</Text>
           <Text style={styles.emptySubtext}>
-            Les messages que vous découvrez apparaîtront ici
+            Vos conversations apparaîtront ici
           </Text>
         </View>
       ) : (
@@ -226,5 +280,19 @@ const styles = StyleSheet.create({
     color: '#999',
     textAlign: 'center',
     marginTop: 8,
+  },
+  messageItemBlurred: {
+    backgroundColor: '#fafafa',
+    opacity: 0.8,
+  },
+  avatarBlurred: {
+    backgroundColor: '#e8e8e8',
+  },
+  textBlurred: {
+    color: '#bbb',
+  },
+  previewBlurred: {
+    color: '#ccc',
+    fontStyle: 'italic',
   },
 });

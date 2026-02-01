@@ -11,9 +11,9 @@ import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocation } from '@/contexts/LocationContext';
 import { useAuth } from '@/contexts/AuthContext';
-import { fetchUnreadMessages } from '@/services/messages';
+import { fetchUndiscoveredMessagesForMap } from '@/services/messages';
 import { isWithinRadius } from '@/services/location';
-import { MessageWithSender, Coordinates } from '@/types';
+import { UndiscoveredMessageMapMeta, Coordinates } from '@/types';
 
 interface Props {
   navigation: any;
@@ -29,9 +29,9 @@ export default function MapScreen({ navigation }: Props) {
   const { current: userLocation, loading: locationLoading, refreshLocation, requestPermission, permission } = useLocation();
   const { user } = useAuth();
   const mapRef = useRef<MapView>(null);
-  const [messages, setMessages] = useState<MessageWithSender[]>([]);
+  const [messages, setMessages] = useState<UndiscoveredMessageMapMeta[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedMessage, setSelectedMessage] = useState<MessageWithSender | null>(null);
+  const [selectedMessage, setSelectedMessage] = useState<UndiscoveredMessageMapMeta | null>(null);
 
   // Request location permission on mount
   useEffect(() => {
@@ -59,7 +59,7 @@ export default function MapScreen({ navigation }: Props) {
 
   const loadMessages = async () => {
     setLoading(true);
-    const data = await fetchUnreadMessages();
+    const data = await fetchUndiscoveredMessagesForMap();
     setMessages(data);
     setLoading(false);
   };
@@ -75,7 +75,7 @@ export default function MapScreen({ navigation }: Props) {
     }
   };
 
-  const handleMarkerPress = (message: MessageWithSender) => {
+  const handleMarkerPress = (message: UndiscoveredMessageMapMeta) => {
     setSelectedMessage(message);
   };
 
@@ -84,13 +84,7 @@ export default function MapScreen({ navigation }: Props) {
     return isWithinRadius(userLocation, messageLocation, 30);
   };
 
-  const openMessage = () => {
-    if (selectedMessage) {
-      navigation.navigate('ReadMessage', { message: selectedMessage });
-    }
-  };
-
-  const getMessageLocation = (message: MessageWithSender): Coordinates => {
+  const getMessageLocation = (message: UndiscoveredMessageMapMeta): Coordinates => {
     // Parse PostGIS POINT format or use direct coordinates
     if (typeof message.location === 'string') {
       const match = message.location.match(/POINT\(([^ ]+) ([^)]+)\)/);
@@ -195,21 +189,25 @@ export default function MapScreen({ navigation }: Props) {
       {selectedMessage && (
         <View style={[styles.messageCard, { bottom: 24 }]}>
           <View style={styles.messageCardHeader}>
-            <Text style={styles.senderName}>
-              {selectedMessage.sender?.display_name || 'Utilisateur'}
-            </Text>
+            <View style={styles.messageCardTitle}>
+              <Ionicons name="mail-unread" size={20} color="#4A90D9" style={{ marginRight: 8 }} />
+              <Text style={styles.senderName}>Message non découvert</Text>
+            </View>
             <TouchableOpacity onPress={() => setSelectedMessage(null)}>
               <Ionicons name="close" size={24} color="#666" />
             </TouchableOpacity>
           </View>
 
           {canReadMessage(getMessageLocation(selectedMessage)) ? (
-            <TouchableOpacity style={styles.readButton} onPress={openMessage}>
-              <Text style={styles.readButtonText}>Lire le message</Text>
+            <TouchableOpacity
+              style={styles.readButton}
+              onPress={() => navigation.navigate('ReadMessage', { messageId: selectedMessage.id })}
+            >
+              <Text style={styles.readButtonText}>Découvrir le message</Text>
             </TouchableOpacity>
           ) : (
             <Text style={styles.distanceText}>
-              Rapprochez-vous pour lire ce message
+              Rapprochez-vous pour découvrir ce message
             </Text>
           )}
         </View>
@@ -313,6 +311,10 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 12,
+  },
+  messageCardTitle: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   senderName: {
     fontSize: 16,

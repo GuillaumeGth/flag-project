@@ -37,6 +37,20 @@ export interface MessageWithSender extends Message {
   sender: Pick<User, 'id' | 'display_name' | 'avatar_url'>;
 }
 
+// Metadata only for undiscovered messages (no content for security)
+export interface UndiscoveredMessageMeta {
+  id: string;
+  created_at: string;
+  is_read: boolean;
+}
+
+// Metadata for map markers (no content for security)
+export interface UndiscoveredMessageMapMeta {
+  id: string;
+  location: string | Coordinates; // PostGIS POINT or Coordinates
+  created_at: string;
+}
+
 // For map markers
 export interface MapMarker {
   id: string;

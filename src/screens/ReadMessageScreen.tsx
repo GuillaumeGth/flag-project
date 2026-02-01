@@ -10,27 +10,27 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Audio } from 'expo-av';
-import { markMessageAsRead } from '@/services/messages';
+import { markMessageAsRead, fetchMessageById } from '@/services/messages';
 import { MessageWithSender } from '@/types';
 
 interface Props {
   navigation: any;
   route: {
     params: {
-      message: MessageWithSender;
+      message?: MessageWithSender;
+      messageId?: string;
     };
   };
 }
 
 export default function ReadMessageScreen({ navigation, route }: Props) {
-  const { message } = route.params;
+  const [message, setMessage] = useState<MessageWithSender | null>(route.params.message || null);
   const [sound, setSound] = useState<Audio.Sound | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Mark message as read
-    markAsRead();
+    loadAndMarkAsRead();
 
     return () => {
       // Cleanup audio
@@ -40,8 +40,20 @@ export default function ReadMessageScreen({ navigation, route }: Props) {
     };
   }, []);
 
-  const markAsRead = async () => {
-    await markMessageAsRead(message.id);
+  const loadAndMarkAsRead = async () => {
+    let currentMessage = message;
+
+    // If we only have messageId, fetch the full message
+    if (!currentMessage && route.params.messageId) {
+      currentMessage = await fetchMessageById(route.params.messageId);
+      if (currentMessage) {
+        setMessage(currentMessage);
+      }
+    }
+
+    if (currentMessage) {
+      await markMessageAsRead(currentMessage.id);
+    }
     setLoading(false);
   };
 
@@ -91,6 +103,18 @@ export default function ReadMessageScreen({ navigation, route }: Props) {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#4A90D9" />
+      </View>
+    );
+  }
+
+  if (!message) {
+    return (
+      <View style={styles.loadingContainer}>
+        <Ionicons name="alert-circle" size={64} color="#ccc" />
+        <Text style={styles.errorText}>Message introuvable</Text>
+        <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+          <Text style={styles.backButtonText}>Retour</Text>
+        </TouchableOpacity>
       </View>
     );
   }
@@ -254,5 +278,23 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: '#fff',
+  },
+  errorText: {
+    marginTop: 16,
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#666',
+  },
+  backButton: {
+    marginTop: 24,
+    backgroundColor: '#4A90D9',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 8,
+  },
+  backButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
   },
 });

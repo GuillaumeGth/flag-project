@@ -29,6 +29,10 @@ jobs:
       - name: Install dependencies
         run: npm ci --legacy-peer-deps
 
+      - name: Get version from tag
+        id: get_version
+        run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+
       - name: Build APK
         run: eas build --platform android --profile production --non-interactive --no-wait --json > build-info.json
 
@@ -57,18 +61,14 @@ jobs:
           # Download the APK
           ARTIFACT_URL=$(eas build:view $BUILD_ID --json | jq -r '.artifacts.buildUrl')
           echo "Downloading APK from: $ARTIFACT_URL"
-          curl -L -o flag-app.apk "$ARTIFACT_URL"
-
-      - name: Get version from tag
-        id: get_version
-        run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+          curl -L -o "Flag-${{ steps.get_version.outputs.VERSION }}.apk" "$ARTIFACT_URL"
 
       - name: Create GitHub Release
         id: create_release
         uses: softprops/action-gh-release@v1
         with:
           name: Release ${{ steps.get_version.outputs.VERSION }}
-          files: flag-app.apk
+          files: Flag-${{ steps.get_version.outputs.VERSION }}.apk
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

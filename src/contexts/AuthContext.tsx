@@ -22,13 +22,54 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     loading: true,
   });
 
+  const setSessionAndUpdateState = async (accessToken: string, refreshToken: string) => {
+    console.log('=== SETTING SESSION ===');
+    try {
+      const { data, error } = await supabase.auth.setSession({
+        access_token: accessToken,
+        refresh_token: refreshToken,
+      });
+
+      if (error) {
+        console.log('Error setting session:', error.message);
+        return { error };
+      }
+
+      console.log('Session set successfully, user:', data.user?.email);
+
+      // Force state update in case onAuthStateChange doesn't fire
+      if (data.session) {
+        setState((prev) => ({
+          ...prev,
+          session: data.session,
+          user: data.user ? mapUser(data.user) : null,
+          loading: false,
+        }));
+      }
+
+      return { error: null };
+    } catch (e) {
+      console.log('Exception setting session:', e);
+      return { error: e as Error };
+    }
+  };
+
+  const mapUser = (supabaseUser: any): User => ({
+    id: supabaseUser.id,
+    phone: supabaseUser.phone,
+    email: supabaseUser.email,
+    display_name: supabaseUser.user_metadata?.display_name || supabaseUser.user_metadata?.full_name,
+    avatar_url: supabaseUser.user_metadata?.avatar_url,
+    created_at: supabaseUser.created_at,
+  });
+
   useEffect(() => {
     // Handle deep link for OAuth callback
     const handleDeepLink = async (event: { url: string }) => {
       const url = event.url;
-      if (url.includes('auth/callback')) {
-        console.log('Deep link received:', url);
+      console.log('=== DEEP LINK EVENT ===', url);
 
+      if (url.includes('auth/callback')) {
         // Try to extract tokens from hash
         const hashIndex = url.indexOf('#');
         if (hashIndex !== -1) {
@@ -36,15 +77,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           const accessToken = hashParams.get('access_token');
           const refreshToken = hashParams.get('refresh_token');
 
+          console.log('Tokens from deep link - access:', !!accessToken, 'refresh:', !!refreshToken);
+
           if (accessToken && refreshToken) {
-            console.log('Setting session from deep link');
-            const { error } = await supabase.auth.setSession({
-              access_token: accessToken,
-              refresh_token: refreshToken,
-            });
-            if (error) {
-              console.log('Error setting session:', error);
-            }
+            await setSessionAndUpdateState(accessToken, refreshToken);
           }
         }
       }
@@ -106,15 +142,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
-  const mapUser = (supabaseUser: any): User => ({
-    id: supabaseUser.id,
-    phone: supabaseUser.phone,
-    email: supabaseUser.email,
-    display_name: supabaseUser.user_metadata?.display_name,
-    avatar_url: supabaseUser.user_metadata?.avatar_url,
-    created_at: supabaseUser.created_at,
-  });
-
   const signInWithPhone = async (phone: string) => {
     const { error } = await supabase.auth.signInWithOtp({
       phone,
@@ -169,11 +196,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           console.log('Refresh token found:', !!refreshToken);
 
           if (accessToken && refreshToken) {
-            await supabase.auth.setSession({
-              access_token: accessToken,
-              refresh_token: refreshToken,
-            });
-            return { error: null };
+            const { error: sessionError } = await setSessionAndUpdateState(accessToken, refreshToken);
+            return { error: sessionError };
           }
         }
 

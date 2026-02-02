@@ -64,6 +64,7 @@ jobs:
         run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
 
       - name: Create GitHub Release
+        id: create_release
         uses: softprops/action-gh-release@v1
         with:
           name: Release ${{ steps.get_version.outputs.VERSION }}
@@ -71,3 +72,23 @@ jobs:
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Send email notification
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 587
+          username: ${{ secrets.EMAIL_USERNAME }}
+          password: ${{ secrets.EMAIL_PASSWORD }}
+          subject: "🚀 Flag APK ${{ steps.get_version.outputs.VERSION }} disponible"
+          to: ${{ secrets.EMAIL_TO }}
+          from: Flag CI <${{ secrets.EMAIL_USERNAME }}>
+          body: |
+            Une nouvelle version de Flag est disponible !
+
+            Version: ${{ steps.get_version.outputs.VERSION }}
+
+            Télécharger l'APK: https://github.com/GuillaumeGth/flag-project/releases/tag/${{ steps.get_version.outputs.VERSION }}
+
+            --
+            Flag CI/CD

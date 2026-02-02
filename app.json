@@ -31,6 +31,20 @@
         "backgroundColor": "#ffffff"
       },
       "package": "com.flagapp.app",
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            {
+              "scheme": "flag",
+              "host": "auth",
+              "pathPrefix": "/callback"
+            }
+          ],
+          "category": ["BROWSABLE", "DEFAULT"]
+        }
+      ],
       "config": {
         "googleMaps": {
           "apiKey": "AIzaSyDrlGiPT_Wt94CvbjeHRn_CzKIp1Pw9OeY"

@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import * as WebBrowser from 'expo-web-browser';
+import * as Linking from 'expo-linking';
 import { supabase } from '@/services/supabase';
 import { User, AuthState } from '@/types';
 
@@ -22,6 +23,43 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   });
 
   useEffect(() => {
+    // Handle deep link for OAuth callback
+    const handleDeepLink = async (event: { url: string }) => {
+      const url = event.url;
+      if (url.includes('auth/callback')) {
+        console.log('Deep link received:', url);
+
+        // Try to extract tokens from hash
+        const hashIndex = url.indexOf('#');
+        if (hashIndex !== -1) {
+          const hashParams = new URLSearchParams(url.substring(hashIndex + 1));
+          const accessToken = hashParams.get('access_token');
+          const refreshToken = hashParams.get('refresh_token');
+
+          if (accessToken && refreshToken) {
+            console.log('Setting session from deep link');
+            const { error } = await supabase.auth.setSession({
+              access_token: accessToken,
+              refresh_token: refreshToken,
+            });
+            if (error) {
+              console.log('Error setting session:', error);
+            }
+          }
+        }
+      }
+    };
+
+    // Check for initial URL (app opened via deep link)
+    Linking.getInitialURL().then((url) => {
+      if (url) {
+        handleDeepLink({ url });
+      }
+    });
+
+    // Listen for deep links while app is running
+    const linkingSubscription = Linking.addEventListener('url', handleDeepLink);
+
     // Check current session with timeout
     const checkSession = async () => {
       try {
@@ -53,6 +91,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
+      console.log('Auth state changed:', _event);
       setState((prev) => ({
         ...prev,
         session,
@@ -61,7 +100,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }));
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      subscription.unsubscribe();
+      linkingSubscription.remove();
+    };
   }, []);
 
   const mapUser = (supabaseUser: any): User => ({

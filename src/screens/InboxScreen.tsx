@@ -131,10 +131,13 @@ export default function InboxScreen({ navigation }: Props) {
               {getMessagePreview(item)}
             </Text>
             {hasUnread && (
-              <View style={styles.unreadBadge}>
-                <Text style={styles.unreadCount}>
-                  {item.unreadCount > 9 ? '9+' : item.unreadCount}
-                </Text>
+              <View style={styles.undiscoveredBadge}>
+                <Ionicons name="eye-off" size={14} color="#999" />
+                <View style={styles.unreadBadge}>
+                  <Text style={styles.unreadCount}>
+                    {item.unreadCount > 9 ? '9+' : item.unreadCount}
+                  </Text>
+                </View>
               </View>
             )}
           </View>
@@ -284,6 +287,12 @@ const styles = StyleSheet.create({
     color: '#333',
     fontWeight: '500',
   },
+  undiscoveredBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginLeft: 8,
+    gap: 6,
+  },
   unreadBadge: {
     backgroundColor: '#4A90D9',
     borderRadius: 10,
@@ -292,7 +301,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 6,
-    marginLeft: 8,
   },
   unreadCount: {
     color: '#fff',

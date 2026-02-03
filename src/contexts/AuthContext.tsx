@@ -240,14 +240,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const blob = await response.blob();
 
       // Generate unique filename
-      const fileExt = imageUri.split('.').pop() || 'jpg';
+      const fileExt = imageUri.split('.').pop()?.toLowerCase() || 'jpg';
       const fileName = `${state.user.id}/${Date.now()}.${fileExt}`;
+      const mimeType = fileExt === 'jpg' ? 'image/jpeg' : `image/${fileExt}`;
 
       // Upload to Supabase Storage
       const { error: uploadError } = await supabase.storage
         .from('avatars')
         .upload(fileName, blob, {
-          contentType: `image/${fileExt}`,
+          contentType: mimeType,
           upsert: true,
         });
 

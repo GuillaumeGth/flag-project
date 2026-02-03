@@ -36,7 +36,7 @@ export default function ProfileScreen() {
       setUploading(false);
 
       if (error) {
-        Alert.alert('Erreur', 'Impossible de mettre à jour votre avatar. Veuillez réessayer.');
+        Alert.alert('Erreur', error.message || 'Impossible de mettre à jour votre avatar.');
       }
     }
   };

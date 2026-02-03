@@ -239,16 +239,44 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const response = await fetch(imageUri);
       const blob = await response.blob();
 
-      // Generate unique filename
-      const fileExt = imageUri.split('.').pop()?.toLowerCase() || 'jpg';
+      // Determine file extension from blob MIME type or URI
+      const validExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'heic'];
+      let fileExt = 'jpg'; // Default extension
+
+      // Try to get extension from blob MIME type first (most reliable)
+      if (blob.type) {
+        const mimeExt = blob.type.split('/')[1]?.toLowerCase();
+        if (mimeExt && validExtensions.includes(mimeExt)) {
+          fileExt = mimeExt === 'jpeg' ? 'jpg' : mimeExt;
+        }
+      }
+
+      // Fallback: try to extract from URI if blob type didn't work
+      if (fileExt === 'jpg' && imageUri.includes('.')) {
+        const uriExt = imageUri.split('.').pop()?.toLowerCase()?.split('?')[0];
+        if (uriExt && validExtensions.includes(uriExt)) {
+          fileExt = uriExt === 'jpeg' ? 'jpg' : uriExt;
+        }
+      }
+
       const fileName = `${state.user.id}/${Date.now()}.${fileExt}`;
-      const mimeType = fileExt === 'jpg' ? 'image/jpeg' : `image/${fileExt}`;
+
+      // Map extension to proper MIME type
+      const mimeTypes: Record<string, string> = {
+        jpg: 'image/jpeg',
+        jpeg: 'image/jpeg',
+        png: 'image/png',
+        gif: 'image/gif',
+        webp: 'image/webp',
+        heic: 'image/heic',
+      };
+      const contentType = mimeTypes[fileExt] || 'image/jpeg';
 
       // Upload to Supabase Storage
       const { error: uploadError } = await supabase.storage
         .from('avatars')
         .upload(fileName, blob, {
-          contentType: mimeType,
+          contentType,
           upsert: true,
         });
 

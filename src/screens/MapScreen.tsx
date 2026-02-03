@@ -11,6 +11,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import MapView, { Marker } from 'react-native-maps';
 import { Ionicons } from '@expo/vector-icons';
+import { captureRef } from 'react-native-view-shot';
 import { useLocation } from '@/contexts/LocationContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { fetchUndiscoveredMessagesForMap } from '@/services/messages';
@@ -35,6 +36,8 @@ export default function MapScreen({ navigation }: Props) {
   const [loading, setLoading] = useState(true);
   const [selectedMessage, setSelectedMessage] = useState<UndiscoveredMessageMapMeta | null>(null);
   const [markersReady, setMarkersReady] = useState(false);
+  const [avatarImages, setAvatarImages] = useState<Record<string, string>>({});
+  const avatarRefs = useRef<Record<string, View | null>>({});
 
   // Request location permission on mount
   useEffect(() => {
@@ -98,6 +101,22 @@ export default function MapScreen({ navigation }: Props) {
     if (!userLocation || !messageLocation) return false;
     return isWithinRadius(userLocation, messageLocation, 30);
   }, [userLocation]);
+
+  const captureAvatar = useCallback(async (messageId: string) => {
+    const ref = avatarRefs.current[messageId];
+    if (!ref || avatarImages[messageId]) return;
+
+    try {
+      const uri = await captureRef(ref, {
+        format: 'png',
+        quality: 1,
+        result: 'tmpfile',
+      });
+      setAvatarImages(prev => ({ ...prev, [messageId]: uri }));
+    } catch (e) {
+      console.log('Failed to capture avatar:', e);
+    }
+  }, [avatarImages]);
 
   // Parse WKB hex string to coordinates
   const parseWKBHex = (wkbHex: string): Coordinates | null => {
@@ -241,28 +260,34 @@ export default function MapScreen({ navigation }: Props) {
       >
         {messages.map((message) => {
           const location = getMessageLocation(message);
-          console.log('DEBUG marker:', message.id, 'location:', location, 'raw:', message.location);
           if (!location) return null;
-          const isReadable = canReadMessage(location);
           const sender = message.sender;
+          const capturedImage = avatarImages[message.id];
 
+          // Avatar with captured image
+          if (sender?.avatar_url) {
+            if (!capturedImage) return null; // Wait for capture
+            return (
+              <Marker
+                key={message.id}
+                coordinate={location}
+                image={{ uri: capturedImage }}
+                onPress={() => handleMarkerPress(message)}
+              />
+            );
+          }
+
+          // Initials marker (use children)
           return (
             <Marker
               key={message.id}
               coordinate={location}
               onPress={() => handleMarkerPress(message)}
             >
-              <View style={styles.markerContainer}>
-                <View style={[styles.customMarker, isReadable ? styles.markerReadable : styles.markerUnreadable]}>
-                  {sender?.avatar_url ? (
-                    <Image source={{ uri: sender.avatar_url }} style={styles.markerAvatar} />
-                  ) : (
-                    <Text style={styles.markerInitials} numberOfLines={1}>
-                      {getInitials(sender?.display_name)}
-                    </Text>
-                  )}
-                </View>
-                <View style={[styles.markerPointer, isReadable ? styles.pointerReadable : styles.pointerUnreadable]} />
+              <View style={styles.initialsMarker}>
+                <Text style={styles.initialsText}>
+                  {getInitials(sender?.display_name)}
+                </Text>
               </View>
             </Marker>
           );
@@ -330,6 +355,31 @@ export default function MapScreen({ navigation }: Props) {
           )}
         </View>
       )}
+
+      {/* Hidden container for capturing circular avatars */}
+      <View style={styles.captureContainer} pointerEvents="none">
+        {messages.map((message) => {
+          const sender = message.sender;
+          if (!sender?.avatar_url || avatarImages[message.id]) return null;
+
+          return (
+            <View
+              key={message.id}
+              ref={(ref) => { avatarRefs.current[message.id] = ref; }}
+              collapsable={false}
+              style={styles.captureAvatar}
+            >
+              <Image
+                source={{ uri: sender.avatar_url }}
+                style={styles.captureAvatarImage}
+                onLoad={() => {
+                  setTimeout(() => captureAvatar(message.id), 100);
+                }}
+              />
+            </View>
+          );
+        })}
+      </View>
     </View>
   );
 }
@@ -503,14 +553,14 @@ const styles = StyleSheet.create({
   markerAvatar: {
     width: 44,
     height: 44,
-    borderRadius: 22,
+    borderRadius: 50,
   },
   markerInitials: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: '700',
-    color: '#fff',
-    textAlign: 'center',
-    includeFontPadding: false,
+    color: '#fff',            
+    
+    
   },
   markerPointer: {
     width: 0,
@@ -527,5 +577,58 @@ const styles = StyleSheet.create({
   },
   pointerUnreadable: {
     borderTopColor: '#999',
+  },
+  avatarMarkerContainer: {
+    width: 54,
+    height: 54,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    borderRadius: 27,
+  },
+  avatarMarkerClip: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    overflow: 'hidden',
+  },
+  avatarMarkerImage: {
+    width: 50,
+    height: 50,
+  },
+  initialsMarker: {
+    width: 50,
+    height: 50,
+    backgroundColor: '#E74C3C',
+    borderRadius: 25,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#fff',
+  },
+  initialsText: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#fff',
+  },
+  captureContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    zIndex: -1,
+  },
+  captureAvatar: {
+    width: 60,
+    height: 60,
+    backgroundColor: '#fff',
+    borderRadius: 30,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 5,
+  },
+  captureAvatarImage: {
+    width: 54,
+    height: 54,
+    borderRadius: 27,
   },
 });

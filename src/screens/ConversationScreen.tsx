@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef, useCallback } from 'react';
+import React, { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -29,7 +29,7 @@ interface Props {
 }
 
 export default function ConversationScreen({ navigation, route }: Props) {
-  const { otherUserId, otherUserName } = route.params;
+  const { otherUserId, otherUserName, otherUserAvatarUrl } = route.params;
   const insets = useSafeAreaInsets();
   const { current: userLocation } = useLocation();
   const { user } = useAuth();
@@ -60,6 +60,9 @@ export default function ConversationScreen({ navigation, route }: Props) {
     }
   };
 
+  // Reverse messages for inverted FlatList (newest at bottom)
+  const reversedMessages = useMemo(() => [...messages].reverse(), [messages]);
+
   const handleSend = async () => {
     if (!inputText.trim() || !userLocation || sending) return;
 
@@ -74,10 +77,6 @@ export default function ConversationScreen({ navigation, route }: Props) {
     if (message) {
       setInputText('');
       await loadMessages();
-      // Scroll to bottom
-      setTimeout(() => {
-        flatListRef.current?.scrollToEnd({ animated: true });
-      }, 100);
     }
     setSending(false);
   };
@@ -110,10 +109,11 @@ export default function ConversationScreen({ navigation, route }: Props) {
   };
 
   const shouldShowDateSeparator = (index: number) => {
-    if (index === 0) return true;
-    const currentDate = new Date(messages[index].created_at).toDateString();
-    const prevDate = new Date(messages[index - 1].created_at).toDateString();
-    return currentDate !== prevDate;
+    // With inverted list, compare with next item (which appears above visually)
+    if (index === reversedMessages.length - 1) return true;
+    const currentDate = new Date(reversedMessages[index].created_at).toDateString();
+    const nextDate = new Date(reversedMessages[index + 1].created_at).toDateString();
+    return currentDate !== nextDate;
   };
 
   const renderMessage = ({ item, index }: { item: MessageWithUsers; index: number }) => {
@@ -123,13 +123,6 @@ export default function ConversationScreen({ navigation, route }: Props) {
 
     return (
       <View>
-        {showDateSeparator && (
-          <View style={styles.dateSeparator}>
-            <Text style={styles.dateSeparatorText}>
-              {formatDateSeparator(item.created_at)}
-            </Text>
-          </View>
-        )}
         <View
           style={[
             styles.messageContainer,
@@ -171,6 +164,13 @@ export default function ConversationScreen({ navigation, route }: Props) {
             <Text style={styles.undiscoveredHint}>Approchez-vous pour découvrir</Text>
           )}
         </View>
+        {showDateSeparator && (
+          <View style={styles.dateSeparator}>
+            <Text style={styles.dateSeparatorText}>
+              {formatDateSeparator(item.created_at)}
+            </Text>
+          </View>
+        )}
       </View>
     );
   };
@@ -183,7 +183,11 @@ export default function ConversationScreen({ navigation, route }: Props) {
             <Ionicons name="arrow-back" size={24} color="#333" />
           </TouchableOpacity>
           <View style={[styles.headerAvatar, isBot && styles.headerAvatarBot]}>
-            <Ionicons name={isBot ? 'flag' : 'person'} size={20} color={isBot ? '#4A90D9' : '#999'} />
+            {otherUserAvatarUrl ? (
+              <Image source={{ uri: otherUserAvatarUrl }} style={styles.headerAvatarImage} />
+            ) : (
+              <Ionicons name={isBot ? 'flag' : 'person'} size={20} color={isBot ? '#4A90D9' : '#999'} />
+            )}
           </View>
           <Text style={styles.headerTitle}>{otherUserName}</Text>
         </View>
@@ -205,18 +209,22 @@ export default function ConversationScreen({ navigation, route }: Props) {
           <Ionicons name="arrow-back" size={24} color="#333" />
         </TouchableOpacity>
         <View style={[styles.headerAvatar, isBot && styles.headerAvatarBot]}>
-          <Ionicons name={isBot ? 'flag' : 'person'} size={20} color={isBot ? '#4A90D9' : '#999'} />
+          {otherUserAvatarUrl ? (
+            <Image source={{ uri: otherUserAvatarUrl }} style={styles.headerAvatarImage} />
+          ) : (
+            <Ionicons name={isBot ? 'flag' : 'person'} size={20} color={isBot ? '#4A90D9' : '#999'} />
+          )}
         </View>
         <Text style={styles.headerTitle}>{otherUserName}</Text>
       </View>
 
       <FlatList
         ref={flatListRef}
-        data={messages}
+        data={reversedMessages}
         keyExtractor={(item) => item.id}
         renderItem={renderMessage}
         contentContainerStyle={styles.messagesList}
-        onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: false })}
+        inverted
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
             <Text style={styles.emptyText}>Aucun message</Text>
@@ -259,7 +267,8 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
     backgroundColor: '#fff',
     borderBottomWidth: 1,
     borderBottomColor: '#eee',
@@ -269,9 +278,9 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   headerAvatar: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     backgroundColor: '#f0f0f0',
     justifyContent: 'center',
     alignItems: 'center',
@@ -279,6 +288,11 @@ const styles = StyleSheet.create({
   },
   headerAvatarBot: {
     backgroundColor: '#e8f4fd',
+  },
+  headerAvatarImage: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
   },
   headerTitle: {
     fontSize: 17,

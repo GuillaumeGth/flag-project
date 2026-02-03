@@ -99,6 +99,7 @@ export default function InboxScreen({ navigation }: Props) {
         onPress={() => navigation.navigate('Conversation', {
           otherUserId: item.id,
           otherUserName: item.otherUser.display_name || 'Utilisateur',
+          otherUserAvatarUrl: item.otherUser.avatar_url,
         })}
         activeOpacity={0.7}
       >

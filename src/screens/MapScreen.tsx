@@ -9,6 +9,7 @@ import {
   Platform,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
 import MapView, { Marker } from 'react-native-maps';
 import { Ionicons } from '@expo/vector-icons';
 import { captureRef } from 'react-native-view-shot';
@@ -29,8 +30,7 @@ const LNG_DELTA = 0.009;
 
 export default function MapScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets();
-  const { current: userLocation, loading: locationLoading, refreshLocation, requestPermission, permission } = useLocation();
-  const { user } = useAuth();
+  const { current: userLocation, loading: locationLoading, refreshLocation, requestPermission, permission } = useLocation();  
   const mapRef = useRef<MapView>(null);
   const [messages, setMessages] = useState<UndiscoveredMessageMapMeta[]>([]);
   const [loading, setLoading] = useState(true);
@@ -46,9 +46,13 @@ export default function MapScreen({ navigation }: Props) {
     }
   }, []);
 
-  useEffect(() => {
-    loadMessages();
-  }, []);
+  // Reload messages when screen gains focus (e.g., after reading a message)
+  useFocusEffect(
+    useCallback(() => {
+      setSelectedMessage(null);
+      loadMessages();
+    }, [])
+  );
 
   // Center on user when location changes
   useEffect(() => {
@@ -615,22 +619,25 @@ const styles = StyleSheet.create({
   },
   captureContainer: {
     position: 'absolute',
-    top: 0,
-    left: 0,
-    zIndex: -1,
+    top: 50,
+    left: 50,
+    zIndex: 9999,
+    opacity: 0.01,
   },
   captureAvatar: {
-    width: 60,
-    height: 60,
+    width: 56,
+    height: 56,
     backgroundColor: '#fff',
-    borderRadius: 30,
+    borderRadius: 28,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 5,
+    borderWidth: 2,
+    borderColor: '#fff',
   },
   captureAvatarImage: {
-    width: 54,
-    height: 54,
-    borderRadius: 27,
+    width: 52,
+    height: 52,
+    borderRadius: 26,
   },
 });

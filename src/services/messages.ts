@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import * as FileSystem from 'expo-file-system/legacy';
 import { Message, MessageWithSender, Coordinates, User, UndiscoveredMessageMeta, UndiscoveredMessageMapMeta, Conversation, MessageWithUsers } from '@/types';
 
 // Default Flag Bot user ID (created via seed.sql)
@@ -312,29 +313,46 @@ export async function uploadMedia(
   uri: string,
   type: 'photo' | 'audio'
 ): Promise<string | null> {
-  const { data: userData } = await supabase.auth.getUser();
-  if (!userData.user) return null;
+  try {
+    const { data: userData } = await supabase.auth.getUser();
+    if (!userData.user) {
+      console.error('No authenticated user');
+      return null;
+    }
 
-  const ext = type === 'photo' ? 'jpg' : 'm4a';
-  const fileName = `${userData.user.id}/${Date.now()}.${ext}`;
-
-  const response = await fetch(uri);
-  const blob = await response.blob();
-
-  const { error } = await supabase.storage
-    .from('media')
-    .upload(fileName, blob, {
-      contentType: type === 'photo' ? 'image/jpeg' : 'audio/m4a',
+    // Read file as base64
+    const base64 = await FileSystem.readAsStringAsync(uri, {
+      encoding: 'base64',
     });
 
-  if (error) {
-    console.error('Error uploading media:', error);
+    // Determine extension and content type
+    const ext = type === 'photo' ? 'jpg' : 'm4a';
+    const contentType = type === 'photo' ? 'image/jpeg' : 'audio/m4a';
+    const fileName = `${userData.user.id}/${Date.now()}.${ext}`;
+
+    // Convert base64 to ArrayBuffer
+    const { decode } = await import('base64-arraybuffer');
+    const arrayBuffer = decode(base64);
+
+    const { error } = await supabase.storage
+      .from('media')
+      .upload(fileName, arrayBuffer, {
+        contentType,
+        upsert: false,
+      });
+
+    if (error) {
+      console.error('Error uploading media:', error.message, error);
+      return null;
+    }
+
+    const { data: urlData } = supabase.storage
+      .from('media')
+      .getPublicUrl(fileName);
+
+    return urlData.publicUrl;
+  } catch (e) {
+    console.error('Exception during media upload:', e);
     return null;
   }
-
-  const { data: urlData } = supabase.storage
-    .from('media')
-    .getPublicUrl(fileName);
-
-  return urlData.publicUrl;
 }

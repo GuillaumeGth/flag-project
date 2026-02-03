@@ -34,12 +34,9 @@
       "intentFilters": [
         {
           "action": "VIEW",
-          "autoVerify": true,
           "data": [
             {
-              "scheme": "flag",
-              "host": "auth",
-              "pathPrefix": "/callback"
+              "scheme": "flag"
             }
           ],
           "category": ["BROWSABLE", "DEFAULT"]

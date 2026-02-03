@@ -69,17 +69,31 @@ DROP INDEX IF EXISTS messages_unread_idx;
 CREATE INDEX messages_unread_idx ON public.messages(recipient_id) WHERE is_read = FALSE;
 
 -- Function to auto-create user profile on signup
+-- Supports both phone auth (display_name) and Google OAuth (full_name/name)
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER AS $$
 BEGIN
-    INSERT INTO public.users (id, email, phone, display_name)
+    INSERT INTO public.users (id, email, phone, display_name, avatar_url)
     VALUES (
         NEW.id,
         NEW.email,
         NEW.phone,
-        COALESCE(NEW.raw_user_meta_data->>'display_name', NEW.email, NEW.phone)
+        COALESCE(
+            NEW.raw_user_meta_data->>'display_name',
+            NEW.raw_user_meta_data->>'full_name',
+            NEW.raw_user_meta_data->>'name',
+            NEW.email
+        ),
+        NEW.raw_user_meta_data->>'avatar_url'
     )
-    ON CONFLICT (id) DO NOTHING;
+    ON CONFLICT (id) DO UPDATE SET
+        email = EXCLUDED.email,
+        display_name = COALESCE(EXCLUDED.display_name, public.users.display_name),
+        avatar_url = COALESCE(EXCLUDED.avatar_url, public.users.avatar_url);
+    RETURN NEW;
+EXCEPTION WHEN OTHERS THEN
+    -- Log error but don't fail the auth user creation
+    RAISE LOG 'handle_new_user error: % %', SQLERRM, SQLSTATE;
     RETURN NEW;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;

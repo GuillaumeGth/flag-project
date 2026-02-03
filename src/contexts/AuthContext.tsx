@@ -1,6 +1,8 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import * as WebBrowser from 'expo-web-browser';
 import * as Linking from 'expo-linking';
+import { File } from 'expo-file-system/next';
+import { decode } from 'base64-arraybuffer';
 import { supabase } from '@/services/supabase';
 import { User, AuthState } from '@/types';
 
@@ -12,6 +14,7 @@ interface AuthContextType extends AuthState {
   signInWithGoogle: () => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
   updateAvatar: (imageUri: string) => Promise<{ error: Error | null }>;
+  updateDisplayName: (displayName: string) => Promise<{ error: Error | null }>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -64,24 +67,120 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     created_at: supabaseUser.created_at,
   });
 
+  // Fetch avatar from public.users table (takes priority over Google avatar)
+  const fetchUserAvatar = async (userId: string): Promise<string | null> => {
+    const { data } = await supabase
+      .from('users')
+      .select('avatar_url')
+      .eq('id', userId)
+      .single();
+    return data?.avatar_url || null;
+  };
+
+  // Update state with avatar from database
+  const updateUserWithDbAvatar = async (userId: string) => {
+    const dbAvatar = await fetchUserAvatar(userId);
+    if (dbAvatar) {
+      setState((prev) => ({
+        ...prev,
+        user: prev.user ? { ...prev.user, avatar_url: dbAvatar } : null,
+      }));
+    }
+  };
+
+  // Sync user profile with Google data if display_name is missing
+  const syncUserProfile = async (authUser: any) => {
+    if (!authUser?.id) return;
+
+    const googleName =
+      authUser.user_metadata?.full_name ||
+      authUser.user_metadata?.name ||
+      authUser.user_metadata?.display_name;
+    const googleAvatar = authUser.user_metadata?.avatar_url;
+
+    if (!googleName && !googleAvatar) return;
+
+    // Check current profile in database
+    const { data: profile } = await supabase
+      .from('users')
+      .select('display_name, avatar_url')
+      .eq('id', authUser.id)
+      .single();
+
+    // Update if display_name or avatar_url is missing
+    const updates: { display_name?: string; avatar_url?: string } = {};
+
+    if (!profile?.display_name && googleName) {
+      updates.display_name = googleName;
+    }
+    if (!profile?.avatar_url && googleAvatar) {
+      updates.avatar_url = googleAvatar;
+    }
+
+    if (Object.keys(updates).length > 0) {
+      console.log('Syncing user profile with Google data:', updates);
+      const { error } = await supabase
+        .from('users')
+        .update(updates)
+        .eq('id', authUser.id);
+
+      if (error) {
+        console.log('Error syncing profile:', error);
+      } else {
+        // Update local state with the new data
+        setState((prev) => ({
+          ...prev,
+          user: prev.user
+            ? {
+                ...prev.user,
+                display_name: updates.display_name || prev.user.display_name,
+                avatar_url: updates.avatar_url || prev.user.avatar_url,
+              }
+            : null,
+        }));
+      }
+    }
+  };
+
   useEffect(() => {
     // Handle deep link for OAuth callback
     const handleDeepLink = async (event: { url: string }) => {
       const url = event.url;
       console.log('=== DEEP LINK EVENT ===', url);
 
-      if (url.includes('auth/callback')) {
-        // Try to extract tokens from hash
+      if (url.includes('auth/callback') || url.includes('auth%2Fcallback')) {
+        let accessToken: string | null = null;
+        let refreshToken: string | null = null;
+        let code: string | null = null;
+
+        // Try to extract tokens from hash fragment
         const hashIndex = url.indexOf('#');
         if (hashIndex !== -1) {
           const hashParams = new URLSearchParams(url.substring(hashIndex + 1));
-          const accessToken = hashParams.get('access_token');
-          const refreshToken = hashParams.get('refresh_token');
+          accessToken = hashParams.get('access_token');
+          refreshToken = hashParams.get('refresh_token');
+          console.log('Deep link hash - access:', !!accessToken, 'refresh:', !!refreshToken);
+        }
 
-          console.log('Tokens from deep link - access:', !!accessToken, 'refresh:', !!refreshToken);
+        // Try to extract from query params
+        const queryIndex = url.indexOf('?');
+        if (queryIndex !== -1) {
+          const queryEnd = hashIndex !== -1 ? hashIndex : url.length;
+          const queryString = url.substring(queryIndex + 1, queryEnd);
+          const queryParams = new URLSearchParams(queryString);
+          code = queryParams.get('code');
+          if (!accessToken) accessToken = queryParams.get('access_token');
+          if (!refreshToken) refreshToken = queryParams.get('refresh_token');
+          console.log('Deep link query - code:', !!code, 'access:', !!accessToken, 'refresh:', !!refreshToken);
+        }
 
-          if (accessToken && refreshToken) {
-            await setSessionAndUpdateState(accessToken, refreshToken);
+        if (accessToken && refreshToken) {
+          await setSessionAndUpdateState(accessToken, refreshToken);
+        } else if (code) {
+          console.log('Exchanging code from deep link');
+          const { error } = await supabase.auth.exchangeCodeForSession(code);
+          if (error) {
+            console.log('Error exchanging code:', error.message);
           }
         }
       }
@@ -107,12 +206,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const sessionPromise = supabase.auth.getSession();
         const { data: { session } } = await Promise.race([sessionPromise, timeoutPromise]) as any;
 
+        const mappedUser = session?.user ? mapUser(session.user) : null;
         setState((prev) => ({
           ...prev,
           session,
-          user: session?.user ? mapUser(session.user) : null,
+          user: mappedUser,
           loading: false,
         }));
+
+        if (mappedUser && session?.user) {
+          // Sync profile in background - don't block the app
+          syncUserProfile(session.user).catch((e) => console.log('Sync profile error:', e));
+          updateUserWithDbAvatar(mappedUser.id).catch((e) => console.log('Update avatar error:', e));
+        }
       } catch (error) {
         console.log('Session check failed:', error);
         setState((prev) => ({
@@ -127,14 +233,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Listen for auth changes
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
+    } = supabase.auth.onAuthStateChange(async (_event, session) => {
       console.log('Auth state changed:', _event);
+      const mappedUser = session?.user ? mapUser(session.user) : null;
       setState((prev) => ({
         ...prev,
         session,
-        user: session?.user ? mapUser(session.user) : null,
+        user: mappedUser,
         loading: false,
       }));
+
+      if (mappedUser && session?.user) {
+        // Sync profile in background - don't block the UI
+        syncUserProfile(session.user).catch((e) => console.log('Sync profile error:', e));
+        updateUserWithDbAvatar(mappedUser.id).catch((e) => console.log('Update avatar error:', e));
+      }
     });
 
     return () => {
@@ -161,8 +274,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signInWithGoogle = async () => {
     try {
-      // Use custom scheme for development builds
       const redirectUrl = 'flag://auth/callback';
+      console.log('=== GOOGLE AUTH START ===');
+      console.log('Redirect URL:', redirectUrl);
 
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
@@ -178,7 +292,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (error) throw error;
       if (!data.url) throw new Error('No OAuth URL returned');
 
-      const result = await WebBrowser.openAuthSessionAsync(data.url, redirectUrl);
+      console.log('OAuth URL:', data.url);
+
+      // Use openAuthSessionAsync with flag:// prefix to capture any flag:// redirect
+      const result = await WebBrowser.openAuthSessionAsync(data.url, 'flag://');
 
       console.log('=== AUTH DEBUG ===');
       console.log('Result type:', result.type);
@@ -186,40 +303,42 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (result.type === 'success' && result.url) {
         console.log('Full URL:', result.url);
 
-        // Try to extract tokens from hash
-        const urlParts = result.url.split('#');
-        if (urlParts.length > 1) {
-          const hashParams = new URLSearchParams(urlParts[1]);
-          const accessToken = hashParams.get('access_token');
-          const refreshToken = hashParams.get('refresh_token');
+        // Check for error in URL first
+        const urlObj = new URL(result.url);
+        const errorParam = urlObj.searchParams.get('error') || urlObj.hash.includes('error=');
+        const errorDescription = urlObj.searchParams.get('error_description');
 
-          console.log('Access token found:', !!accessToken);
-          console.log('Refresh token found:', !!refreshToken);
-
-          if (accessToken && refreshToken) {
-            const { error: sessionError } = await setSessionAndUpdateState(accessToken, refreshToken);
-            return { error: sessionError };
-          }
+        if (errorParam && errorDescription) {
+          const decodedError = decodeURIComponent(errorDescription.replace(/\+/g, ' '));
+          console.log('Auth error from Supabase:', decodedError);
+          throw new Error(decodedError);
         }
 
-        // Try query params (PKCE flow)
-        const queryParts = result.url.split('?');
-        if (queryParts.length > 1) {
-          const queryParams = new URLSearchParams(queryParts[1].split('#')[0]);
-          const code = queryParams.get('code');
+        // Parse URL to extract tokens or code
+        let accessToken: string | null = null;
+        let refreshToken: string | null = null;
 
-          console.log('Auth code found:', !!code);
-
-          if (code) {
-            const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
-            if (exchangeError) throw exchangeError;
-            return { error: null };
-          }
+        // Try to extract from hash fragment
+        const hashIndex = result.url.indexOf('#');
+        if (hashIndex !== -1) {
+          const hashParams = new URLSearchParams(result.url.substring(hashIndex + 1));
+          accessToken = hashParams.get('access_token');
+          refreshToken = hashParams.get('refresh_token');
+          console.log('Hash params - access:', !!accessToken, 'refresh:', !!refreshToken);
         }
 
-        // If we got here, no tokens found
-        console.log('No tokens or code found in URL');
-        throw new Error('Authentication failed - no tokens received');
+        if (accessToken && refreshToken) {
+          console.log('Setting session with tokens');
+          const { error: sessionError } = await setSessionAndUpdateState(accessToken, refreshToken);
+          return { error: sessionError };
+        }
+
+        // Tokens not in URL, let deep link listener handle it
+        console.log('No tokens in result URL, checking deep link listener...');
+      }
+
+      if (result.type === 'cancel') {
+        console.log('User cancelled authentication');
       }
 
       return { error: null };
@@ -235,47 +354,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         throw new Error('User not authenticated');
       }
 
-      // Fetch the image and convert to blob
-      const response = await fetch(imageUri);
-      const blob = await response.blob();
-
-      // Determine file extension from blob MIME type or URI
-      const validExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'heic'];
-      let fileExt = 'jpg'; // Default extension
-
-      // Try to get extension from blob MIME type first (most reliable)
-      if (blob.type) {
-        const mimeExt = blob.type.split('/')[1]?.toLowerCase();
-        if (mimeExt && validExtensions.includes(mimeExt)) {
-          fileExt = mimeExt === 'jpeg' ? 'jpg' : mimeExt;
-        }
-      }
-
-      // Fallback: try to extract from URI if blob type didn't work
-      if (fileExt === 'jpg' && imageUri.includes('.')) {
-        const uriExt = imageUri.split('.').pop()?.toLowerCase()?.split('?')[0];
-        if (uriExt && validExtensions.includes(uriExt)) {
-          fileExt = uriExt === 'jpeg' ? 'jpg' : uriExt;
-        }
-      }
-
+      // Get file extension
+      const fileExt = imageUri.split('.').pop()?.toLowerCase()?.split('?')[0] || 'jpg';
       const fileName = `${state.user.id}/${Date.now()}.${fileExt}`;
+      const contentType = fileExt === 'png' ? 'image/png' : 'image/jpeg';
 
-      // Map extension to proper MIME type
-      const mimeTypes: Record<string, string> = {
-        jpg: 'image/jpeg',
-        jpeg: 'image/jpeg',
-        png: 'image/png',
-        gif: 'image/gif',
-        webp: 'image/webp',
-        heic: 'image/heic',
-      };
-      const contentType = mimeTypes[fileExt] || 'image/jpeg';
+      // Read file as base64 using expo-file-system new API
+      const file = new File(imageUri);
+      const base64 = await file.base64();
+
+      // Convert base64 to ArrayBuffer
+      const arrayBuffer = decode(base64);
 
       // Upload to Supabase Storage
       const { error: uploadError } = await supabase.storage
         .from('avatars')
-        .upload(fileName, blob, {
+        .upload(fileName, arrayBuffer, {
           contentType,
           upsert: true,
         });
@@ -291,13 +385,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       const avatarUrl = urlData.publicUrl;
 
-      // Update user metadata
+      // Update user metadata in auth
       const { error: updateError } = await supabase.auth.updateUser({
         data: { avatar_url: avatarUrl },
       });
 
       if (updateError) {
         throw updateError;
+      }
+
+      // Also update the public.users table
+      const { error: dbError } = await supabase
+        .from('users')
+        .update({ avatar_url: avatarUrl })
+        .eq('id', state.user.id);
+
+      if (dbError) {
+        console.log('Error updating users table:', dbError);
       }
 
       // Update local state
@@ -309,6 +413,40 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return { error: null };
     } catch (error) {
       console.log('Update avatar error:', error);
+      return { error: error as Error };
+    }
+  };
+
+  const updateDisplayName = async (displayName: string): Promise<{ error: Error | null }> => {
+    try {
+      if (!state.user?.id) {
+        throw new Error('User not authenticated');
+      }
+
+      // Update in public.users table
+      const { error: dbError } = await supabase
+        .from('users')
+        .update({ display_name: displayName })
+        .eq('id', state.user.id);
+
+      if (dbError) {
+        throw dbError;
+      }
+
+      // Update user metadata in auth
+      await supabase.auth.updateUser({
+        data: { display_name: displayName },
+      });
+
+      // Update local state
+      setState((prev) => ({
+        ...prev,
+        user: prev.user ? { ...prev.user, display_name: displayName } : null,
+      }));
+
+      return { error: null };
+    } catch (error) {
+      console.log('Update display name error:', error);
       return { error: error as Error };
     }
   };
@@ -326,6 +464,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         signInWithGoogle,
         signOut,
         updateAvatar,
+        updateDisplayName,
       }}
     >
       {children}

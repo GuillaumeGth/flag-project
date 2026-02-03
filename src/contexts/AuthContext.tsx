@@ -11,6 +11,7 @@ interface AuthContextType extends AuthState {
   verifyOtp: (phone: string, token: string) => Promise<{ error: Error | null }>;
   signInWithGoogle: () => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
+  updateAvatar: (imageUri: string) => Promise<{ error: Error | null }>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -228,6 +229,61 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const updateAvatar = async (imageUri: string): Promise<{ error: Error | null }> => {
+    try {
+      if (!state.user?.id) {
+        throw new Error('User not authenticated');
+      }
+
+      // Fetch the image and convert to blob
+      const response = await fetch(imageUri);
+      const blob = await response.blob();
+
+      // Generate unique filename
+      const fileExt = imageUri.split('.').pop() || 'jpg';
+      const fileName = `${state.user.id}/${Date.now()}.${fileExt}`;
+
+      // Upload to Supabase Storage
+      const { error: uploadError } = await supabase.storage
+        .from('avatars')
+        .upload(fileName, blob, {
+          contentType: `image/${fileExt}`,
+          upsert: true,
+        });
+
+      if (uploadError) {
+        throw uploadError;
+      }
+
+      // Get public URL
+      const { data: urlData } = supabase.storage
+        .from('avatars')
+        .getPublicUrl(fileName);
+
+      const avatarUrl = urlData.publicUrl;
+
+      // Update user metadata
+      const { error: updateError } = await supabase.auth.updateUser({
+        data: { avatar_url: avatarUrl },
+      });
+
+      if (updateError) {
+        throw updateError;
+      }
+
+      // Update local state
+      setState((prev) => ({
+        ...prev,
+        user: prev.user ? { ...prev.user, avatar_url: avatarUrl } : null,
+      }));
+
+      return { error: null };
+    } catch (error) {
+      console.log('Update avatar error:', error);
+      return { error: error as Error };
+    }
+  };
+
   const signOut = async () => {
     await supabase.auth.signOut();
   };
@@ -240,6 +296,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         verifyOtp,
         signInWithGoogle,
         signOut,
+        updateAvatar,
       }}
     >
       {children}

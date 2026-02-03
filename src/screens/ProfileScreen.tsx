@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -6,12 +6,40 @@ import {
   StyleSheet,
   Image,
   Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import * as ImagePicker from 'expo-image-picker';
 import { useAuth } from '@/contexts/AuthContext';
 
 export default function ProfileScreen() {
-  const { user, signOut } = useAuth();
+  const { user, signOut, updateAvatar } = useAuth();
+  const [uploading, setUploading] = useState(false);
+
+  const handleChangeAvatar = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permission refusée', 'Nous avons besoin de la permission pour accéder à vos photos.');
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.8,
+    });
+
+    if (!result.canceled && result.assets[0]) {
+      setUploading(true);
+      const { error } = await updateAvatar(result.assets[0].uri);
+      setUploading(false);
+
+      if (error) {
+        Alert.alert('Erreur', 'Impossible de mettre à jour votre avatar. Veuillez réessayer.');
+      }
+    }
+  };
 
   const handleSignOut = () => {
     Alert.alert(
@@ -31,13 +59,20 @@ export default function ProfileScreen() {
       </View>
 
       <View style={styles.profileSection}>
-        <View style={styles.avatar}>
-          {user?.avatar_url ? (
-            <Image source={{ uri: user.avatar_url }} style={styles.avatarImage} />
-          ) : (
-            <Ionicons name="person" size={48} color="#999" />
-          )}
-        </View>
+        <TouchableOpacity onPress={handleChangeAvatar} disabled={uploading}>
+          <View style={styles.avatar}>
+            {uploading ? (
+              <ActivityIndicator size="large" color="#4A90D9" />
+            ) : user?.avatar_url ? (
+              <Image source={{ uri: user.avatar_url }} style={styles.avatarImage} />
+            ) : (
+              <Ionicons name="person" size={48} color="#999" />
+            )}
+          </View>
+          <View style={styles.avatarEditBadge}>
+            <Ionicons name="camera" size={16} color="#fff" />
+          </View>
+        </TouchableOpacity>
         <Text style={styles.displayName}>
           {user?.display_name || 'Utilisateur'}
         </Text>
@@ -116,6 +151,19 @@ const styles = StyleSheet.create({
     width: 96,
     height: 96,
     borderRadius: 48,
+  },
+  avatarEditBadge: {
+    position: 'absolute',
+    bottom: 16,
+    right: 0,
+    backgroundColor: '#4A90D9',
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 3,
+    borderColor: '#fff',
   },
   displayName: {
     fontSize: 22,

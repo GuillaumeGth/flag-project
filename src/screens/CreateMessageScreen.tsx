@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   View,
   Text,
@@ -17,20 +17,34 @@ import { useLocation } from '@/contexts/LocationContext';
 import { sendMessage, uploadMedia } from '@/services/messages';
 import { MessageContentType } from '@/types';
 
+interface Recipient {
+  id: string;
+  name: string;
+}
+
 interface Props {
   navigation: any;
   route: {
     params?: {
       recipientId?: string;
       recipientName?: string;
+      recipients?: Recipient[];
     };
   };
 }
 
 export default function CreateMessageScreen({ navigation, route }: Props) {
   const { current: userLocation } = useLocation();
-  const recipientId = route.params?.recipientId;
-  const recipientName = route.params?.recipientName || 'Destinataire';
+
+  // Support both old format (single recipient) and new format (multiple recipients)
+  const recipients: Recipient[] = route.params?.recipients ||
+    (route.params?.recipientId
+      ? [{ id: route.params.recipientId, name: route.params.recipientName || 'Destinataire' }]
+      : []);
+
+  const recipientsDisplay = recipients.length > 0
+    ? recipients.map(r => r.name).join(', ')
+    : 'Sélectionner';
 
   const [contentType, setContentType] = useState<MessageContentType>('text');
   const [textContent, setTextContent] = useState('');
@@ -38,6 +52,8 @@ export default function CreateMessageScreen({ navigation, route }: Props) {
   const [recording, setRecording] = useState<Audio.Recording | null>(null);
   const [isRecording, setIsRecording] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const soundRef = useRef<Audio.Sound | null>(null);
 
   const pickImage = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -105,9 +121,49 @@ export default function CreateMessageScreen({ navigation, route }: Props) {
     }
   };
 
-  const clearMedia = () => {
+  const clearMedia = async () => {
+    if (soundRef.current) {
+      await soundRef.current.unloadAsync();
+      soundRef.current = null;
+    }
+    setIsPlaying(false);
     setMediaUri(null);
     setContentType('text');
+  };
+
+  const playAudio = async () => {
+    if (!mediaUri) return;
+
+    try {
+      if (isPlaying && soundRef.current) {
+        await soundRef.current.stopAsync();
+        setIsPlaying(false);
+        return;
+      }
+
+      await Audio.setAudioModeAsync({
+        allowsRecordingIOS: false,
+        playsInSilentModeIOS: true,
+      });
+
+      if (soundRef.current) {
+        await soundRef.current.unloadAsync();
+      }
+
+      const { sound } = await Audio.Sound.createAsync({ uri: mediaUri });
+      soundRef.current = sound;
+
+      sound.setOnPlaybackStatusUpdate((status) => {
+        if (status.isLoaded && status.didJustFinish) {
+          setIsPlaying(false);
+        }
+      });
+
+      await sound.playAsync();
+      setIsPlaying(true);
+    } catch (error) {
+      console.error('Error playing audio:', error);
+    }
   };
 
   const handleSend = async () => {
@@ -116,8 +172,8 @@ export default function CreateMessageScreen({ navigation, route }: Props) {
       return;
     }
 
-    if (!recipientId) {
-      Alert.alert('Erreur', 'Sélectionnez un destinataire');
+    if (recipients.length === 0) {
+      Alert.alert('Erreur', 'Sélectionnez au moins un destinataire');
       return;
     }
 
@@ -146,18 +202,33 @@ export default function CreateMessageScreen({ navigation, route }: Props) {
         uploadedMediaUrl = url;
       }
 
-      const message = await sendMessage(
-        recipientId,
-        contentType,
-        userLocation,
-        textContent || undefined,
-        uploadedMediaUrl
+      // Send message to all recipients
+      const sendPromises = recipients.map((recipient) =>
+        sendMessage(
+          recipient.id,
+          contentType,
+          userLocation,
+          textContent || undefined,
+          uploadedMediaUrl
+        )
       );
 
-      if (message) {
-        Alert.alert('Succès', 'Message envoyé !', [
+      const results = await Promise.all(sendPromises);
+      const successCount = results.filter(Boolean).length;
+
+      if (successCount === recipients.length) {
+        const message = recipients.length > 1
+          ? `Message envoyé à ${recipients.length} destinataires !`
+          : 'Message envoyé !';
+        Alert.alert('Succès', message, [
           { text: 'OK', onPress: () => navigation.goBack() },
         ]);
+      } else if (successCount > 0) {
+        Alert.alert(
+          'Envoi partiel',
+          `Message envoyé à ${successCount}/${recipients.length} destinataires`,
+          [{ text: 'OK', onPress: () => navigation.goBack() }]
+        );
       } else {
         Alert.alert('Erreur', 'Échec de l\'envoi');
       }
@@ -184,7 +255,9 @@ export default function CreateMessageScreen({ navigation, route }: Props) {
           style={styles.recipientButton}
           onPress={() => navigation.navigate('SelectRecipient')}
         >
-          <Text style={styles.recipientName}>{recipientName}</Text>
+          <Text style={styles.recipientName} numberOfLines={2}>
+            {recipientsDisplay}
+          </Text>
           <Ionicons name="chevron-forward" size={20} color="#666" />
         </TouchableOpacity>
       </View>
@@ -208,8 +281,16 @@ export default function CreateMessageScreen({ navigation, route }: Props) {
 
       {mediaUri && contentType === 'audio' && (
         <View style={styles.audioPreview}>
-          <Ionicons name="mic" size={24} color="#4A90D9" />
-          <Text style={styles.audioText}>Audio enregistré</Text>
+          <TouchableOpacity onPress={playAudio} style={styles.playButton}>
+            <Ionicons
+              name={isPlaying ? 'pause' : 'play'}
+              size={24}
+              color="#fff"
+            />
+          </TouchableOpacity>
+          <Text style={styles.audioText}>
+            {isPlaying ? 'Lecture en cours...' : 'Audio enregistré'}
+          </Text>
           <TouchableOpacity onPress={clearMedia}>
             <Ionicons name="close-circle" size={24} color="#999" />
           </TouchableOpacity>
@@ -356,9 +437,17 @@ const styles = StyleSheet.create({
     padding: 12,
     marginBottom: 16,
   },
+  playButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#4A90D9',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   audioText: {
     flex: 1,
-    marginLeft: 8,
+    marginLeft: 12,
     fontSize: 14,
     color: '#333',
   },

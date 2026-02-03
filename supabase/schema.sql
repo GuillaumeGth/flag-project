@@ -126,12 +126,17 @@ CREATE TRIGGER on_user_created_send_welcome
     AFTER INSERT ON public.users
     FOR EACH ROW EXECUTE FUNCTION public.send_welcome_message();
 
--- Storage bucket for media
+-- Storage bucket for media (photos, audio)
 INSERT INTO storage.buckets (id, name, public)
 VALUES ('media', 'media', true)
 ON CONFLICT (id) DO NOTHING;
 
--- Storage policies (drop if exists, then create)
+-- Storage bucket for avatars
+INSERT INTO storage.buckets (id, name, public)
+VALUES ('avatars', 'avatars', true)
+ON CONFLICT (id) DO NOTHING;
+
+-- Storage policies for media bucket
 DROP POLICY IF EXISTS "Authenticated users can upload media" ON storage.objects;
 CREATE POLICY "Authenticated users can upload media"
 ON storage.objects FOR INSERT
@@ -141,3 +146,34 @@ DROP POLICY IF EXISTS "Anyone can view media" ON storage.objects;
 CREATE POLICY "Anyone can view media"
 ON storage.objects FOR SELECT
 USING (bucket_id = 'media');
+
+-- Storage policies for avatars bucket
+DROP POLICY IF EXISTS "Anyone can view avatars" ON storage.objects;
+CREATE POLICY "Anyone can view avatars"
+ON storage.objects FOR SELECT
+USING (bucket_id = 'avatars');
+
+DROP POLICY IF EXISTS "Users can upload own avatar" ON storage.objects;
+CREATE POLICY "Users can upload own avatar"
+ON storage.objects FOR INSERT
+WITH CHECK (
+    bucket_id = 'avatars'
+    AND auth.role() = 'authenticated'
+    AND auth.uid()::text = (storage.foldername(name))[1]
+);
+
+DROP POLICY IF EXISTS "Users can update own avatar" ON storage.objects;
+CREATE POLICY "Users can update own avatar"
+ON storage.objects FOR UPDATE
+USING (
+    bucket_id = 'avatars'
+    AND auth.uid()::text = (storage.foldername(name))[1]
+);
+
+DROP POLICY IF EXISTS "Users can delete own avatar" ON storage.objects;
+CREATE POLICY "Users can delete own avatar"
+ON storage.objects FOR DELETE
+USING (
+    bucket_id = 'avatars'
+    AND auth.uid()::text = (storage.foldername(name))[1]
+);

@@ -283,6 +283,8 @@ export default function MapScreen({ navigation }: Props) {
               key={message.id}
               coordinate={location}
               onPress={() => handleMarkerPress(message)}
+              image={require('../assets/red-circle.png')}
+
             >
               <View style={styles.initialsMarker}>
                 <Text style={styles.initialsText}>
@@ -597,14 +599,14 @@ const styles = StyleSheet.create({
     height: 50,
   },
   initialsMarker: {
-    width: 50,
-    height: 50,
-    backgroundColor: '#E74C3C',
+    width: 42,
+    height: 42,
+    
     borderRadius: 25,
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 2,
-    borderColor: '#fff',
+    
+    
   },
   initialsText: {
     fontSize: 18,

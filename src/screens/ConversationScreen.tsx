@@ -18,7 +18,6 @@ import { useAuth } from '@/contexts/AuthContext';
 import {
   fetchConversationMessages,
   sendMessage,
-  markMessageAsRead,
   FLAG_BOT_ID,
 } from '@/services/messages';
 import { MessageWithUsers } from '@/types';
@@ -51,13 +50,6 @@ export default function ConversationScreen({ navigation, route }: Props) {
     const data = await fetchConversationMessages(otherUserId);
     setMessages(data);
     setLoading(false);
-
-    // Mark unread messages as read (except from Flag Bot for testing)
-    for (const msg of data) {
-      if (msg.recipient_id === user?.id && !msg.is_read && msg.sender_id !== FLAG_BOT_ID) {
-        await markMessageAsRead(msg.id);
-      }
-    }
   };
 
   // Reverse messages for inverted FlatList (newest at bottom)

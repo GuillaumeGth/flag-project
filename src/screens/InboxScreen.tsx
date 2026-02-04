@@ -38,9 +38,15 @@ export default function InboxScreen({ navigation }: Props) {
 
   const loadConversations = async () => {
     setLoading(true);
-    const data = await fetchConversations();
-    setConversations(data);
-    setLoading(false);
+    try {
+      const data = await fetchConversations();
+      setConversations(data);
+    } catch (error) {
+      console.error('Error loading conversations:', error);
+      setConversations([]);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const onRefresh = useCallback(async () => {

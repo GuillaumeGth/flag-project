@@ -54,6 +54,12 @@ export async function fetchConversations(): Promise<Conversation[]> {
     const otherUserId = isFromMe ? msg.recipient_id : msg.sender_id;
     const otherUser = isFromMe ? msg.recipient : msg.sender;
 
+    // Skip if other user data is missing (user might have been deleted)
+    if (!otherUser || !otherUserId) {
+      console.warn('Skipping message with missing user data:', msg.id);
+      continue;
+    }
+
     if (!conversationsMap.has(otherUserId)) {
       // Count unread messages from this user
       const unreadCount = (messages || []).filter(

@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -8,11 +8,15 @@ import {
   ActivityIndicator,
   RefreshControl,
   Image,
+  ScrollView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { fetchConversations, FLAG_BOT_ID } from '@/services/messages';
 import { Conversation } from '@/types';
+
+// DEBUG MODE - set to false to disable on-screen logs
+const DEBUG_MODE = true;
 
 interface Props {
   navigation: any;
@@ -23,13 +27,21 @@ export default function InboxScreen({ navigation }: Props) {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const isLoadingRef = useRef(false);
+  const [debugLogs, setDebugLogs] = useState<string[]>([]);
 
+  const addLog = (message: string) => {
+    const timestamp = new Date().toLocaleTimeString();
+    setDebugLogs(prev => [...prev, `[${timestamp}] ${message}`]);
+    console.log(message);
+  };
+
+  // Load conversations on mount and when screen comes into focus
   useEffect(() => {
+    // Load immediately on mount
     loadConversations();
-  }, []);
 
-  // Refresh when screen comes into focus
-  useEffect(() => {
+    // Also refresh when navigating back to this screen
     const unsubscribe = navigation.addListener('focus', () => {
       loadConversations();
     });
@@ -37,14 +49,26 @@ export default function InboxScreen({ navigation }: Props) {
   }, [navigation]);
 
   const loadConversations = async () => {
+    // Prevent concurrent calls
+    if (isLoadingRef.current) {
+      addLog('Already loading, skipping...');
+      return;
+    }
+
+    addLog('loadConversations started');
+    isLoadingRef.current = true;
     setLoading(true);
     try {
+      addLog('Calling fetchConversations...');
       const data = await fetchConversations();
+      addLog(`Got ${data.length} conversations`);
       setConversations(data);
-    } catch (error) {
-      console.error('Error loading conversations:', error);
+    } catch (error: any) {
+      addLog(`ERROR: ${error?.message || error}`);
       setConversations([]);
     } finally {
+      addLog('Setting loading to false');
+      isLoadingRef.current = false;
       setLoading(false);
     }
   };
@@ -155,8 +179,17 @@ export default function InboxScreen({ navigation }: Props) {
 
   if (loading) {
     return (
-      <View style={styles.loadingContainer}>
+      <View style={[styles.loadingContainer, { paddingTop: insets.top }]}>
         <ActivityIndicator size="large" color="#4A90D9" />
+        <Text style={styles.loadingText}>Chargement...</Text>
+        {DEBUG_MODE && (
+          <ScrollView style={styles.debugContainer}>
+            <Text style={styles.debugTitle}>Debug Logs:</Text>
+            {debugLogs.map((log, index) => (
+              <Text key={index} style={styles.debugLog}>{log}</Text>
+            ))}
+          </ScrollView>
+        )}
       </View>
     );
   }
@@ -172,6 +205,15 @@ export default function InboxScreen({ navigation }: Props) {
           <Ionicons name="create-outline" size={24} color="#4A90D9" />
         </TouchableOpacity>
       </View>
+
+      {DEBUG_MODE && debugLogs.length > 0 && (
+        <ScrollView style={styles.debugContainerInline}>
+          <Text style={styles.debugTitle}>Debug Logs:</Text>
+          {debugLogs.map((log, index) => (
+            <Text key={index} style={styles.debugLog}>{log}</Text>
+          ))}
+        </ScrollView>
+      )}
 
       {conversations.length === 0 ? (
         <View style={styles.emptyContainer}>
@@ -211,6 +253,39 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 16,
+    color: '#666',
+  },
+  debugContainer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    maxHeight: 200,
+    backgroundColor: 'rgba(0,0,0,0.9)',
+    padding: 10,
+  },
+  debugTitle: {
+    color: '#4A90D9',
+    fontWeight: 'bold',
+    marginBottom: 5,
+  },
+  debugLog: {
+    color: '#0f0',
+    fontSize: 11,
+    fontFamily: 'monospace',
+    marginBottom: 2,
+  },
+  debugContainerInline: {
+    maxHeight: 150,
+    backgroundColor: 'rgba(0,0,0,0.9)',
+    padding: 10,
+    marginHorizontal: 10,
+    marginBottom: 10,
+    borderRadius: 8,
   },
   header: {
     flexDirection: 'row',

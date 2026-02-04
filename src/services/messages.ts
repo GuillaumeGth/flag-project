@@ -25,68 +25,96 @@ export async function fetchAllUsers(): Promise<User[]> {
 
 // Fetch all conversations for current user
 export async function fetchConversations(): Promise<Conversation[]> {
-  const { data: userData } = await supabase.auth.getUser();
-  if (!userData.user) return [];
+  console.log('[fetchConversations] Starting...');
 
-  const currentUserId = userData.user.id;
+  try {
+    const { data: userData, error: userError } = await supabase.auth.getUser();
+    console.log('[fetchConversations] Got user:', userData?.user?.id, 'error:', userError?.message);
 
-  // Fetch all messages where user is sender or recipient
-  const { data: messages, error } = await supabase
-    .from('messages')
-    .select(`
-      *,
-      sender:users!sender_id (id, display_name, avatar_url),
-      recipient:users!recipient_id (id, display_name, avatar_url)
-    `)
-    .or(`sender_id.eq.${currentUserId},recipient_id.eq.${currentUserId}`)
-    .order('created_at', { ascending: false });
+    if (userError) {
+      console.error('[fetchConversations] Auth error:', userError);
+      return [];
+    }
 
-  if (error) {
-    console.error('Error fetching conversations:', error);
+    if (!userData?.user) {
+      console.log('[fetchConversations] No user found');
+      return [];
+    }
+
+    const currentUserId = userData.user.id;
+
+    // Fetch all messages where user is sender or recipient
+    console.log('[fetchConversations] Fetching messages...');
+
+    // Add timeout to prevent infinite loading
+    const timeoutPromise = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error('Query timeout after 10s')), 10000)
+    );
+
+    const queryPromise = supabase
+      .from('messages')
+      .select(`
+        *,
+        sender:users!sender_id (id, display_name, avatar_url),
+        recipient:users!recipient_id (id, display_name, avatar_url)
+      `)
+      .or(`sender_id.eq.${currentUserId},recipient_id.eq.${currentUserId}`)
+      .order('created_at', { ascending: false });
+
+    const { data: messages, error } = await Promise.race([queryPromise, timeoutPromise]);
+
+    console.log('[fetchConversations] Messages fetched:', messages?.length, 'error:', error);
+
+    if (error) {
+      console.error('Error fetching conversations:', error);
+      return [];
+    }
+
+    // Group messages by conversation (other user)
+    const conversationsMap = new Map<string, Conversation>();
+
+    for (const msg of messages || []) {
+      const isFromMe = msg.sender_id === currentUserId;
+      const otherUserId = isFromMe ? msg.recipient_id : msg.sender_id;
+      const otherUser = isFromMe ? msg.recipient : msg.sender;
+
+      // Skip if other user data is missing (user might have been deleted)
+      if (!otherUser || !otherUserId) {
+        console.warn('Skipping message with missing user data:', msg.id);
+        continue;
+      }
+
+      if (!conversationsMap.has(otherUserId)) {
+        // Count unread messages from this user
+        const unreadCount = (messages || []).filter(
+          m => m.sender_id === otherUserId && m.recipient_id === currentUserId && !m.is_read
+        ).length;
+
+        conversationsMap.set(otherUserId, {
+          id: otherUserId,
+          otherUser: {
+            id: otherUser.id,
+            display_name: otherUser.display_name,
+            avatar_url: otherUser.avatar_url,
+          },
+          lastMessage: {
+            id: msg.id,
+            content_type: msg.content_type,
+            text_content: msg.text_content,
+            created_at: msg.created_at,
+            is_read: msg.is_read,
+            is_from_me: isFromMe,
+          },
+          unreadCount,
+        });
+      }
+    }
+
+    return Array.from(conversationsMap.values());
+  } catch (error) {
+    console.error('[fetchConversations] Exception:', error);
     return [];
   }
-
-  // Group messages by conversation (other user)
-  const conversationsMap = new Map<string, Conversation>();
-
-  for (const msg of messages || []) {
-    const isFromMe = msg.sender_id === currentUserId;
-    const otherUserId = isFromMe ? msg.recipient_id : msg.sender_id;
-    const otherUser = isFromMe ? msg.recipient : msg.sender;
-
-    // Skip if other user data is missing (user might have been deleted)
-    if (!otherUser || !otherUserId) {
-      console.warn('Skipping message with missing user data:', msg.id);
-      continue;
-    }
-
-    if (!conversationsMap.has(otherUserId)) {
-      // Count unread messages from this user
-      const unreadCount = (messages || []).filter(
-        m => m.sender_id === otherUserId && m.recipient_id === currentUserId && !m.is_read
-      ).length;
-
-      conversationsMap.set(otherUserId, {
-        id: otherUserId,
-        otherUser: {
-          id: otherUser.id,
-          display_name: otherUser.display_name,
-          avatar_url: otherUser.avatar_url,
-        },
-        lastMessage: {
-          id: msg.id,
-          content_type: msg.content_type,
-          text_content: msg.text_content,
-          created_at: msg.created_at,
-          is_read: msg.is_read,
-          is_from_me: isFromMe,
-        },
-        unreadCount,
-      });
-    }
-  }
-
-  return Array.from(conversationsMap.values());
 }
 
 // Fetch all messages for a specific conversation

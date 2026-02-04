@@ -67,6 +67,47 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     created_at: supabaseUser.created_at,
   });
 
+  // Ensure user exists in public.users table (fallback if trigger doesn't work)
+  const ensureUserInDatabase = async (authUser: any) => {
+    if (!authUser?.id) {
+      console.log('ensureUserInDatabase: No authUser.id');
+      return;
+    }
+
+    console.log('ensureUserInDatabase: Checking user', authUser.id);
+
+    const { data: existingUser, error: selectError } = await supabase
+      .from('users')
+      .select('id')
+      .eq('id', authUser.id)
+      .maybeSingle();
+
+    console.log('ensureUserInDatabase: existingUser=', existingUser, 'selectError=', selectError);
+
+    if (!existingUser) {
+      console.log('User not found in public.users, creating...');
+      const { error } = await supabase.from('users').insert({
+        id: authUser.id,
+        email: authUser.email,
+        phone: authUser.phone,
+        display_name:
+          authUser.user_metadata?.display_name ||
+          authUser.user_metadata?.full_name ||
+          authUser.user_metadata?.name ||
+          authUser.email,
+        avatar_url: authUser.user_metadata?.avatar_url,
+      });
+
+      if (error) {
+        console.log('Error creating user in public.users:', error);
+      } else {
+        console.log('User created in public.users successfully');
+      }
+    } else {
+      console.log('User already exists in public.users');
+    }
+  };
+
   // Fetch avatar from public.users table (takes priority over Google avatar)
   const fetchUserAvatar = async (userId: string): Promise<string | null> => {
     const { data } = await supabase
@@ -215,6 +256,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }));
 
         if (mappedUser && session?.user) {
+          // Ensure user exists in database first (fallback if trigger doesn't work)
+          await ensureUserInDatabase(session.user);
           // Sync profile in background - don't block the app
           syncUserProfile(session.user).catch((e) => console.log('Sync profile error:', e));
           updateUserWithDbAvatar(mappedUser.id).catch((e) => console.log('Update avatar error:', e));
@@ -244,6 +287,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }));
 
       if (mappedUser && session?.user) {
+        // Ensure user exists in database first (fallback if trigger doesn't work)
+        await ensureUserInDatabase(session.user);
         // Sync profile in background - don't block the UI
         syncUserProfile(session.user).catch((e) => console.log('Sync profile error:', e));
         updateUserWithDbAvatar(mappedUser.id).catch((e) => console.log('Update avatar error:', e));

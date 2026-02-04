@@ -3,8 +3,31 @@ import * as SecureStore from 'expo-secure-store';
 import Constants from 'expo-constants';
 
 // Get Supabase config from Constants (app.json extra) or env vars
-const supabaseUrl = Constants.expoConfig?.extra?.supabaseUrl || process.env.EXPO_PUBLIC_SUPABASE_URL || '';
-const supabaseAnonKey = Constants.expoConfig?.extra?.supabaseAnonKey || process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || '';
+// Try multiple sources for compatibility with different build types
+const supabaseUrl =
+  Constants.expoConfig?.extra?.supabaseUrl ||
+  Constants.manifest?.extra?.supabaseUrl ||
+  (Constants as any).manifest2?.extra?.expoClient?.extra?.supabaseUrl ||
+  process.env.EXPO_PUBLIC_SUPABASE_URL ||
+  '';
+
+const supabaseAnonKey =
+  Constants.expoConfig?.extra?.supabaseAnonKey ||
+  Constants.manifest?.extra?.supabaseAnonKey ||
+  (Constants as any).manifest2?.extra?.expoClient?.extra?.supabaseAnonKey ||
+  process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ||
+  '';
+
+// Debug logging for production issues
+console.log('[Supabase] URL configured:', supabaseUrl ? 'Yes' : 'No');
+console.log('[Supabase] Key configured:', supabaseAnonKey ? 'Yes' : 'No');
+if (!supabaseUrl || !supabaseAnonKey) {
+  console.error('[Supabase] Missing configuration!', {
+    hasExpoConfig: !!Constants.expoConfig,
+    hasManifest: !!Constants.manifest,
+    hasManifest2: !!(Constants as any).manifest2,
+  });
+}
 
 // Custom storage using SecureStore for sensitive data
 const ExpoSecureStoreAdapter = {

@@ -47,19 +47,21 @@ export async function fetchConversations(): Promise<Conversation[]> {
     console.log('[fetchConversations] Fetching messages...');
 
     // Add timeout to prevent infinite loading
-    const timeoutPromise = new Promise<never>((_, reject) =>
-      setTimeout(() => reject(new Error('Query timeout after 10s')), 10000)
+    const timeoutPromise = new Promise<{ data: null; error: Error }>((resolve) =>
+      setTimeout(() => resolve({ data: null, error: new Error('Query timeout after 10s') }), 10000)
     );
 
-    const queryPromise = supabase
-      .from('messages')
-      .select(`
-        *,
-        sender:users!sender_id (id, display_name, avatar_url),
-        recipient:users!recipient_id (id, display_name, avatar_url)
-      `)
-      .or(`sender_id.eq.${currentUserId},recipient_id.eq.${currentUserId}`)
-      .order('created_at', { ascending: false });
+    const queryPromise = (async () => {
+      return await supabase
+        .from('messages')
+        .select(`
+          *,
+          sender:users!sender_id (id, display_name, avatar_url),
+          recipient:users!recipient_id (id, display_name, avatar_url)
+        `)
+        .or(`sender_id.eq.${currentUserId},recipient_id.eq.${currentUserId}`)
+        .order('created_at', { ascending: false });
+    })();
 
     const { data: messages, error } = await Promise.race([queryPromise, timeoutPromise]);
 

@@ -21,6 +21,7 @@ import { UndiscoveredMessageMapMeta, Coordinates } from '@/types';
 
 interface Props {
   navigation: any;
+  route: any;
 }
 
 // 500m radius = ~0.009 latitudeDelta (1km visible area)
@@ -28,16 +29,19 @@ const VISIBLE_RADIUS_METERS = 500;
 const LAT_DELTA = 0.009;
 const LNG_DELTA = 0.009;
 
-export default function MapScreen({ navigation }: Props) {
+export default function MapScreen({ navigation, route }: Props) {
   const insets = useSafeAreaInsets();
   const { current: userLocation, loading: locationLoading, refreshLocation, requestPermission, permission } = useLocation();  
   const mapRef = useRef<MapView>(null);
   const [messages, setMessages] = useState<UndiscoveredMessageMapMeta[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedMessage, setSelectedMessage] = useState<UndiscoveredMessageMapMeta | null>(null);
+  const [centerLocation, setCenterLocation] = useState<Coordinates | null>(null);
+  const [centeredMessageId, setCenteredMessageId] = useState<string | null>(null);
   const [markersReady, setMarkersReady] = useState(false);
   const [avatarImages, setAvatarImages] = useState<Record<string, string>>({});
   const avatarRefs = useRef<Record<string, View | null>>({});
+  const focusTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Request location permission on mount
   useEffect(() => {
@@ -46,17 +50,47 @@ export default function MapScreen({ navigation }: Props) {
     }
   }, []);
 
-  // Reload messages when screen gains focus (e.g., after reading a message)
+  // Load messages whenever the map screen is focused
   useFocusEffect(
     useCallback(() => {
-      setSelectedMessage(null);
       loadMessages();
     }, [])
   );
 
-  // Center on user when location changes
+  // Remember which message we should center on when coming from another screen
   useEffect(() => {
-    if (userLocation && mapRef.current) {
+    const unsubscribe = navigation.addListener('focus', () => {
+      const params = navigation.getState()?.routes?.find(r => r.name === 'Map')?.params ?? route?.params;
+
+      if (params && params.messageId) {
+        setCenteredMessageId(params.messageId);
+      } else {
+        if (focusTimeoutRef.current) {
+          clearTimeout(focusTimeoutRef.current);
+          focusTimeoutRef.current = null;
+        }
+        setCenterLocation(null);
+        setCenteredMessageId(null);
+        setSelectedMessage(null);
+      }
+    });
+
+    return unsubscribe;
+  }, [navigation, route]);
+
+  // Clear any pending timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (focusTimeoutRef.current) {
+        clearTimeout(focusTimeoutRef.current);
+        focusTimeoutRef.current = null;
+      }
+    };
+  }, []);
+
+  // Center on user when location changes (unless we are focusing a specific message)
+  useEffect(() => {
+    if (userLocation && mapRef.current && !centeredMessageId) {
       console.log('DEBUG: User location:', userLocation.latitude, userLocation.longitude);
       mapRef.current.animateToRegion({
         latitude: userLocation.latitude,
@@ -65,7 +99,67 @@ export default function MapScreen({ navigation }: Props) {
         longitudeDelta: LNG_DELTA,
       }, 500);
     }
-  }, [userLocation]);
+  }, [userLocation, centeredMessageId]);
+
+  // When messages are loaded and we have a centeredMessageId, center the map on that message,
+  // then after a delay, return to the normal mode centered on the user
+  useEffect(() => {
+    if (!centeredMessageId || !mapRef.current || messages.length === 0) return;
+
+    const targetMessage = messages.find((m) => m.id === centeredMessageId);
+    if (!targetMessage) return;
+
+    const location = getMessageLocation(targetMessage);
+    if (!location) return;
+
+    setCenterLocation(location);
+    setSelectedMessage(targetMessage);
+    
+    // Clear any previous timeout before scheduling a new one
+    if (focusTimeoutRef.current) {
+      clearTimeout(focusTimeoutRef.current);
+      focusTimeoutRef.current = null;
+    }
+
+    // First, slightly zoom out around the flag
+    mapRef.current.animateToRegion(
+      {
+        latitude: location.latitude,
+        longitude: location.longitude,
+        latitudeDelta: 0.02,
+        longitudeDelta: 0.02,
+      },
+      500
+    );
+
+    // After 5 seconds, go back to normal mode centered on the user
+    if (userLocation) {
+      focusTimeoutRef.current = setTimeout(() => {
+        if (!mapRef.current || !userLocation) return;
+
+        setCenteredMessageId(null);
+        setCenterLocation(null);
+        setSelectedMessage(null);
+
+        mapRef.current.animateToRegion(
+          {
+            latitude: userLocation.latitude,
+            longitude: userLocation.longitude,
+            latitudeDelta: LAT_DELTA,
+            longitudeDelta: LNG_DELTA,
+          },
+          500
+        );
+      }, 5000);
+    }
+
+    return () => {
+      if (focusTimeoutRef.current) {
+        clearTimeout(focusTimeoutRef.current);
+        focusTimeoutRef.current = null;
+      }
+    };
+  }, [centeredMessageId, messages, userLocation]);
 
   const loadMessages = async () => {
     setLoading(true);

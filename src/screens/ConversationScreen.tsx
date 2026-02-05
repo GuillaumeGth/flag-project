@@ -113,6 +113,18 @@ export default function ConversationScreen({ navigation, route }: Props) {
     const showDateSeparator = shouldShowDateSeparator(index);
     const isUndiscovered = !isFromMe && !item.is_read;
 
+    const handleUndiscoveredPress = () => {
+      if (isUndiscovered && item.location) {
+        navigation.navigate('Main', {
+          screen: 'Map',
+          params: {
+            messageId: item.id,
+            canOpen: false,
+          },
+        });
+      }
+    };
+
     return (
       <View>
         <View
@@ -121,37 +133,67 @@ export default function ConversationScreen({ navigation, route }: Props) {
             isFromMe ? styles.messageContainerRight : styles.messageContainerLeft,
           ]}
         >
-          <View
-            style={[
-              styles.messageBubble,
-              isFromMe ? styles.messageBubbleRight : styles.messageBubbleLeft,
-              isUndiscovered && styles.messageBubbleUndiscovered,
-            ]}
-          >
-            {item.content_type === 'photo' && item.media_url && (
-              <Image source={{ uri: item.media_url }} style={styles.messageImage} blurRadius={isUndiscovered ? 20 : 0} />
-            )}
-            {item.content_type === 'audio' && (
-              <View style={styles.audioMessage}>
-                <Ionicons name="mic" size={20} color={isFromMe ? '#fff' : '#4A90D9'} />
-                <Text style={[styles.audioText, isFromMe && styles.audioTextRight]}>
-                  Message audio
+          {isUndiscovered ? (
+            <TouchableOpacity activeOpacity={0.7} onPress={handleUndiscoveredPress}>
+              <View
+                style={[
+                  styles.messageBubble,
+                  isFromMe ? styles.messageBubbleRight : styles.messageBubbleLeft,
+                  styles.messageBubbleUndiscovered,
+                ]}
+              >
+                {item.content_type === 'photo' && item.media_url && (
+                  <Image source={{ uri: item.media_url }} style={styles.messageImage} blurRadius={20} />
+                )}
+                {item.content_type === 'audio' && (
+                  <View style={styles.audioMessage}>
+                    <Ionicons name="mic" size={20} color={isFromMe ? '#fff' : '#4A90D9'} />
+                    <Text style={[styles.audioText, isFromMe && styles.audioTextRight]}>
+                      Message audio
+                    </Text>
+                  </View>
+                )}
+                {item.text_content ? (
+                  <Text style={[styles.messageText, isFromMe && styles.messageTextRight, styles.messageTextBlurred]}>
+                    {'••••••••••••••••'}
+                  </Text>
+                ) : null}
+                <Text style={[styles.messageTime, isFromMe && styles.messageTimeRight]}>
+                  {formatTime(item.created_at)}
+                  {isFromMe ? (item.is_read ? ' ✓✓' : ' ✓') : ''}
                 </Text>
+                <View style={styles.blurOverlay} />
               </View>
-            )}
-            {item.text_content ? (
-              <Text style={[styles.messageText, isFromMe && styles.messageTextRight, isUndiscovered && styles.messageTextBlurred]}>
-                {isUndiscovered ? '••••••••••••••••' : item.text_content}
+            </TouchableOpacity>
+          ) : (
+            <View
+              style={[
+                styles.messageBubble,
+                isFromMe ? styles.messageBubbleRight : styles.messageBubbleLeft,
+              ]}
+            >
+              {item.content_type === 'photo' && item.media_url && (
+                <Image source={{ uri: item.media_url }} style={styles.messageImage} />
+              )}
+              {item.content_type === 'audio' && (
+                <View style={styles.audioMessage}>
+                  <Ionicons name="mic" size={20} color={isFromMe ? '#fff' : '#4A90D9'} />
+                  <Text style={[styles.audioText, isFromMe && styles.audioTextRight]}>
+                    Message audio
+                  </Text>
+                </View>
+              )}
+              {item.text_content ? (
+                <Text style={[styles.messageText, isFromMe && styles.messageTextRight]}>
+                  {item.text_content}
+                </Text>
+              ) : null}
+              <Text style={[styles.messageTime, isFromMe && styles.messageTimeRight]}>
+                {formatTime(item.created_at)}
+                {isFromMe ? (item.is_read ? ' ✓✓' : ' ✓') : ''}
               </Text>
-            ) : null}
-            <Text style={[styles.messageTime, isFromMe && styles.messageTimeRight]}>
-              {formatTime(item.created_at)}
-              {isFromMe ? (item.is_read ? ' ✓✓' : ' ✓') : ''}
-            </Text>
-            {isUndiscovered && (
-              <View style={styles.blurOverlay} />
-            )}
-          </View>
+            </View>
+          )}
           {isUndiscovered && (
             <Text style={styles.undiscoveredHint}>Approchez-vous pour découvrir</Text>
           )}

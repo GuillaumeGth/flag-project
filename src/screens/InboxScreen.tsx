@@ -81,6 +81,13 @@ export default function InboxScreen({ navigation }: Props) {
 
   const getMessagePreview = (conversation: Conversation) => {
     const { lastMessage } = conversation;
+    const isUndiscovered = !lastMessage.is_from_me && !lastMessage.is_read;
+
+    // Si le dernier message est un message non découvert reçu, ne pas afficher de preview
+    if (isUndiscovered) {
+      return 'Nouveau message à découvrir';
+    }
+
     const prefix = lastMessage.is_from_me ? 'Vous: ' : '';
 
     switch (lastMessage.content_type) {

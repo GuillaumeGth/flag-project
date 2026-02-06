@@ -13,6 +13,7 @@ import {
   Modal,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { Audio } from 'expo-av';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocation } from '@/contexts/LocationContext';
 import { useAuth } from '@/contexts/AuthContext';
@@ -40,11 +41,20 @@ export default function ConversationScreen({ navigation, route }: Props) {
   const [sending, setSending] = useState(false);
   const [inputText, setInputText] = useState('');
   const [fullImageUrl, setFullImageUrl] = useState<string | null>(null);
+  const [audioSound, setAudioSound] = useState<Audio.Sound | null>(null);
+  const [playingMessageId, setPlayingMessageId] = useState<string | null>(null);
+  const [isPlayingAudio, setIsPlayingAudio] = useState(false);
 
   const isBot = otherUserId === FLAG_BOT_ID;
 
   useEffect(() => {
     loadMessages();
+
+    return () => {
+      if (audioSound) {
+        audioSound.unloadAsync();
+      }
+    };
   }, []);
 
   const loadMessages = async () => {
@@ -101,6 +111,56 @@ export default function ConversationScreen({ navigation, route }: Props) {
       });
     }
   };
+
+  const handleAudioPress = useCallback(
+    async (message: MessageWithUsers) => {
+      if (!message.media_url) return;
+
+      try {
+        await Audio.setAudioModeAsync({
+          allowsRecordingIOS: false,
+          playsInSilentModeIOS: true,
+          staysActiveInBackground: false,
+          playThroughEarpieceAndroid: false,
+        });
+
+        // If tapping the currently playing message
+        if (playingMessageId === message.id && audioSound) {
+          const status = await audioSound.getStatusAsync();
+          if ('isLoaded' in status && status.isLoaded && status.isPlaying) {
+            await audioSound.pauseAsync();
+            setIsPlayingAudio(false);
+          } else {
+            await audioSound.playAsync();
+            setIsPlayingAudio(true);
+          }
+          return;
+        }
+
+        // New message or no sound yet: unload previous
+        if (audioSound) {
+          await audioSound.unloadAsync();
+        }
+
+        const { sound } = await Audio.Sound.createAsync({ uri: message.media_url });
+        setAudioSound(sound);
+        setPlayingMessageId(message.id);
+        setIsPlayingAudio(true);
+
+        sound.setOnPlaybackStatusUpdate((status) => {
+          if (status.isLoaded && status.didJustFinish) {
+            setIsPlayingAudio(false);
+            setPlayingMessageId(null);
+          }
+        });
+
+        await sound.playAsync();
+      } catch (error) {
+        console.error('Error playing audio in conversation:', error);
+      }
+    },
+    [audioSound, playingMessageId]
+  );
 
   const shouldShowDateSeparator = (index: number) => {
     // With inverted list, compare with next item (which appears above visually)
@@ -182,13 +242,27 @@ export default function ConversationScreen({ navigation, route }: Props) {
                   <Image source={{ uri: item.media_url }} style={styles.messageImage} />
                 </TouchableOpacity>
               )}
-              {item.content_type === 'audio' && (
-                <View style={styles.audioMessage}>
-                  <Ionicons name="mic" size={20} color={isFromMe ? '#fff' : '#4A90D9'} />
+              {item.content_type === 'audio' && item.media_url && (
+                <TouchableOpacity
+                  style={styles.audioMessage}
+                  activeOpacity={0.7}
+                  onPress={() => handleAudioPress(item)}
+                >
+                  <Ionicons
+                    name={
+                      playingMessageId === item.id && isPlayingAudio
+                        ? 'pause'
+                        : 'play'
+                    }
+                    size={20}
+                    color={isFromMe ? '#fff' : '#4A90D9'}
+                  />
                   <Text style={[styles.audioText, isFromMe && styles.audioTextRight]}>
-                    Message audio
+                    {playingMessageId === item.id && isPlayingAudio
+                      ? 'En lecture...'
+                      : 'Message audio'}
                   </Text>
-                </View>
+                </TouchableOpacity>
               )}
               {item.text_content ? (
                 <Text style={[styles.messageText, isFromMe && styles.messageTextRight]}>

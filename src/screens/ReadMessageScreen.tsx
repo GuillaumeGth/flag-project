@@ -58,9 +58,16 @@ export default function ReadMessageScreen({ navigation, route }: Props) {
   };
 
   const playAudio = async () => {
-    if (!message.media_url) return;
+    if (!message?.media_url) return;
 
     try {
+      await Audio.setAudioModeAsync({
+        allowsRecordingIOS: false,
+        playsInSilentModeIOS: true,
+        staysActiveInBackground: false,
+        playThroughEarpieceAndroid: false,
+      });
+
       if (sound) {
         if (isPlaying) {
           await sound.pauseAsync();

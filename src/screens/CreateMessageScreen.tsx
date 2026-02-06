@@ -95,6 +95,8 @@ export default function CreateMessageScreen({ navigation, route }: Props) {
       await Audio.setAudioModeAsync({
         allowsRecordingIOS: true,
         playsInSilentModeIOS: true,
+        staysActiveInBackground: false,
+        playThroughEarpieceAndroid: false,
       });
 
       const { recording } = await Audio.Recording.createAsync(
@@ -144,6 +146,8 @@ export default function CreateMessageScreen({ navigation, route }: Props) {
       await Audio.setAudioModeAsync({
         allowsRecordingIOS: false,
         playsInSilentModeIOS: true,
+        staysActiveInBackground: false,
+        playThroughEarpieceAndroid: false,
       });
 
       if (soundRef.current) {

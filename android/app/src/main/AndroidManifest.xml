@@ -41,9 +41,9 @@
         <data android:scheme="flag"/>
         <data android:scheme="exp+flag-app"/>
       </intent-filter>
-      <intent-filter android:autoVerify="true" data-generated="true">
+      <intent-filter data-generated="true">
         <action android:name="android.intent.action.VIEW"/>
-        <data android:scheme="flag" android:host="auth" android:pathPrefix="/callback"/>
+        <data android:scheme="flag"/>
         <category android:name="android.intent.category.BROWSABLE"/>
         <category android:name="android.intent.category.DEFAULT"/>
       </intent-filter>

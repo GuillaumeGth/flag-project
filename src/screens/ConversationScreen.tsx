@@ -10,6 +10,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   Image,
+  Modal,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -38,6 +39,7 @@ export default function ConversationScreen({ navigation, route }: Props) {
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [inputText, setInputText] = useState('');
+  const [fullImageUrl, setFullImageUrl] = useState<string | null>(null);
 
   const isBot = otherUserId === FLAG_BOT_ID;
 
@@ -173,7 +175,12 @@ export default function ConversationScreen({ navigation, route }: Props) {
               ]}
             >
               {item.content_type === 'photo' && item.media_url && (
-                <Image source={{ uri: item.media_url }} style={styles.messageImage} />
+                <TouchableOpacity
+                  activeOpacity={0.9}
+                  onPress={() => setFullImageUrl(item.media_url || null)}
+                >
+                  <Image source={{ uri: item.media_url }} style={styles.messageImage} />
+                </TouchableOpacity>
               )}
               {item.content_type === 'audio' && (
                 <View style={styles.audioMessage}>
@@ -266,6 +273,32 @@ export default function ConversationScreen({ navigation, route }: Props) {
           </View>
         }
       />
+
+      {fullImageUrl && (
+        <Modal
+          visible
+          transparent
+          animationType="fade"
+          onRequestClose={() => setFullImageUrl(null)}
+        >
+          <View style={styles.fullscreenOverlay}>
+            <TouchableOpacity
+              style={styles.fullscreenCloseButton}
+              onPress={() => setFullImageUrl(null)}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="close" size={28} color="#fff" />
+            </TouchableOpacity>
+            <View style={styles.fullscreenImageContainer}>
+              <Image
+                source={{ uri: fullImageUrl }}
+                style={styles.fullscreenImage}
+                resizeMode="contain"
+              />
+            </View>
+          </View>
+        </Modal>
+      )}
 
       <View style={[styles.inputContainer, { paddingBottom: insets.bottom || 16 }]}>
         <TextInput
@@ -476,5 +509,33 @@ const styles = StyleSheet.create({
   },
   sendButtonDisabled: {
     backgroundColor: '#ccc',
+  },
+  fullscreenOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.95)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  fullscreenImageContainer: {
+    width: '100%',
+    height: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  fullscreenImage: {
+    width: '100%',
+    height: '100%',
+  },
+  fullscreenCloseButton: {
+    position: 'absolute',
+    top: 40,
+    right: 20,
+    zIndex: 2,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });

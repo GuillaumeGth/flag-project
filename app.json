@@ -31,6 +31,7 @@
         "backgroundColor": "#1E2028"
       },
       "package": "com.flagapp.app",
+      "googleServicesFile": "./android/app/google-services.json",
       "intentFilters": [
         {
           "action": "VIEW",

@@ -4,6 +4,7 @@ import * as Linking from 'expo-linking';
 import { File } from 'expo-file-system/next';
 import { decode } from 'base64-arraybuffer';
 import { supabase } from '@/services/supabase';
+import { registerPushToken, unregisterPushToken } from '@/services/notifications';
 import { User, AuthState } from '@/types';
 
 WebBrowser.maybeCompleteAuthSession();
@@ -261,6 +262,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           // Sync profile in background - don't block the app
           syncUserProfile(session.user).catch((e) => console.log('Sync profile error:', e));
           updateUserWithDbAvatar(mappedUser.id).catch((e) => console.log('Update avatar error:', e));
+          // Register push token for remote notifications
+          registerPushToken(mappedUser.id).catch((e) => console.log('Register push token error:', e));
         }
       } catch (error) {
         console.log('Session check failed:', error);
@@ -292,6 +295,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // Sync profile in background - don't block the UI
         syncUserProfile(session.user).catch((e) => console.log('Sync profile error:', e));
         updateUserWithDbAvatar(mappedUser.id).catch((e) => console.log('Update avatar error:', e));
+        // Register push token for remote notifications
+        registerPushToken(mappedUser.id).catch((e) => console.log('Register push token error:', e));
       }
     });
 
@@ -497,6 +502,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const signOut = async () => {
+    // Unregister push token before signing out
+    if (state.user?.id) {
+      await unregisterPushToken(state.user.id).catch((e) =>
+        console.log('Unregister push token error:', e)
+      );
+    }
     await supabase.auth.signOut();
   };
 

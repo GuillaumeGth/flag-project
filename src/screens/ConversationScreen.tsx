@@ -15,7 +15,6 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { Audio } from 'expo-av';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useLocation } from '@/contexts/LocationContext';
 import { useAuth } from '@/contexts/AuthContext';
 import {
   fetchConversationMessages,
@@ -32,7 +31,6 @@ interface Props {
 export default function ConversationScreen({ navigation, route }: Props) {
   const { otherUserId, otherUserName, otherUserAvatarUrl } = route.params;
   const insets = useSafeAreaInsets();
-  const { current: userLocation } = useLocation();
   const { user } = useAuth();
   const flatListRef = useRef<FlatList>(null);
 
@@ -68,13 +66,13 @@ export default function ConversationScreen({ navigation, route }: Props) {
   const reversedMessages = useMemo(() => [...messages].reverse(), [messages]);
 
   const handleSend = async () => {
-    if (!inputText.trim() || !userLocation || sending) return;
+    if (!inputText.trim() || sending) return;
 
     setSending(true);
     const message = await sendMessage(
       otherUserId,
       'text',
-      userLocation,
+      null, // No geolocation for conversation messages
       inputText.trim()
     );
 
@@ -228,52 +226,70 @@ export default function ConversationScreen({ navigation, route }: Props) {
               </View>
             </TouchableOpacity>
           ) : (
-            <View
-              style={[
-                styles.messageBubble,
-                isFromMe ? styles.messageBubbleRight : styles.messageBubbleLeft,
-              ]}
-            >
-              {item.content_type === 'photo' && item.media_url && (
-                <TouchableOpacity
-                  activeOpacity={0.9}
-                  onPress={() => setFullImageUrl(item.media_url || null)}
-                >
-                  <Image source={{ uri: item.media_url }} style={styles.messageImage} />
-                </TouchableOpacity>
-              )}
-              {item.content_type === 'audio' && item.media_url && (
-                <TouchableOpacity
-                  style={styles.audioMessage}
-                  activeOpacity={0.7}
-                  onPress={() => handleAudioPress(item)}
-                >
-                  <Ionicons
-                    name={
-                      playingMessageId === item.id && isPlayingAudio
-                        ? 'pause'
-                        : 'play'
-                    }
-                    size={20}
-                    color={isFromMe ? '#fff' : '#4A90D9'}
-                  />
-                  <Text style={[styles.audioText, isFromMe && styles.audioTextRight]}>
-                    {playingMessageId === item.id && isPlayingAudio
-                      ? 'En lecture...'
-                      : 'Message audio'}
+              <View
+                style={[
+                  styles.messageBubble,
+                  isFromMe ? styles.messageBubbleRight : styles.messageBubbleLeft,
+                ]}
+              >
+                {item.content_type === 'photo' && item.media_url && (
+                  <TouchableOpacity
+                    activeOpacity={0.9}
+                    onPress={() => setFullImageUrl(item.media_url || null)}
+                  >
+                    <Image source={{ uri: item.media_url }} style={styles.messageImage} />
+                  </TouchableOpacity>
+                )}
+                {item.content_type === 'audio' && item.media_url && (
+                  <TouchableOpacity
+                    style={styles.audioMessage}
+                    activeOpacity={0.7}
+                    onPress={() => handleAudioPress(item)}
+                  >
+                    <Ionicons
+                      name={
+                        playingMessageId === item.id && isPlayingAudio
+                          ? 'pause'
+                          : 'play'
+                      }
+                      size={20}
+                      color={isFromMe ? '#fff' : '#4A90D9'}
+                    />
+                    <Text style={[styles.audioText, isFromMe && styles.audioTextRight]}>
+                      {playingMessageId === item.id && isPlayingAudio
+                        ? 'En lecture...'
+                        : 'Message audio'}
+                    </Text>
+                  </TouchableOpacity>
+                )}
+                {item.text_content ? (
+                  <Text style={[styles.messageText, isFromMe && styles.messageTextRight]}>
+                    {item.text_content}
                   </Text>
-                </TouchableOpacity>
-              )}
-              {item.text_content ? (
-                <Text style={[styles.messageText, isFromMe && styles.messageTextRight]}>
-                  {item.text_content}
-                </Text>
-              ) : null}
-              <Text style={[styles.messageTime, isFromMe && styles.messageTimeRight]}>
-                {formatTime(item.created_at)}
-                {isFromMe ? (item.is_read ? ' ✓✓' : ' ✓') : ''}
-              </Text>
-            </View>
+                ) : null}
+                <View style={[styles.messageFooter, !item.location && styles.messageFooterNoFlag]}>
+                  {item.location && (
+                    <TouchableOpacity
+                      activeOpacity={0.7}
+                      onPress={() => {
+                        navigation.navigate('Main', {
+                          screen: 'Map',
+                          params: {
+                            focusLocation: item.location,
+                          },
+                        });
+                      }}
+                      style={styles.flagButton}
+                    >
+                      <Ionicons name="flag" size={12} color={isFromMe ? 'rgba(255, 255, 255, 0.7)' : '#4A90D9'} />
+                    </TouchableOpacity>
+                  )}
+                  <Text style={[styles.messageTime, isFromMe && styles.messageTimeRight]}>
+                    {formatTime(item.created_at)}
+                    {isFromMe ? (item.is_read ? ' ✓✓' : ' ✓') : ''}
+                  </Text>
+                </View>
+              </View>
           )}
           {isUndiscovered && (
             <Text style={styles.undiscoveredHint}>Approchez-vous pour découvrir</Text>
@@ -531,11 +547,21 @@ const styles = StyleSheet.create({
   audioTextRight: {
     color: '#fff',
   },
+  messageFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 4,
+  },
+  messageFooterNoFlag: {
+    justifyContent: 'flex-end',
+  },
+  flagButton: {
+    padding: 2,
+  },
   messageTime: {
     fontSize: 11,
     color: '#999',
-    marginTop: 4,
-    alignSelf: 'flex-end',
   },
   messageTimeRight: {
     color: 'rgba(255, 255, 255, 0.7)',

@@ -1,6 +1,8 @@
 import * as Notifications from 'expo-notifications';
-import { Platform } from 'react-native';
+import Constants from 'expo-constants';
+import { Alert, Platform } from 'react-native';
 import { Coordinates } from '@/types';
+import { supabase } from '@/services/supabase';
 
 // Configure notification behavior
 Notifications.setNotificationHandler({
@@ -8,6 +10,8 @@ Notifications.setNotificationHandler({
     shouldShowAlert: true,
     shouldPlaySound: true,
     shouldSetBadge: true,
+    shouldShowBanner: true,
+    shouldShowList: true,
   }),
 });
 
@@ -54,14 +58,89 @@ export async function notifyNearbyMessage(
   });
 }
 
-// Get push token for remote notifications (future use)
+// Get push token for remote notifications
 export async function getPushToken(): Promise<string | null> {
   try {
-    const token = await Notifications.getExpoPushTokenAsync();
+    const projectId = Constants.expoConfig?.extra?.eas?.projectId;
+    console.log('Project ID from config:', projectId);
+    if (!projectId) {
+      console.error('No projectId found in app.json - check extra.eas.projectId');
+      return null;
+    }
+    console.log('Requesting Expo push token...');
+    const token = await Notifications.getExpoPushTokenAsync({ projectId });
+    console.log('Expo push token received:', token.data);
     return token.data;
   } catch (error) {
-    console.error('Error getting push token:', error);
+    console.error('Error getting push token (this fails on Expo Go - use dev build):', error);
     return null;
+  }
+}
+
+// Register push token in database for the current user
+export async function registerPushToken(userId: string): Promise<boolean> {
+  try {
+    // First request permission
+    const hasPermission = await requestNotificationPermission();
+    if (!hasPermission) {
+      Alert.alert('Push Debug', 'Permission notifications refusée');
+      return false;
+    }
+
+    // Get the push token
+    const token = await getPushToken();
+    if (!token) {
+      Alert.alert('Push Debug', 'Impossible d\'obtenir le push token');
+      return false;
+    }
+
+    // Upsert token in database (handles duplicates via unique constraint)
+    const { data, error } = await supabase
+      .from('user_push_tokens')
+      .upsert(
+        {
+          user_id: userId,
+          expo_push_token: token,
+          device_name: Platform.OS,
+        },
+        {
+          onConflict: 'user_id,expo_push_token',
+        }
+      )
+      .select();
+
+    if (error) {
+      Alert.alert('Push Debug', `Erreur upsert: ${error.message}\n${error.hint || ''}`);
+      return false;
+    }
+
+    Alert.alert('Push Debug', `Token enregistré ! Rows: ${data?.length}`);
+    return true;
+  } catch (error) {
+    Alert.alert('Push Debug', `Exception: ${error}`);
+    return false;
+  }
+}
+
+// Unregister push token when user signs out
+export async function unregisterPushToken(userId: string): Promise<void> {
+  try {
+    const token = await getPushToken();
+    if (!token) return;
+
+    const { error } = await supabase
+      .from('user_push_tokens')
+      .delete()
+      .eq('user_id', userId)
+      .eq('expo_push_token', token);
+
+    if (error) {
+      console.error('Error unregistering push token:', error);
+    } else {
+      console.log('Push token unregistered successfully');
+    }
+  } catch (error) {
+    console.error('Error in unregisterPushToken:', error);
   }
 }
 

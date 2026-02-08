@@ -38,6 +38,7 @@ export default function MapScreen({ navigation, route }: Props) {
   const [selectedMessage, setSelectedMessage] = useState<UndiscoveredMessageMapMeta | null>(null);
   const [centerLocation, setCenterLocation] = useState<Coordinates | null>(null);
   const [centeredMessageId, setCenteredMessageId] = useState<string | null>(null);
+  const [focusLocation, setFocusLocation] = useState<any>(null);
   const [markersReady, setMarkersReady] = useState(false);
   const [avatarImages, setAvatarImages] = useState<Record<string, string>>({});
   const avatarRefs = useRef<Record<string, View | null>>({});
@@ -60,10 +61,15 @@ export default function MapScreen({ navigation, route }: Props) {
   // Remember which message we should center on when coming from another screen
   useEffect(() => {
     const unsubscribe = navigation.addListener('focus', () => {
-      const params = navigation.getState()?.routes?.find(r => r.name === 'Map')?.params ?? route?.params;
+      const params = navigation.getState()?.routes?.find((r: any) => r.name === 'Map')?.params ?? route?.params;
+      console.log('DEBUG Map focus params:', JSON.stringify(params));
 
       if (params && params.messageId) {
         setCenteredMessageId(params.messageId);
+        setFocusLocation(null);
+      } else if (params && params.focusLocation) {
+        setFocusLocation(params.focusLocation);
+        setCenteredMessageId(null);
       } else {
         if (focusTimeoutRef.current) {
           clearTimeout(focusTimeoutRef.current);
@@ -71,6 +77,7 @@ export default function MapScreen({ navigation, route }: Props) {
         }
         setCenterLocation(null);
         setCenteredMessageId(null);
+        setFocusLocation(null);
         setSelectedMessage(null);
       }
     });
@@ -88,9 +95,9 @@ export default function MapScreen({ navigation, route }: Props) {
     };
   }, []);
 
-  // Center on user when location changes (unless we are focusing a specific message)
+  // Center on user when location changes (unless we are focusing a specific message or location)
   useEffect(() => {
-    if (userLocation && mapRef.current && !centeredMessageId) {
+    if (userLocation && mapRef.current && !centeredMessageId && !focusLocation) {
       console.log('DEBUG: User location:', userLocation.latitude, userLocation.longitude);
       mapRef.current.animateToRegion({
         latitude: userLocation.latitude,
@@ -99,7 +106,7 @@ export default function MapScreen({ navigation, route }: Props) {
         longitudeDelta: LNG_DELTA,
       }, 500);
     }
-  }, [userLocation, centeredMessageId]);
+  }, [userLocation, centeredMessageId, focusLocation]);
 
   // When messages are loaded and we have a centeredMessageId, center the map on that message,
   // then after a delay, return to the normal mode centered on the user
@@ -160,6 +167,60 @@ export default function MapScreen({ navigation, route }: Props) {
       }
     };
   }, [centeredMessageId, messages, userLocation]);
+
+  // Handle focusLocation from conversation screen
+  useEffect(() => {
+    console.log('DEBUG focusLocation:', focusLocation);
+    if (!focusLocation || !mapRef.current) return;
+
+    // Use the same parsing function as for undiscovered messages
+    const coords = getMessageLocation({ location: focusLocation } as any);
+    console.log('DEBUG parsed coords:', coords);
+    if (!coords) return;
+
+    // Clear any previous timeout
+    if (focusTimeoutRef.current) {
+      clearTimeout(focusTimeoutRef.current);
+      focusTimeoutRef.current = null;
+    }
+
+    // Animate to the focus location
+    mapRef.current.animateToRegion(
+      {
+        latitude: coords.latitude,
+        longitude: coords.longitude,
+        latitudeDelta: 0.01,
+        longitudeDelta: 0.01,
+      },
+      500
+    );
+
+    // After 5 seconds, go back to user location
+    if (userLocation) {
+      focusTimeoutRef.current = setTimeout(() => {
+        if (!mapRef.current || !userLocation) return;
+
+        setFocusLocation(null);
+
+        mapRef.current.animateToRegion(
+          {
+            latitude: userLocation.latitude,
+            longitude: userLocation.longitude,
+            latitudeDelta: LAT_DELTA,
+            longitudeDelta: LNG_DELTA,
+          },
+          500
+        );
+      }, 5000);
+    }
+
+    return () => {
+      if (focusTimeoutRef.current) {
+        clearTimeout(focusTimeoutRef.current);
+        focusTimeoutRef.current = null;
+      }
+    };
+  }, [focusLocation, userLocation]);
 
   const loadMessages = async () => {
     setLoading(true);

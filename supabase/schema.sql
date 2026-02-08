@@ -28,6 +28,40 @@ DROP POLICY IF EXISTS "Users can insert own profile" ON public.users;
 CREATE POLICY "Users can insert own profile" ON public.users
     FOR INSERT WITH CHECK (auth.uid() = id);
 
+-- Push tokens table (multiple devices per user)
+CREATE TABLE IF NOT EXISTS public.user_push_tokens (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+    expo_push_token TEXT NOT NULL,
+    device_name TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE public.user_push_tokens ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Users can manage own push tokens" ON public.user_push_tokens;
+CREATE POLICY "Users can manage own push tokens" ON public.user_push_tokens
+    FOR ALL
+    USING (auth.uid() = user_id)
+    WITH CHECK (auth.uid() = user_id);
+
+-- Ensure one row per (user, token) for upsert
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1
+        FROM pg_constraint
+        WHERE conrelid = 'public.user_push_tokens'::regclass
+          AND contype = 'u'
+          AND conname = 'user_push_tokens_user_token_key'
+    ) THEN
+        ALTER TABLE public.user_push_tokens
+            ADD CONSTRAINT user_push_tokens_user_token_key
+            UNIQUE (user_id, expo_push_token);
+    END IF;
+END
+$$;
+
 -- Messages table
 CREATE TABLE IF NOT EXISTS public.messages (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -139,6 +173,62 @@ DROP TRIGGER IF EXISTS on_user_created_send_welcome ON public.users;
 CREATE TRIGGER on_user_created_send_welcome
     AFTER INSERT ON public.users
     FOR EACH ROW EXECUTE FUNCTION public.send_welcome_message();
+
+-- HTTP extension for calling external APIs (used for push notifications)
+CREATE EXTENSION IF NOT EXISTS http;
+
+-- Function to send push notification via Expo when a new message is created
+CREATE OR REPLACE FUNCTION public.send_push_on_new_message()
+RETURNS TRIGGER AS $$
+DECLARE
+    target_tokens TEXT[];
+    token TEXT;
+    sender_name TEXT;
+    expo_url TEXT := 'https://exp.host/--/api/v2/push/send';
+    payload JSONB;
+BEGIN
+    -- Collect all push tokens for the recipient
+    SELECT array_agg(expo_push_token)
+    INTO target_tokens
+    FROM public.user_push_tokens
+    WHERE user_id = NEW.recipient_id;
+
+    IF target_tokens IS NULL OR array_length(target_tokens, 1) = 0 THEN
+        RETURN NEW;
+    END IF;
+
+    -- Get sender display name (fallback to generic label)
+    SELECT COALESCE(display_name, 'Quelqu''un')
+    INTO sender_name
+    FROM public.users
+    WHERE id = NEW.sender_id;
+
+    FOREACH token IN ARRAY target_tokens LOOP
+        payload := jsonb_build_object(
+            'to', token,
+            'sound', 'default',
+            'title', 'Nouveau message reçu',
+            'body', sender_name || ' t''a laissé un nouveau message à découvrir',
+            'data', jsonb_build_object('messageId', NEW.id)
+        );
+
+        PERFORM
+            http.post(
+                expo_url,
+                'application/json',
+                payload::text,
+                ARRAY[http_header('accept', 'application/json')]
+            );
+    END LOOP;
+
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+DROP TRIGGER IF EXISTS on_message_created_send_push ON public.messages;
+CREATE TRIGGER on_message_created_send_push
+    AFTER INSERT ON public.messages
+    FOR EACH ROW EXECUTE FUNCTION public.send_push_on_new_message();
 
 -- Storage bucket for media (photos, audio)
 INSERT INTO storage.buckets (id, name, public)

@@ -266,7 +266,7 @@ export async function fetchMessageById(messageId: string): Promise<MessageWithSe
 export async function sendMessage(
   recipientId: string,
   contentType: 'text' | 'photo' | 'audio',
-  location: Coordinates,
+  location: Coordinates | null,
   textContent?: string,
   mediaUrl?: string
 ): Promise<Message | null> {
@@ -281,9 +281,9 @@ export async function sendMessage(
       content_type: contentType,
       text_content: textContent,
       media_url: mediaUrl,
-      location: `POINT(${location.longitude} ${location.latitude})`,
-      radius: 30,
-      is_read: false,
+      location: location ? `POINT(${location.longitude} ${location.latitude})` : null,
+      radius: location ? 30 : null,
+      is_read: location ? false : true, // Messages without location are immediately readable
     })
     .select()
     .single();

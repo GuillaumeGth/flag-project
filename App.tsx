@@ -1,14 +1,16 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
+import * as SecureStore from 'expo-secure-store';
 
 import { AuthProvider, useAuth } from '@/contexts/AuthContext';
 import { LocationProvider } from '@/contexts/LocationContext';
 
+import PermissionsScreen from '@/screens/PermissionsScreen';
 import AuthScreen from '@/screens/AuthScreen';
 import MapScreen from '@/screens/MapScreen';
 import InboxScreen from '@/screens/InboxScreen';
@@ -60,13 +62,36 @@ function MainTabs() {
   );
 }
 
+const PERMISSIONS_DONE_KEY = 'permissions_onboarding_done';
+
 function AppNavigator() {
   const { user, loading } = useAuth();
+  const [permissionsDone, setPermissionsDone] = useState<boolean | null>(null);
 
-  if (loading) {
-    return null; // Or a splash screen
+  console.log('[AppNavigator] render: loading =', loading, 'user =', user?.id, 'permissionsDone =', permissionsDone);
+
+  useEffect(() => {
+    SecureStore.getItemAsync(PERMISSIONS_DONE_KEY).then((value) => {
+      setPermissionsDone(value === 'true');
+    });
+  }, []);
+
+  if (loading || permissionsDone === null) {
+    console.log('[AppNavigator] showing null (loading)');
+    return null;
   }
 
+  const handlePermissionsComplete = async () => {
+    await SecureStore.setItemAsync(PERMISSIONS_DONE_KEY, 'true');
+    setPermissionsDone(true);
+  };
+
+  if (!permissionsDone && !user) {
+    console.log('[AppNavigator] showing PermissionsScreen');
+    return <PermissionsScreen onComplete={handlePermissionsComplete} />;
+  }
+
+  console.log('[AppNavigator] showing', user ? 'MainTabs' : 'AuthScreen');
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       {user ? (

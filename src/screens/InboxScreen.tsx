@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useAuth } from '@/contexts/AuthContext';
 import { fetchConversations, FLAG_BOT_ID } from '@/services/messages';
 import { Conversation } from '@/types';
 
@@ -20,29 +21,36 @@ interface Props {
 
 export default function InboxScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets();
+  const { user } = useAuth();
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
-    loadConversations();
-  }, []);
+    console.log('[InboxScreen] useEffect[user] fired, user =', user?.id);
+    if (user) {
+      loadConversations();
+    }
+  }, [user]);
 
   // Refresh when screen comes into focus
   useEffect(() => {
     const unsubscribe = navigation.addListener('focus', () => {
+      console.log('[InboxScreen] focus event fired');
       loadConversations();
     });
     return unsubscribe;
   }, [navigation]);
 
   const loadConversations = async () => {
+    console.log('[InboxScreen] loadConversations: START');
     setLoading(true);
     try {
       const data = await fetchConversations();
+      console.log('[InboxScreen] loadConversations: got', data.length, 'conversations');
       setConversations(data);
     } catch (error) {
-      console.error('Error loading conversations:', error);
+      console.error('[InboxScreen] Error loading conversations:', error);
       setConversations([]);
     } finally {
       setLoading(false);

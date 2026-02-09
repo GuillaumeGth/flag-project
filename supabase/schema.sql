@@ -213,11 +213,10 @@ BEGIN
         );
 
         PERFORM
-            http.post(
+            http_post(
                 expo_url,
-                'application/json',
                 payload::text,
-                ARRAY[http_header('accept', 'application/json')]
+                'application/json'
             );
     END LOOP;
 

@@ -1,13 +1,20 @@
-import { supabase } from './supabase';
+import { supabase, getCachedUserId } from './supabase';
 import * as FileSystem from 'expo-file-system/legacy';
 import { Message, MessageWithSender, Coordinates, User, UndiscoveredMessageMeta, UndiscoveredMessageMapMeta, Conversation, MessageWithUsers } from '@/types';
 
 // Default Flag Bot user ID (created via seed.sql)
 export const FLAG_BOT_ID = '00000000-0000-0000-0000-000000000001';
 
+// Helper to get current user ID from cached value (avoids getSession() deadlock)
+function getCurrentUserId(): string | null {
+  const userId = getCachedUserId();
+  console.log('[messages] getCurrentUserId:', userId);
+  return userId;
+}
+
 // Fetch all users (for recipient selection)
 export async function fetchAllUsers(): Promise<User[]> {
-  const { data: userData } = await supabase.auth.getUser();
+  const currentUserId = await getCurrentUserId();
 
   const { data, error } = await supabase
     .from('users')
@@ -20,15 +27,18 @@ export async function fetchAllUsers(): Promise<User[]> {
   }
 
   // Filter out current user
-  return (data || []).filter(user => user.id !== userData.user?.id);
+  return (data || []).filter(user => user.id !== currentUserId);
 }
 
 // Fetch all conversations for current user
 export async function fetchConversations(): Promise<Conversation[]> {
-  const { data: userData } = await supabase.auth.getUser();
-  if (!userData.user) return [];
-
-  const currentUserId = userData.user.id;
+  console.log('[messages] fetchConversations: START');
+  const currentUserId = await getCurrentUserId();
+  console.log('[messages] fetchConversations: currentUserId =', currentUserId);
+  if (!currentUserId) {
+    console.log('[messages] fetchConversations: NO USER ID - returning empty');
+    return [];
+  }
 
   // Fetch all messages where user is sender or recipient
   const { data: messages, error } = await supabase
@@ -41,6 +51,7 @@ export async function fetchConversations(): Promise<Conversation[]> {
     .or(`sender_id.eq.${currentUserId},recipient_id.eq.${currentUserId}`)
     .order('created_at', { ascending: false });
 
+  console.log('[messages] fetchConversations: query done, error =', error, 'count =', messages?.length);
   if (error) {
     console.error('Error fetching conversations:', error);
     return [];
@@ -91,10 +102,8 @@ export async function fetchConversations(): Promise<Conversation[]> {
 
 // Fetch all messages for a specific conversation
 export async function fetchConversationMessages(otherUserId: string): Promise<MessageWithUsers[]> {
-  const { data: userData } = await supabase.auth.getUser();
-  if (!userData.user) return [];
-
-  const currentUserId = userData.user.id;
+  const currentUserId = await getCurrentUserId();
+  if (!currentUserId) return [];
 
   const { data, error } = await supabase
     .from('messages')
@@ -116,8 +125,8 @@ export async function fetchConversationMessages(otherUserId: string): Promise<Me
 
 // Fetch messages for current user (as recipient)
 export async function fetchMyMessages(): Promise<MessageWithSender[]> {
-  const { data: userData } = await supabase.auth.getUser();
-  if (!userData.user) return [];
+  const currentUserId = await getCurrentUserId();
+  if (!currentUserId) return [];
 
   const { data, error } = await supabase
     .from('messages')
@@ -129,7 +138,7 @@ export async function fetchMyMessages(): Promise<MessageWithSender[]> {
         avatar_url
       )
     `)
-    .eq('recipient_id', userData.user.id)
+    .eq('recipient_id', currentUserId)
     .order('created_at', { ascending: false });
 
   if (error) {
@@ -142,8 +151,8 @@ export async function fetchMyMessages(): Promise<MessageWithSender[]> {
 
 // Fetch unread messages for map display
 export async function fetchUnreadMessages(): Promise<MessageWithSender[]> {
-  const { data: userData } = await supabase.auth.getUser();
-  if (!userData.user) return [];
+  const currentUserId = await getCurrentUserId();
+  if (!currentUserId) return [];
 
   const { data, error } = await supabase
     .from('messages')
@@ -155,7 +164,7 @@ export async function fetchUnreadMessages(): Promise<MessageWithSender[]> {
         avatar_url
       )
     `)
-    .eq('recipient_id', userData.user.id)
+    .eq('recipient_id', currentUserId)
     .eq('is_read', false)
     .order('created_at', { ascending: false });
 
@@ -169,8 +178,8 @@ export async function fetchUnreadMessages(): Promise<MessageWithSender[]> {
 
 // Fetch read messages (inbox)
 export async function fetchReadMessages(): Promise<MessageWithSender[]> {
-  const { data: userData } = await supabase.auth.getUser();
-  if (!userData.user) return [];
+  const currentUserId = await getCurrentUserId();
+  if (!currentUserId) return [];
 
   const { data, error } = await supabase
     .from('messages')
@@ -182,7 +191,7 @@ export async function fetchReadMessages(): Promise<MessageWithSender[]> {
         avatar_url
       )
     `)
-    .eq('recipient_id', userData.user.id)
+    .eq('recipient_id', currentUserId)
     .eq('is_read', true)
     .order('read_at', { ascending: false });
 
@@ -196,13 +205,13 @@ export async function fetchReadMessages(): Promise<MessageWithSender[]> {
 
 // Fetch only metadata for undiscovered messages (no content for security)
 export async function fetchUndiscoveredMessagesMetadata(): Promise<UndiscoveredMessageMeta[]> {
-  const { data: userData } = await supabase.auth.getUser();
-  if (!userData.user) return [];
+  const currentUserId = await getCurrentUserId();
+  if (!currentUserId) return [];
 
   const { data, error } = await supabase
     .from('messages')
     .select('id, created_at, is_read')
-    .eq('recipient_id', userData.user.id)
+    .eq('recipient_id', currentUserId)
     .eq('is_read', false)
     .order('created_at', { ascending: false });
 
@@ -216,8 +225,13 @@ export async function fetchUndiscoveredMessagesMetadata(): Promise<UndiscoveredM
 
 // Fetch only location metadata for map markers (no content for security)
 export async function fetchUndiscoveredMessagesForMap(): Promise<UndiscoveredMessageMapMeta[]> {
-  const { data: userData } = await supabase.auth.getUser();
-  if (!userData.user) return [];
+  console.log('[messages] fetchUndiscoveredMessagesForMap: START');
+  const currentUserId = await getCurrentUserId();
+  console.log('[messages] fetchUndiscoveredMessagesForMap: currentUserId =', currentUserId);
+  if (!currentUserId) {
+    console.log('[messages] fetchUndiscoveredMessagesForMap: NO USER ID - returning empty');
+    return [];
+  }
 
   const { data, error } = await supabase
     .from('messages')
@@ -227,9 +241,10 @@ export async function fetchUndiscoveredMessagesForMap(): Promise<UndiscoveredMes
       created_at,
       sender:users!sender_id (id, display_name, avatar_url)
     `)
-    .eq('recipient_id', userData.user.id)
+    .eq('recipient_id', currentUserId)
     .eq('is_read', false)
     .order('created_at', { ascending: false });
+  console.log('[messages] fetchUndiscoveredMessagesForMap: query done, error =', error, 'count =', data?.length);
 
   if (error) {
     console.error('Error fetching undiscovered messages for map:', error);
@@ -270,13 +285,18 @@ export async function sendMessage(
   textContent?: string,
   mediaUrl?: string
 ): Promise<Message | null> {
-  const { data: userData } = await supabase.auth.getUser();
-  if (!userData.user) return null;
+  const currentUserId = await getCurrentUserId();
+  if (!currentUserId) {
+    console.error('sendMessage: No authenticated user');
+    return null;
+  }
+
+  console.log('sendMessage:', { recipientId, contentType, hasText: !!textContent, hasMedia: !!mediaUrl, hasLocation: !!location });
 
   const { data, error } = await supabase
     .from('messages')
     .insert({
-      sender_id: userData.user.id,
+      sender_id: currentUserId,
       recipient_id: recipientId,
       content_type: contentType,
       text_content: textContent,
@@ -289,7 +309,7 @@ export async function sendMessage(
     .single();
 
   if (error) {
-    console.error('Error sending message:', error);
+    console.error('sendMessage error:', error.message, '| code:', error.code, '| details:', error.details, '| hint:', error.hint);
     return null;
   }
 
@@ -320,8 +340,8 @@ export async function uploadMedia(
   type: 'photo' | 'audio'
 ): Promise<string | null> {
   try {
-    const { data: userData } = await supabase.auth.getUser();
-    if (!userData.user) {
+    const currentUserId = await getCurrentUserId();
+    if (!currentUserId) {
       console.error('No authenticated user');
       return null;
     }
@@ -334,7 +354,7 @@ export async function uploadMedia(
     // Determine extension and content type
     const ext = type === 'photo' ? 'jpg' : 'm4a';
     const contentType = type === 'photo' ? 'image/jpeg' : 'audio/m4a';
-    const fileName = `${userData.user.id}/${Date.now()}.${ext}`;
+    const fileName = `${currentUserId}/${Date.now()}.${ext}`;
 
     // Convert base64 to ArrayBuffer
     const { decode } = await import('base64-arraybuffer');

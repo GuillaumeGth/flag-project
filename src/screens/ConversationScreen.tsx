@@ -11,17 +11,20 @@ import {
   Platform,
   Image,
   Modal,
+  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Audio } from 'expo-av';
+import * as ImagePicker from 'expo-image-picker';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '@/contexts/AuthContext';
 import {
   fetchConversationMessages,
   sendMessage,
   FLAG_BOT_ID,
+  uploadMedia,
 } from '@/services/messages';
-import { MessageWithUsers } from '@/types';
+import { MessageWithUsers, MessageContentType } from '@/types';
 
 interface Props {
   navigation: any;
@@ -43,6 +46,14 @@ export default function ConversationScreen({ navigation, route }: Props) {
   const [playingMessageId, setPlayingMessageId] = useState<string | null>(null);
   const [isPlayingAudio, setIsPlayingAudio] = useState(false);
 
+  // Local media state for composing a message
+  const [contentType, setContentType] = useState<MessageContentType>('text');
+  const [mediaUri, setMediaUri] = useState<string | null>(null);
+  const [recording, setRecording] = useState<Audio.Recording | null>(null);
+  const [isRecording, setIsRecording] = useState(false);
+  const [isPlayingInputAudio, setIsPlayingInputAudio] = useState(false);
+  const inputSoundRef = useRef<Audio.Sound | null>(null);
+
   const isBot = otherUserId === FLAG_BOT_ID;
 
   useEffect(() => {
@@ -51,6 +62,9 @@ export default function ConversationScreen({ navigation, route }: Props) {
     return () => {
       if (audioSound) {
         audioSound.unloadAsync();
+      }
+      if (inputSoundRef.current) {
+        inputSoundRef.current.unloadAsync();
       }
     };
   }, []);
@@ -66,21 +80,168 @@ export default function ConversationScreen({ navigation, route }: Props) {
   const reversedMessages = useMemo(() => [...messages].reverse(), [messages]);
 
   const handleSend = async () => {
-    if (!inputText.trim() || sending) return;
+    const hasText = !!inputText.trim();
+    const hasMedia = !!mediaUri;
+    if ((!hasText && !hasMedia) || sending) return;
 
     setSending(true);
-    const message = await sendMessage(
-      otherUserId,
-      'text',
-      null, // No geolocation for conversation messages
-      inputText.trim()
-    );
 
-    if (message) {
-      setInputText('');
-      await loadMessages();
+    try {
+      let finalContentType: MessageContentType = hasMedia ? contentType : 'text';
+      let uploadedMediaUrl: string | undefined;
+
+      if (hasMedia && mediaUri && contentType !== 'text') {
+        const url = await uploadMedia(mediaUri, contentType as 'photo' | 'audio');
+        if (!url) {
+          Alert.alert('Erreur', "Échec de l'upload du média");
+          setSending(false);
+          return;
+        }
+        uploadedMediaUrl = url;
+      } else if (!hasMedia) {
+        finalContentType = 'text';
+      }
+
+      const message = await sendMessage(
+        otherUserId,
+        finalContentType,
+        null, // No geolocation for conversation messages
+        hasText ? inputText.trim() : undefined,
+        uploadedMediaUrl
+      );
+
+      if (message) {
+        setInputText('');
+        setMediaUri(null);
+        setContentType('text');
+        if (inputSoundRef.current) {
+          await inputSoundRef.current.unloadAsync();
+          inputSoundRef.current = null;
+        }
+        setIsPlayingInputAudio(false);
+        await loadMessages();
+      }
+    } catch (error) {
+      console.error('Error sending conversation message:', error);
+      Alert.alert('Erreur', "Une erreur est survenue lors de l'envoi");
     }
+
     setSending(false);
+  };
+
+  const pickImage = async () => {
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      quality: 0.8,
+    });
+
+    if (!result.canceled && result.assets[0]) {
+      setMediaUri(result.assets[0].uri);
+      setContentType('photo');
+    }
+  };
+
+  const takePhoto = async () => {
+    const { status } = await ImagePicker.requestCameraPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permission requise', 'Accès à la caméra nécessaire');
+      return;
+    }
+
+    const result = await ImagePicker.launchCameraAsync({
+      quality: 0.8,
+    });
+
+    if (!result.canceled && result.assets[0]) {
+      setMediaUri(result.assets[0].uri);
+      setContentType('photo');
+    }
+  };
+
+  const startRecording = async () => {
+    try {
+      const { status } = await Audio.requestPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permission requise', 'Accès au micro nécessaire');
+        return;
+      }
+
+      await Audio.setAudioModeAsync({
+        allowsRecordingIOS: true,
+        playsInSilentModeIOS: true,
+        staysActiveInBackground: false,
+        playThroughEarpieceAndroid: false,
+      });
+
+      const { recording } = await Audio.Recording.createAsync(
+        Audio.RecordingOptionsPresets.HIGH_QUALITY
+      );
+      setRecording(recording);
+      setIsRecording(true);
+    } catch (error) {
+      console.error('Error starting recording (conversation):', error);
+    }
+  };
+
+  const stopRecording = async () => {
+    if (!recording) return;
+
+    setIsRecording(false);
+    await recording.stopAndUnloadAsync();
+    const uri = recording.getURI();
+    setRecording(null);
+
+    if (uri) {
+      setMediaUri(uri);
+      setContentType('audio');
+    }
+  };
+
+  const clearMedia = async () => {
+    if (inputSoundRef.current) {
+      await inputSoundRef.current.unloadAsync();
+      inputSoundRef.current = null;
+    }
+    setIsPlayingInputAudio(false);
+    setMediaUri(null);
+    setContentType('text');
+  };
+
+  const playInputAudio = async () => {
+    if (!mediaUri) return;
+
+    try {
+      if (isPlayingInputAudio && inputSoundRef.current) {
+        await inputSoundRef.current.stopAsync();
+        setIsPlayingInputAudio(false);
+        return;
+      }
+
+      await Audio.setAudioModeAsync({
+        allowsRecordingIOS: false,
+        playsInSilentModeIOS: true,
+        staysActiveInBackground: false,
+        playThroughEarpieceAndroid: false,
+      });
+
+      if (inputSoundRef.current) {
+        await inputSoundRef.current.unloadAsync();
+      }
+
+      const { sound } = await Audio.Sound.createAsync({ uri: mediaUri });
+      inputSoundRef.current = sound;
+
+      sound.setOnPlaybackStatusUpdate((status) => {
+        if (status.isLoaded && status.didJustFinish) {
+          setIsPlayingInputAudio(false);
+        }
+      });
+
+      await sound.playAsync();
+      setIsPlayingInputAudio(true);
+    } catch (error) {
+      console.error('Error playing input audio (conversation):', error);
+    }
   };
 
   const formatTime = (dateString: string) => {
@@ -226,70 +387,70 @@ export default function ConversationScreen({ navigation, route }: Props) {
               </View>
             </TouchableOpacity>
           ) : (
-              <View
-                style={[
-                  styles.messageBubble,
-                  isFromMe ? styles.messageBubbleRight : styles.messageBubbleLeft,
-                ]}
-              >
-                {item.content_type === 'photo' && item.media_url && (
+            <View
+              style={[
+                styles.messageBubble,
+                isFromMe ? styles.messageBubbleRight : styles.messageBubbleLeft,
+              ]}
+            >
+              {item.content_type === 'photo' && item.media_url && (
+                <TouchableOpacity
+                  activeOpacity={0.9}
+                  onPress={() => setFullImageUrl(item.media_url || null)}
+                >
+                  <Image source={{ uri: item.media_url }} style={styles.messageImage} />
+                </TouchableOpacity>
+              )}
+              {item.content_type === 'audio' && item.media_url && (
+                <TouchableOpacity
+                  style={styles.audioMessage}
+                  activeOpacity={0.7}
+                  onPress={() => handleAudioPress(item)}
+                >
+                  <Ionicons
+                    name={
+                      playingMessageId === item.id && isPlayingAudio
+                        ? 'pause'
+                        : 'play'
+                    }
+                    size={20}
+                    color={isFromMe ? '#fff' : '#4A90D9'}
+                  />
+                  <Text style={[styles.audioText, isFromMe && styles.audioTextRight]}>
+                    {playingMessageId === item.id && isPlayingAudio
+                      ? 'En lecture...'
+                      : 'Message audio'}
+                  </Text>
+                </TouchableOpacity>
+              )}
+              {item.text_content ? (
+                <Text style={[styles.messageText, isFromMe && styles.messageTextRight]}>
+                  {item.text_content}
+                </Text>
+              ) : null}
+              <View style={[styles.messageFooter, !item.location && styles.messageFooterNoFlag]}>
+                {item.location && (
                   <TouchableOpacity
-                    activeOpacity={0.9}
-                    onPress={() => setFullImageUrl(item.media_url || null)}
-                  >
-                    <Image source={{ uri: item.media_url }} style={styles.messageImage} />
-                  </TouchableOpacity>
-                )}
-                {item.content_type === 'audio' && item.media_url && (
-                  <TouchableOpacity
-                    style={styles.audioMessage}
                     activeOpacity={0.7}
-                    onPress={() => handleAudioPress(item)}
+                    onPress={() => {
+                      navigation.navigate('Main', {
+                        screen: 'Map',
+                        params: {
+                          focusLocation: item.location,
+                        },
+                      });
+                    }}
+                    style={styles.flagButton}
                   >
-                    <Ionicons
-                      name={
-                        playingMessageId === item.id && isPlayingAudio
-                          ? 'pause'
-                          : 'play'
-                      }
-                      size={20}
-                      color={isFromMe ? '#fff' : '#4A90D9'}
-                    />
-                    <Text style={[styles.audioText, isFromMe && styles.audioTextRight]}>
-                      {playingMessageId === item.id && isPlayingAudio
-                        ? 'En lecture...'
-                        : 'Message audio'}
-                    </Text>
+                    <Ionicons name="flag" size={12} color={isFromMe ? 'rgba(255, 255, 255, 0.7)' : '#4A90D9'} />
                   </TouchableOpacity>
                 )}
-                {item.text_content ? (
-                  <Text style={[styles.messageText, isFromMe && styles.messageTextRight]}>
-                    {item.text_content}
-                  </Text>
-                ) : null}
-                <View style={[styles.messageFooter, !item.location && styles.messageFooterNoFlag]}>
-                  {item.location && (
-                    <TouchableOpacity
-                      activeOpacity={0.7}
-                      onPress={() => {
-                        navigation.navigate('Main', {
-                          screen: 'Map',
-                          params: {
-                            focusLocation: item.location,
-                          },
-                        });
-                      }}
-                      style={styles.flagButton}
-                    >
-                      <Ionicons name="flag" size={12} color={isFromMe ? 'rgba(255, 255, 255, 0.7)' : '#4A90D9'} />
-                    </TouchableOpacity>
-                  )}
-                  <Text style={[styles.messageTime, isFromMe && styles.messageTimeRight]}>
-                    {formatTime(item.created_at)}
-                    {isFromMe ? (item.is_read ? ' ✓✓' : ' ✓') : ''}
-                  </Text>
-                </View>
+                <Text style={[styles.messageTime, isFromMe && styles.messageTimeRight]}>
+                  {formatTime(item.created_at)}
+                  {isFromMe ? (item.is_read ? ' ✓✓' : ' ✓') : ''}
+                </Text>
               </View>
+            </View>
           )}
           {isUndiscovered && (
             <Text style={styles.undiscoveredHint}>Approchez-vous pour découvrir</Text>
@@ -391,26 +552,83 @@ export default function ConversationScreen({ navigation, route }: Props) {
       )}
 
       <View style={[styles.inputContainer, { paddingBottom: insets.bottom || 16 }]}>
-        <TextInput
-          style={styles.input}
-          placeholder="Votre message..."
-          placeholderTextColor="#999"
-          value={inputText}
-          onChangeText={setInputText}
-          multiline
-          maxLength={1000}
-        />
-        <TouchableOpacity
-          style={[styles.sendButton, (!inputText.trim() || sending) && styles.sendButtonDisabled]}
-          onPress={handleSend}
-          disabled={!inputText.trim() || sending}
-        >
-          {sending ? (
-            <ActivityIndicator size="small" color="#fff" />
-          ) : (
-            <Ionicons name="send" size={20} color="#fff" />
-          )}
-        </TouchableOpacity>
+        {mediaUri && contentType === 'photo' && (
+          <View style={styles.inputMediaPreview}>
+            <Image source={{ uri: mediaUri }} style={styles.inputMediaImage} />
+            <TouchableOpacity onPress={clearMedia} style={styles.inputMediaClear}>
+              <Ionicons name="close-circle" size={22} color="#fff" />
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {mediaUri && contentType === 'audio' && (
+          <View style={styles.inputAudioPreview}>
+            <TouchableOpacity onPress={playInputAudio} style={styles.inputAudioPlayButton}>
+              <Ionicons
+                name={isPlayingInputAudio ? 'pause' : 'play'}
+                size={18}
+                color="#fff"
+              />
+            </TouchableOpacity>
+            <Text style={styles.inputAudioText}>
+              {isPlayingInputAudio ? 'Lecture en cours...' : 'Audio enregistré'}
+            </Text>
+            <TouchableOpacity onPress={clearMedia}>
+              <Ionicons name="close-circle" size={20} color="#999" />
+            </TouchableOpacity>
+          </View>
+        )}
+
+        <View style={styles.inputRow}>
+          <View style={styles.inputBox}>
+            <TextInput
+              style={styles.input}
+              placeholder="Votre message..."
+              placeholderTextColor="#999"
+              value={inputText}
+              onChangeText={setInputText}
+              multiline
+              maxLength={1000}
+            />
+            <View style={styles.inputActions}>
+              <TouchableOpacity onPress={pickImage} style={styles.inputIconButton}>
+                <Ionicons name="image" size={20} color="#4A90D9" />
+              </TouchableOpacity>
+              <TouchableOpacity onPress={takePhoto} style={styles.inputIconButton}>
+                <Ionicons name="camera" size={20} color="#4A90D9" />
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          <TouchableOpacity
+            style={[styles.sendButton, sending && styles.sendButtonDisabled]}
+            onPress={async () => {
+              const hasText = !!inputText.trim();
+
+              if (hasText || mediaUri) {
+                await handleSend();
+                return;
+              }
+
+              if (isRecording) {
+                await stopRecording();
+              } else {
+                await startRecording();
+              }
+            }}
+            disabled={sending}
+          >
+            {sending ? (
+              <ActivityIndicator size="small" color="#fff" />
+            ) : (
+              <Ionicons
+                name={inputText.trim() || mediaUri ? 'send' : isRecording ? 'stop' : 'mic'}
+                size={20}
+                color="#fff"
+              />
+            )}
+          </TouchableOpacity>
+        </View>
       </View>
     </KeyboardAvoidingView>
   );
@@ -582,27 +800,47 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   inputContainer: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
+    flexDirection: 'column',
+    alignItems: 'stretch',
     padding: 12,
     backgroundColor: '#fff',
     borderTopWidth: 1,
     borderTopColor: '#eee',
   },
-  input: {
+  inputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  inputBox: {
     flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
     backgroundColor: '#f5f5f5',
     borderRadius: 20,
-    paddingHorizontal: 16,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    marginRight: 8,
+  },
+  inputActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  inputIconButton: {
+    paddingHorizontal: 8,
+    paddingVertical: 8,
+  },
+  input: {
+    flex: 1,
+    backgroundColor: 'transparent',
+    paddingHorizontal: 0,
     paddingVertical: 10,
     fontSize: 16,
     maxHeight: 100,
-    marginRight: 8,
   },
   sendButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     backgroundColor: '#4A90D9',
     justifyContent: 'center',
     alignItems: 'center',
@@ -637,5 +875,46 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.6)',
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  inputMediaPreview: {
+    marginBottom: 8,
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  inputMediaImage: {
+    width: 140,
+    height: 140,
+    borderRadius: 12,
+  },
+  inputMediaClear: {
+    position: 'absolute',
+    top: 4,
+    right: 4,
+  },
+  inputAudioPreview: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f5f5f5',
+    borderRadius: 8,
+    padding: 8,
+    marginBottom: 8,
+  },
+  inputAudioPlayButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#4A90D9',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  inputAudioText: {
+    flex: 1,
+    marginLeft: 8,
+    fontSize: 13,
+    color: '#333',
+  },
+  recordingButton: {
+    backgroundColor: '#ffe5e5',
+    borderRadius: 16,
   },
 });

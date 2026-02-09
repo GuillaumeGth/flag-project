@@ -218,6 +218,7 @@ export default function CreateMessageScreen({ navigation, route }: Props) {
       );
 
       const results = await Promise.all(sendPromises);
+      console.log('handleSend results:', results.map((r, i) => ({ recipient: recipients[i]?.id, success: !!r })));
       const successCount = results.filter(Boolean).length;
 
       if (successCount === recipients.length) {

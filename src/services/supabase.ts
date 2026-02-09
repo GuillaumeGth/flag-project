@@ -40,3 +40,24 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     detectSessionInUrl: false,
   },
 });
+
+// Cached user ID — updated synchronously by auth state changes.
+// Use getCachedUserId() instead of getSession() in data-fetching functions
+// to avoid deadlocking on the internal Supabase auth lock.
+let _cachedUserId: string | null = null;
+
+// Resolves once Supabase's internal _initializePromise completes (SecureStore read done).
+// Await this instead of getSession() inside onAuthStateChange to avoid deadlock.
+export const supabaseReady = supabase.auth.getSession().then(({ data: { session } }) => {
+  _cachedUserId = session?.user?.id ?? null;
+  console.log('[supabase] supabaseReady resolved, cachedUserId:', _cachedUserId);
+});
+
+// Keep cached userId in sync with auth state changes (sign-in, sign-out, token refresh)
+supabase.auth.onAuthStateChange((_event, session) => {
+  _cachedUserId = session?.user?.id ?? null;
+});
+
+export function getCachedUserId(): string | null {
+  return _cachedUserId;
+}

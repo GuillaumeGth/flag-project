@@ -31,7 +31,8 @@ const LNG_DELTA = 0.009;
 
 export default function MapScreen({ navigation, route }: Props) {
   const insets = useSafeAreaInsets();
-  const { current: userLocation, loading: locationLoading, refreshLocation, requestPermission, permission } = useLocation();  
+  const { user } = useAuth();
+  const { current: userLocation, loading: locationLoading, refreshLocation, requestPermission, permission } = useLocation();
   const mapRef = useRef<MapView>(null);
   const [messages, setMessages] = useState<UndiscoveredMessageMapMeta[]>([]);
   const [loading, setLoading] = useState(true);
@@ -51,11 +52,14 @@ export default function MapScreen({ navigation, route }: Props) {
     }
   }, []);
 
-  // Load messages whenever the map screen is focused
+  // Load messages whenever the map screen is focused or user changes (after login)
   useFocusEffect(
     useCallback(() => {
-      loadMessages();
-    }, [])
+      console.log('[MapScreen] useFocusEffect fired, user =', user?.id);
+      if (user) {
+        loadMessages();
+      }
+    }, [user])
   );
 
   // Remember which message we should center on when coming from another screen
@@ -223,10 +227,11 @@ export default function MapScreen({ navigation, route }: Props) {
   }, [focusLocation, userLocation]);
 
   const loadMessages = async () => {
+    console.log('[MapScreen] loadMessages: START');
     setLoading(true);
     setMarkersReady(false);
     const data = await fetchUndiscoveredMessagesForMap();
-    console.log('DEBUG: Loaded', data.length, 'messages:', JSON.stringify(data));
+    console.log('[MapScreen] loadMessages: got', data.length, 'messages');
     setMessages(data);
     setLoading(false);
     setTimeout(() => setMarkersReady(true), 500);

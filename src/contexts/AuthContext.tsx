@@ -3,7 +3,7 @@ import * as WebBrowser from 'expo-web-browser';
 import * as Linking from 'expo-linking';
 import { File } from 'expo-file-system/next';
 import { decode } from 'base64-arraybuffer';
-import { supabase } from '@/services/supabase';
+import { supabase, supabaseReady } from '@/services/supabase';
 import { registerPushToken, unregisterPushToken } from '@/services/notifications';
 import { User, AuthState } from '@/types';
 
@@ -28,7 +28,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   });
 
   const setSessionAndUpdateState = async (accessToken: string, refreshToken: string) => {
-    console.log('=== SETTING SESSION ===');
+    console.log('[AuthContext] setSessionAndUpdateState: START');
     try {
       const { data, error } = await supabase.auth.setSession({
         access_token: accessToken,
@@ -36,14 +36,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       });
 
       if (error) {
-        console.log('Error setting session:', error.message);
+        console.log('[AuthContext] setSessionAndUpdateState: ERROR', error.message);
         return { error };
       }
 
-      console.log('Session set successfully, user:', data.user?.email);
+      console.log('[AuthContext] setSessionAndUpdateState: session set, userId:', data.user?.id);
+
+      // Wait for Supabase client initialization to complete before allowing screens to mount
+      // This ensures getSession() won't hang in data-fetching functions
+      // Use supabaseReady (plain promise) instead of getSession() to avoid deadlock
+      console.log('[AuthContext] setSessionAndUpdateState: waiting for supabaseReady...');
+      await supabaseReady;
+      console.log('[AuthContext] setSessionAndUpdateState: supabaseReady resolved');
 
       // Force state update in case onAuthStateChange doesn't fire
       if (data.session) {
+        console.log('[AuthContext] setSessionAndUpdateState: forcing setState with user');
         setState((prev) => ({
           ...prev,
           session: data.session,
@@ -54,7 +62,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       return { error: null };
     } catch (e) {
-      console.log('Exception setting session:', e);
+      console.log('[AuthContext] setSessionAndUpdateState: EXCEPTION', e);
       return { error: e as Error };
     }
   };
@@ -238,17 +246,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Listen for deep links while app is running
     const linkingSubscription = Linking.addEventListener('url', handleDeepLink);
 
-    // Check current session with timeout
-    const checkSession = async () => {
-      try {
-        const timeoutPromise = new Promise((_, reject) =>
-          setTimeout(() => reject(new Error('Session check timeout')), 5000)
-        );
+    // Listen for auth changes
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      console.log('[AuthContext] onAuthStateChange:', _event, 'hasSession:', !!session, 'userId:', session?.user?.id);
 
-        const sessionPromise = supabase.auth.getSession();
-        const { data: { session } } = await Promise.race([sessionPromise, timeoutPromise]) as any;
+      // Wait for Supabase client to be fully initialized before updating state.
+      // Use supabaseReady (plain promise) instead of getSession() to avoid deadlock.
+      // getSession() acquires an internal lock that's already held during event firing.
+      console.log('[AuthContext] Waiting for supabaseReady...');
+      await supabaseReady;
+      console.log('[AuthContext] supabaseReady resolved, proceeding with:', _event);
 
-        const mappedUser = session?.user ? mapUser(session.user) : null;
+      // On explicit sign out, clear everything
+      if (_event === 'SIGNED_OUT') {
+        console.log('[AuthContext] SIGNED_OUT -> clearing state');
+        setState({ user: null, session: null, loading: false });
+        return;
+      }
+
+      // If we have a valid session, update state and run post-login setup
+      if (session?.user) {
+        const mappedUser = mapUser(session.user);
+        console.log('[AuthContext] Setting user:', mappedUser.id, 'event:', _event);
         setState((prev) => ({
           ...prev,
           session,
@@ -256,47 +277,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           loading: false,
         }));
 
-        if (mappedUser && session?.user) {
-          // Ensure user exists in database first (fallback if trigger doesn't work)
-          await ensureUserInDatabase(session.user);
-          // Sync profile in background - don't block the app
+        if (_event === 'SIGNED_IN' || _event === 'INITIAL_SESSION') {
+          console.log('[AuthContext] Running post-login setup for:', _event);
+          // All post-login operations are fire-and-forget to avoid deadlock.
+          // Supabase queries internally call getSession() which would deadlock
+          // if awaited inside onAuthStateChange (the auth lock is held).
+          ensureUserInDatabase(session.user).catch((e) => console.log('ensureUserInDatabase error:', e));
           syncUserProfile(session.user).catch((e) => console.log('Sync profile error:', e));
           updateUserWithDbAvatar(mappedUser.id).catch((e) => console.log('Update avatar error:', e));
-          // Register push token for remote notifications
           registerPushToken(mappedUser.id).catch((e) => console.log('Register push token error:', e));
         }
-      } catch (error) {
-        console.log('Session check failed:', error);
-        setState((prev) => ({
-          ...prev,
-          loading: false,
-        }));
+        return;
       }
-    };
 
-    checkSession();
-
-    // Listen for auth changes
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      console.log('Auth state changed:', _event);
-      const mappedUser = session?.user ? mapUser(session.user) : null;
-      setState((prev) => ({
-        ...prev,
-        session,
-        user: mappedUser,
-        loading: false,
-      }));
-
-      if (mappedUser && session?.user) {
-        // Ensure user exists in database first (fallback if trigger doesn't work)
-        await ensureUserInDatabase(session.user);
-        // Sync profile in background - don't block the UI
-        syncUserProfile(session.user).catch((e) => console.log('Sync profile error:', e));
-        updateUserWithDbAvatar(mappedUser.id).catch((e) => console.log('Update avatar error:', e));
-        // Register push token for remote notifications
-        registerPushToken(mappedUser.id).catch((e) => console.log('Register push token error:', e));
+      // No session: only update loading state on INITIAL_SESSION (no stored session)
+      // Never reset user to null from other events (prevents race condition)
+      if (_event === 'INITIAL_SESSION') {
+        console.log('[AuthContext] INITIAL_SESSION with no session -> setting loading=false');
+        setState((prev) => ({ ...prev, loading: false }));
+      } else {
+        console.log('[AuthContext] Ignoring event with no session:', _event);
       }
     });
 

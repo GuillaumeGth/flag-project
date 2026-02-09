@@ -1,20 +1,8 @@
 import * as Notifications from 'expo-notifications';
 import Constants from 'expo-constants';
-import { Alert, Platform } from 'react-native';
+import { Platform } from 'react-native';
 import { Coordinates } from '@/types';
 import { supabase } from '@/services/supabase';
-
-// Debug log array to accumulate logs and show them all at once
-let debugLogs: string[] = [];
-function debugLog(msg: string) {
-  console.log(`[PUSH DEBUG] ${msg}`);
-  debugLogs.push(msg);
-}
-function showDebugLogs(title: string) {
-  const logs = debugLogs.join('\n');
-  debugLogs = [];
-  Alert.alert(title, logs);
-}
 
 // Configure notification behavior
 Notifications.setNotificationHandler({
@@ -29,23 +17,17 @@ Notifications.setNotificationHandler({
 
 // Request notification permissions
 export async function requestNotificationPermission(): Promise<boolean> {
-  debugLog(`Platform: ${Platform.OS}`);
   const { status: existingStatus } = await Notifications.getPermissionsAsync();
-  debugLog(`Existing permission status: ${existingStatus}`);
   let finalStatus = existingStatus;
 
   if (existingStatus !== 'granted') {
     const { status } = await Notifications.requestPermissionsAsync();
     finalStatus = status;
-    debugLog(`Requested permission, new status: ${finalStatus}`);
   }
 
   if (finalStatus !== 'granted') {
-    debugLog('Permission NOT granted');
     return false;
   }
-
-  debugLog('Permission granted');
 
   // Android needs a notification channel
   if (Platform.OS === 'android') {
@@ -55,7 +37,6 @@ export async function requestNotificationPermission(): Promise<boolean> {
       vibrationPattern: [0, 250, 250, 250],
       lightColor: '#4A90D9',
     });
-    debugLog('Android notification channel created');
   }
 
   return true;
@@ -79,46 +60,31 @@ export async function notifyNearbyMessage(
 
 // Get push token for remote notifications
 export async function getPushToken(): Promise<string | null> {
-  debugLog(`Constants.expoConfig: ${JSON.stringify(Constants.expoConfig?.extra?.eas)}`);
-  debugLog(`Constants.easConfig: ${JSON.stringify((Constants as any).easConfig)}`);
   const projectId =
     Constants.expoConfig?.extra?.eas?.projectId ??
     (Constants as any).easConfig?.projectId ??
     'c8cb48ce-1c64-4314-a6ad-ada1e82efca8';
-  debugLog(`projectId used: ${projectId}`);
-  debugLog('Calling getExpoPushTokenAsync...');
   const token = await Notifications.getExpoPushTokenAsync({ projectId });
-  debugLog(`Token received: ${token.data}`);
   return token.data;
 }
 
 // Register push token in database for the current user
 export async function registerPushToken(userId: string): Promise<boolean> {
-  debugLogs = [];
   try {
-    debugLog(`registerPushToken START for userId: ${userId}`);
-
     // First request permission
     const hasPermission = await requestNotificationPermission();
     if (!hasPermission) {
-      debugLog('FAILED: permission not granted');
-      showDebugLogs('Push ECHEC - Permission');
       return false;
     }
 
     // Get the push token
-    debugLog('Getting push token...');
     const token = await getPushToken();
-    debugLog(`getPushToken returned: ${token}`);
     if (!token) {
-      debugLog('FAILED: token is null');
-      showDebugLogs('Push ECHEC - Token null');
       return false;
     }
 
     // Upsert token in database
-    debugLog('Upserting token in DB...');
-    const { data, error } = await supabase
+    const { error } = await supabase
       .from('user_push_tokens')
       .upsert(
         {
@@ -133,18 +99,13 @@ export async function registerPushToken(userId: string): Promise<boolean> {
       .select();
 
     if (error) {
-      debugLog(`FAILED upsert: ${error.message} | ${error.hint || ''}`);
-      showDebugLogs('Push ECHEC - DB');
+      console.error('Error registering push token:', error);
       return false;
     }
 
-    debugLog(`SUCCESS! Rows: ${data?.length}`);
-    showDebugLogs('Push OK');
     return true;
-  } catch (error: any) {
-    debugLog(`EXCEPTION: ${error?.message || error}`);
-    debugLog(`Stack: ${error?.stack || 'N/A'}`);
-    showDebugLogs('Push EXCEPTION');
+  } catch (error) {
+    console.error('Error in registerPushToken:', error);
     return false;
   }
 }

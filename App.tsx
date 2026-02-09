@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { NavigationContainer } from '@react-navigation/native';
+import { NavigationContainer, NavigationContainerRef } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
@@ -9,6 +9,7 @@ import * as SecureStore from 'expo-secure-store';
 
 import { AuthProvider, useAuth } from '@/contexts/AuthContext';
 import { LocationProvider } from '@/contexts/LocationContext';
+import { addNotificationResponseListener } from '@/services/notifications';
 
 import PermissionsScreen from '@/screens/PermissionsScreen';
 import AuthScreen from '@/screens/AuthScreen';
@@ -126,11 +127,23 @@ function AppNavigator() {
 }
 
 export default function App() {
+  const navigationRef = useRef<NavigationContainerRef<any>>(null);
+
+  useEffect(() => {
+    const subscription = addNotificationResponseListener(() => {
+      // Navigate to Inbox tab to trigger message refetch via focus listener
+      if (navigationRef.current?.isReady()) {
+        navigationRef.current.navigate('Main', { screen: 'Map' });
+      }
+    });
+    return () => subscription.remove();
+  }, []);
+
   return (
     <SafeAreaProvider>
       <AuthProvider>
         <LocationProvider>
-          <NavigationContainer>
+          <NavigationContainer ref={navigationRef}>
             <AppNavigator />
             <StatusBar style="dark" />
           </NavigationContainer>

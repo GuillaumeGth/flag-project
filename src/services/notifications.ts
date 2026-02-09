@@ -152,14 +152,12 @@ export async function registerPushToken(userId: string): Promise<boolean> {
 // Unregister push token when user signs out
 export async function unregisterPushToken(userId: string): Promise<void> {
   try {
-    const token = await getPushToken();
-    if (!token) return;
-
+    // Delete all tokens for this user to ensure clean sign-out,
+    // even if getPushToken() would fail or return a different token.
     const { error } = await supabase
       .from('user_push_tokens')
       .delete()
-      .eq('user_id', userId)
-      .eq('expo_push_token', token);
+      .eq('user_id', userId);
 
     if (error) {
       console.error('Error unregistering push token:', error);

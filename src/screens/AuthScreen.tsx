@@ -10,6 +10,7 @@ import {
   Platform,
 } from 'react-native';
 import { useAuth } from '@/contexts/AuthContext';
+import { colors } from '@/theme';
 
 export default function AuthScreen() {
   const { signInWithPhone, verifyOtp, signInWithGoogle } = useAuth();
@@ -84,7 +85,7 @@ export default function AuthScreen() {
             <TextInput
               style={styles.input}
               placeholder="Numéro de téléphone"
-              placeholderTextColor="#999"
+              placeholderTextColor={colors.textMuted}
               keyboardType="phone-pad"
               value={phone}
               onChangeText={setPhone}
@@ -128,7 +129,7 @@ export default function AuthScreen() {
             <TextInput
               style={styles.input}
               placeholder="Code à 6 chiffres"
-              placeholderTextColor="#999"
+              placeholderTextColor={colors.textMuted}
               keyboardType="number-pad"
               value={otp}
               onChangeText={setOtp}
@@ -169,7 +170,7 @@ export default function AuthScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: colors.background,
   },
   content: {
     flex: 1,
@@ -179,28 +180,29 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 48,
     fontWeight: 'bold',
-    color: '#4A90D9',
+    color: colors.primary,
     textAlign: 'center',
     marginBottom: 8,
   },
   subtitle: {
     fontSize: 16,
-    color: '#666',
+    color: colors.textSecondary,
     textAlign: 'center',
     marginBottom: 48,
   },
   input: {
     borderWidth: 1,
-    borderColor: '#ddd',
+    borderColor: colors.border,
     borderRadius: 12,
     paddingHorizontal: 16,
     paddingVertical: 14,
     fontSize: 16,
     marginBottom: 16,
-    backgroundColor: '#f9f9f9',
+    backgroundColor: colors.surfaceLight,
+    color: colors.textPrimary,
   },
   button: {
-    backgroundColor: '#4A90D9',
+    backgroundColor: colors.primary,
     borderRadius: 12,
     paddingVertical: 16,
     alignItems: 'center',
@@ -218,28 +220,28 @@ const styles = StyleSheet.create({
   dividerLine: {
     flex: 1,
     height: 1,
-    backgroundColor: '#ddd',
+    backgroundColor: colors.border,
   },
   dividerText: {
     paddingHorizontal: 16,
-    color: '#999',
+    color: colors.textMuted,
   },
   googleButton: {
     borderWidth: 1,
-    borderColor: '#ddd',
+    borderColor: colors.border,
     borderRadius: 12,
     paddingVertical: 16,
     alignItems: 'center',
-    backgroundColor: '#fff',
+    backgroundColor: colors.surfaceLight,
   },
   googleButtonText: {
-    color: '#333',
+    color: colors.textPrimary,
     fontSize: 16,
     fontWeight: '600',
   },
   otpInfo: {
     fontSize: 14,
-    color: '#666',
+    color: colors.textSecondary,
     textAlign: 'center',
     marginBottom: 16,
   },
@@ -248,11 +250,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   backButtonText: {
-    color: '#4A90D9',
+    color: colors.primaryLight,
     fontSize: 14,
   },
   error: {
-    color: '#e74c3c',
+    color: colors.error,
     textAlign: 'center',
     marginTop: 16,
   },

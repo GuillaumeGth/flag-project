@@ -15,6 +15,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { useAuth } from '@/contexts/AuthContext';
+import { colors } from '@/theme';
 
 export default function ProfileScreen() {
   const { user, signOut, updateAvatar, updateDisplayName } = useAuth();
@@ -91,11 +92,11 @@ export default function ProfileScreen() {
         <TouchableOpacity onPress={handleChangeAvatar} disabled={uploading}>
           <View style={styles.avatar}>
             {uploading ? (
-              <ActivityIndicator size="large" color="#4A90D9" />
+              <ActivityIndicator size="large" color={colors.primary} />
             ) : user?.avatar_url ? (
               <Image source={{ uri: user.avatar_url }} style={styles.avatarImage} />
             ) : (
-              <Ionicons name="person" size={48} color="#999" />
+              <Ionicons name="person" size={48} color={colors.textSecondary} />
             )}
           </View>
           <View style={styles.avatarEditBadge}>
@@ -106,7 +107,7 @@ export default function ProfileScreen() {
           <Text style={styles.displayName}>
             {user?.display_name || 'Utilisateur'}
           </Text>
-          <Ionicons name="pencil" size={16} color="#4A90D9" style={styles.editIcon} />
+          <Ionicons name="pencil" size={16} color={colors.primary} style={styles.editIcon} />
         </TouchableOpacity>
         <Text style={styles.identifier}>
           {user?.phone || user?.email || ''}
@@ -115,32 +116,32 @@ export default function ProfileScreen() {
 
       <View style={styles.menuSection}>
         <TouchableOpacity style={styles.menuItem}>
-          <Ionicons name="person-outline" size={24} color="#333" />
+          <Ionicons name="person-outline" size={24} color={colors.textPrimary} />
           <Text style={styles.menuText}>Modifier le profil</Text>
-          <Ionicons name="chevron-forward" size={20} color="#ccc" />
+          <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
         </TouchableOpacity>
 
         <TouchableOpacity style={styles.menuItem}>
-          <Ionicons name="notifications-outline" size={24} color="#333" />
+          <Ionicons name="notifications-outline" size={24} color={colors.textPrimary} />
           <Text style={styles.menuText}>Notifications</Text>
-          <Ionicons name="chevron-forward" size={20} color="#ccc" />
+          <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
         </TouchableOpacity>
 
         <TouchableOpacity style={styles.menuItem}>
-          <Ionicons name="shield-outline" size={24} color="#333" />
+          <Ionicons name="shield-outline" size={24} color={colors.textPrimary} />
           <Text style={styles.menuText}>Confidentialité</Text>
-          <Ionicons name="chevron-forward" size={20} color="#ccc" />
+          <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
         </TouchableOpacity>
 
         <TouchableOpacity style={styles.menuItem}>
-          <Ionicons name="help-circle-outline" size={24} color="#333" />
+          <Ionicons name="help-circle-outline" size={24} color={colors.textPrimary} />
           <Text style={styles.menuText}>Aide</Text>
-          <Ionicons name="chevron-forward" size={20} color="#ccc" />
+          <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
         </TouchableOpacity>
       </View>
 
       <TouchableOpacity style={styles.signOutButton} onPress={handleSignOut}>
-        <Ionicons name="log-out-outline" size={24} color="#e74c3c" />
+        <Ionicons name="log-out-outline" size={24} color={colors.error} />
         <Text style={styles.signOutText}>Se déconnecter</Text>
       </TouchableOpacity>
 
@@ -196,7 +197,7 @@ export default function ProfileScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: colors.background,
   },
   header: {
     paddingHorizontal: 16,
@@ -206,19 +207,19 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 28,
     fontWeight: 'bold',
-    color: '#333',
+    color: colors.textPrimary,
   },
   profileSection: {
     alignItems: 'center',
     padding: 24,
     borderBottomWidth: 1,
-    borderBottomColor: '#eee',
+    borderBottomColor: colors.border,
   },
   avatar: {
     width: 96,
     height: 96,
     borderRadius: 48,
-    backgroundColor: '#f0f0f0',
+    backgroundColor: colors.surfaceLight,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 16,
@@ -232,24 +233,24 @@ const styles = StyleSheet.create({
     position: 'absolute',
     bottom: 16,
     right: 0,
-    backgroundColor: '#4A90D9',
+    backgroundColor: colors.primary,
     width: 32,
     height: 32,
     borderRadius: 16,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 3,
-    borderColor: '#fff',
+    borderColor: colors.background,
   },
   displayName: {
     fontSize: 22,
     fontWeight: '600',
-    color: '#333',
+    color: colors.textPrimary,
     marginBottom: 4,
   },
   identifier: {
     fontSize: 14,
-    color: '#999',
+    color: colors.textSecondary,
   },
   menuSection: {
     paddingVertical: 8,
@@ -264,7 +265,7 @@ const styles = StyleSheet.create({
     flex: 1,
     marginLeft: 16,
     fontSize: 16,
-    color: '#333',
+    color: colors.textPrimary,
   },
   signOutButton: {
     flexDirection: 'row',
@@ -276,11 +277,11 @@ const styles = StyleSheet.create({
   signOutText: {
     marginLeft: 16,
     fontSize: 16,
-    color: '#e74c3c',
+    color: colors.error,
   },
   version: {
     textAlign: 'center',
-    color: '#ccc',
+    color: colors.textMuted,
     fontSize: 12,
     marginTop: 'auto',
     paddingBottom: 32,
@@ -294,12 +295,12 @@ const styles = StyleSheet.create({
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
     justifyContent: 'center',
     alignItems: 'center',
   },
   modalContent: {
-    backgroundColor: '#fff',
+    backgroundColor: colors.surface,
     borderRadius: 16,
     padding: 24,
     width: '85%',
@@ -308,17 +309,19 @@ const styles = StyleSheet.create({
   modalTitle: {
     fontSize: 20,
     fontWeight: '600',
-    color: '#333',
+    color: colors.textPrimary,
     marginBottom: 16,
     textAlign: 'center',
   },
   modalInput: {
     borderWidth: 1,
-    borderColor: '#ddd',
+    borderColor: colors.border,
     borderRadius: 12,
     padding: 14,
     fontSize: 16,
     marginBottom: 20,
+    backgroundColor: colors.surfaceLight,
+    color: colors.textPrimary,
   },
   modalButtons: {
     flexDirection: 'row',
@@ -328,19 +331,19 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: 14,
     borderRadius: 12,
-    backgroundColor: '#f0f0f0',
+    backgroundColor: colors.surfaceLight,
     alignItems: 'center',
   },
   modalCancelText: {
     fontSize: 16,
     fontWeight: '500',
-    color: '#666',
+    color: colors.textSecondary,
   },
   modalSaveButton: {
     flex: 1,
     padding: 14,
     borderRadius: 12,
-    backgroundColor: '#4A90D9',
+    backgroundColor: colors.primary,
     alignItems: 'center',
   },
   modalSaveText: {

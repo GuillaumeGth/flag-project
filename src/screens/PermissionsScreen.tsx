@@ -11,6 +11,7 @@ import * as Notifications from 'expo-notifications';
 import { Camera } from 'expo-camera';
 import { Audio } from 'expo-av';
 import { Ionicons } from '@expo/vector-icons';
+import { colors } from '@/theme';
 
 interface PermissionItem {
   key: string;
@@ -201,7 +202,7 @@ export default function PermissionsScreen({ onComplete }: PermissionsScreenProps
 
       <View style={styles.content}>
         <View style={styles.iconContainer}>
-          <Ionicons name={current.icon} size={64} color="#4A90D9" />
+          <Ionicons name={current.icon} size={64} color={colors.primary} />
         </View>
 
         <Text style={styles.title}>{current.label}</Text>
@@ -234,7 +235,7 @@ export default function PermissionsScreen({ onComplete }: PermissionsScreenProps
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: colors.background,
     paddingHorizontal: 32,
     paddingTop: 80,
     paddingBottom: 40,
@@ -249,14 +250,14 @@ const styles = StyleSheet.create({
     width: 10,
     height: 10,
     borderRadius: 5,
-    backgroundColor: '#ddd',
+    backgroundColor: colors.surfaceLight,
   },
   progressDotActive: {
-    backgroundColor: '#4A90D9',
+    backgroundColor: colors.primary,
     width: 24,
   },
   progressDotDone: {
-    backgroundColor: '#4A90D9',
+    backgroundColor: colors.primary,
   },
   content: {
     flex: 1,
@@ -267,7 +268,7 @@ const styles = StyleSheet.create({
     width: 120,
     height: 120,
     borderRadius: 60,
-    backgroundColor: '#EBF3FB',
+    backgroundColor: colors.surfaceLight,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 32,
@@ -275,19 +276,19 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 28,
     fontWeight: 'bold',
-    color: '#333',
+    color: colors.textPrimary,
     textAlign: 'center',
     marginBottom: 12,
   },
   description: {
     fontSize: 16,
-    color: '#666',
+    color: colors.textSecondary,
     textAlign: 'center',
     marginBottom: 48,
     lineHeight: 22,
   },
   button: {
-    backgroundColor: '#4A90D9',
+    backgroundColor: colors.primary,
     borderRadius: 12,
     paddingVertical: 16,
     paddingHorizontal: 48,
@@ -304,12 +305,12 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   skipButtonText: {
-    color: '#999',
+    color: colors.textMuted,
     fontSize: 14,
   },
   footer: {
     textAlign: 'center',
-    color: '#999',
+    color: colors.textMuted,
     fontSize: 14,
   },
 });

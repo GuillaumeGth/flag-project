@@ -12,6 +12,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { fetchAllUsers, FLAG_BOT_ID } from '@/services/messages';
 import { User } from '@/types';
+import { colors } from '@/theme';
 
 interface Props {
   navigation: any;
@@ -94,7 +95,7 @@ export default function SelectRecipientScreen({ navigation }: Props) {
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()}>
-          <Ionicons name="arrow-back" size={24} color="#333" />
+          <Ionicons name="arrow-back" size={24} color={colors.textPrimary} />
         </TouchableOpacity>
         <Text style={styles.title}>Choisir les destinataires</Text>
         <TouchableOpacity
@@ -114,11 +115,11 @@ export default function SelectRecipientScreen({ navigation }: Props) {
 
       {loading ? (
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#4A90D9" />
+          <ActivityIndicator size="large" color={colors.primary} />
         </View>
       ) : users.length === 0 ? (
         <View style={styles.emptyContainer}>
-          <Ionicons name="people-outline" size={64} color="#ccc" />
+          <Ionicons name="people-outline" size={64} color={colors.textMuted} />
           <Text style={styles.emptyTitle}>Aucun utilisateur</Text>
           <Text style={styles.emptyText}>
             Il n'y a pas encore d'autres utilisateurs.{'\n'}
@@ -140,7 +141,7 @@ export default function SelectRecipientScreen({ navigation }: Props) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: colors.background,
   },
   header: {
     flexDirection: 'row',
@@ -148,20 +149,20 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     padding: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
+    borderBottomColor: colors.border,
   },
   title: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#333',
+    color: colors.textPrimary,
   },
   confirmButton: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#4A90D9',
+    color: colors.primary,
   },
   confirmButtonDisabled: {
-    color: '#ccc',
+    color: colors.textMuted,
   },
   loadingContainer: {
     flex: 1,
@@ -177,13 +178,13 @@ const styles = StyleSheet.create({
   emptyTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#333',
+    color: colors.textPrimary,
     marginTop: 16,
     marginBottom: 8,
   },
   emptyText: {
     fontSize: 14,
-    color: '#666',
+    color: colors.textSecondary,
     textAlign: 'center',
     lineHeight: 20,
   },
@@ -194,34 +195,34 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     padding: 12,
-    backgroundColor: '#f9f9f9',
+    backgroundColor: colors.surfaceLight,
     borderRadius: 12,
     marginBottom: 8,
   },
   userItemSelected: {
-    backgroundColor: '#e8f4fd',
+    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: '#4A90D9',
+    borderColor: colors.primary,
   },
   checkbox: {
     width: 24,
     height: 24,
     borderRadius: 12,
     borderWidth: 2,
-    borderColor: '#ccc',
+    borderColor: colors.textMuted,
     marginRight: 12,
     justifyContent: 'center',
     alignItems: 'center',
   },
   checkboxSelected: {
-    backgroundColor: '#4A90D9',
-    borderColor: '#4A90D9',
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
   },
   avatar: {
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: '#e0e0e0',
+    backgroundColor: colors.surface,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -231,7 +232,7 @@ const styles = StyleSheet.create({
     borderRadius: 24,
   },
   botAvatar: {
-    backgroundColor: '#e8f4fd',
+    backgroundColor: colors.surfaceLight,
   },
   userInfo: {
     flex: 1,
@@ -240,11 +241,11 @@ const styles = StyleSheet.create({
   userName: {
     fontSize: 16,
     fontWeight: '500',
-    color: '#333',
+    color: colors.textPrimary,
   },
   botLabel: {
     fontSize: 12,
-    color: '#4A90D9',
+    color: colors.primary,
     marginTop: 2,
   },
 });

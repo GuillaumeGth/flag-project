@@ -14,6 +14,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '@/contexts/AuthContext';
 import { fetchConversations, FLAG_BOT_ID } from '@/services/messages';
 import { Conversation } from '@/types';
+import { colors } from '@/theme';
 
 interface Props {
   navigation: any;
@@ -154,7 +155,7 @@ export default function InboxScreen({ navigation }: Props) {
             </Text>
             {hasUnread && (
               <View style={styles.undiscoveredBadge}>
-                <Ionicons name="eye-off" size={14} color="#999" />
+                <Ionicons name="eye-off" size={14} color={colors.textSecondary} />
                 <View style={styles.unreadBadge}>
                   <Text style={styles.unreadCount}>
                     {item.unreadCount > 9 ? '9+' : item.unreadCount}
@@ -171,7 +172,7 @@ export default function InboxScreen({ navigation }: Props) {
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#4A90D9" />
+        <ActivityIndicator size="large" color={colors.primary} />
       </View>
     );
   }
@@ -184,13 +185,13 @@ export default function InboxScreen({ navigation }: Props) {
           style={styles.newMessageButton}
           onPress={() => navigation.navigate('SelectRecipient')}
         >
-          <Ionicons name="create-outline" size={24} color="#4A90D9" />
+          <Ionicons name="create-outline" size={24} color={colors.primary} />
         </TouchableOpacity>
       </View>
 
       {conversations.length === 0 ? (
         <View style={styles.emptyContainer}>
-          <Ionicons name="chatbubbles-outline" size={64} color="#ccc" />
+          <Ionicons name="chatbubbles-outline" size={64} color={colors.textMuted} />
           <Text style={styles.emptyText}>Aucune conversation</Text>
           <Text style={styles.emptySubtext}>
             Commencez une conversation en appuyant sur le bouton +
@@ -220,12 +221,13 @@ export default function InboxScreen({ navigation }: Props) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: colors.background,
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: colors.background,
   },
   header: {
     flexDirection: 'row',
@@ -234,12 +236,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#eee',
+    borderBottomColor: colors.border,
   },
   title: {
     fontSize: 28,
     fontWeight: 'bold',
-    color: '#333',
+    color: colors.textPrimary,
   },
   newMessageButton: {
     padding: 8,
@@ -253,19 +255,19 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
+    borderBottomColor: colors.border,
   },
   avatar: {
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: '#f0f0f0',
+    backgroundColor: colors.surfaceLight,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
   },
   botAvatar: {
-    backgroundColor: '#e8f4fd',
+    backgroundColor: colors.surfaceLight,
   },
   avatarImage: {
     width: 56,
@@ -284,17 +286,17 @@ const styles = StyleSheet.create({
   userName: {
     fontSize: 16,
     fontWeight: '500',
-    color: '#333',
+    color: colors.textPrimary,
   },
   userNameUnread: {
     fontWeight: '700',
   },
   date: {
     fontSize: 12,
-    color: '#999',
+    color: colors.textMuted,
   },
   dateUnread: {
-    color: '#4A90D9',
+    color: colors.primary,
   },
   previewRow: {
     flexDirection: 'row',
@@ -303,10 +305,10 @@ const styles = StyleSheet.create({
   preview: {
     flex: 1,
     fontSize: 14,
-    color: '#666',
+    color: colors.textSecondary,
   },
   previewUnread: {
-    color: '#333',
+    color: colors.textPrimary,
     fontWeight: '500',
   },
   undiscoveredBadge: {
@@ -316,7 +318,7 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   unreadBadge: {
-    backgroundColor: '#4A90D9',
+    backgroundColor: colors.primary,
     borderRadius: 10,
     minWidth: 20,
     height: 20,
@@ -338,18 +340,18 @@ const styles = StyleSheet.create({
   emptyText: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#666',
+    color: colors.textSecondary,
     marginTop: 16,
   },
   emptySubtext: {
     fontSize: 14,
-    color: '#999',
+    color: colors.textMuted,
     textAlign: 'center',
     marginTop: 8,
     marginBottom: 24,
   },
   startButton: {
-    backgroundColor: '#4A90D9',
+    backgroundColor: colors.primary,
     paddingHorizontal: 24,
     paddingVertical: 12,
     borderRadius: 24,

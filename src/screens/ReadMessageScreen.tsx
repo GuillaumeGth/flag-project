@@ -12,6 +12,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Audio } from 'expo-av';
 import { markMessageAsRead, fetchMessageById } from '@/services/messages';
 import { MessageWithSender } from '@/types';
+import { colors } from '@/theme';
 
 interface Props {
   navigation: any;
@@ -109,7 +110,7 @@ export default function ReadMessageScreen({ navigation, route }: Props) {
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#4A90D9" />
+        <ActivityIndicator size="large" color={colors.primary} />
       </View>
     );
   }
@@ -117,7 +118,7 @@ export default function ReadMessageScreen({ navigation, route }: Props) {
   if (!message) {
     return (
       <View style={styles.loadingContainer}>
-        <Ionicons name="alert-circle" size={64} color="#ccc" />
+        <Ionicons name="alert-circle" size={64} color={colors.textMuted} />
         <Text style={styles.errorText}>Message introuvable</Text>
         <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
           <Text style={styles.backButtonText}>Retour</Text>
@@ -130,7 +131,7 @@ export default function ReadMessageScreen({ navigation, route }: Props) {
     <View style={styles.container}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()}>
-          <Ionicons name="arrow-back" size={24} color="#333" />
+          <Ionicons name="arrow-back" size={24} color={colors.textPrimary} />
         </TouchableOpacity>
         <View style={styles.headerInfo}>
           <Text style={styles.senderName}>
@@ -153,7 +154,7 @@ export default function ReadMessageScreen({ navigation, route }: Props) {
             <Ionicons
               name={isPlaying ? 'pause-circle' : 'play-circle'}
               size={64}
-              color="#4A90D9"
+              color={colors.primary}
             />
             <Text style={styles.audioText}>
               {isPlaying ? 'En lecture...' : 'Appuyez pour écouter'}
@@ -167,7 +168,7 @@ export default function ReadMessageScreen({ navigation, route }: Props) {
         )}
 
         <View style={styles.locationBadge}>
-          <Ionicons name="location" size={16} color="#4A90D9" />
+          <Ionicons name="location" size={16} color={colors.primary} />
           <Text style={styles.locationText}>
             Message découvert à cet endroit
           </Text>
@@ -195,12 +196,13 @@ export default function ReadMessageScreen({ navigation, route }: Props) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: colors.background,
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: colors.background,
   },
   header: {
     flexDirection: 'row',
@@ -209,7 +211,7 @@ const styles = StyleSheet.create({
     paddingTop: 56,
     paddingBottom: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#eee',
+    borderBottomColor: colors.border,
   },
   headerInfo: {
     flex: 1,
@@ -218,11 +220,11 @@ const styles = StyleSheet.create({
   senderName: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#333',
+    color: colors.textPrimary,
   },
   date: {
     fontSize: 12,
-    color: '#999',
+    color: colors.textMuted,
     marginTop: 2,
   },
   content: {
@@ -240,43 +242,43 @@ const styles = StyleSheet.create({
   audioPlayer: {
     alignItems: 'center',
     padding: 32,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: colors.surfaceLight,
     borderRadius: 12,
     marginBottom: 16,
   },
   audioText: {
     marginTop: 8,
     fontSize: 14,
-    color: '#666',
+    color: colors.textSecondary,
   },
   textContent: {
     fontSize: 18,
     lineHeight: 28,
-    color: '#333',
+    color: colors.textPrimary,
     marginBottom: 24,
   },
   locationBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#f0f7ff',
+    backgroundColor: colors.surfaceLight,
     borderRadius: 8,
     padding: 12,
   },
   locationText: {
     marginLeft: 8,
     fontSize: 14,
-    color: '#4A90D9',
+    color: colors.primary,
   },
   footer: {
     padding: 16,
     borderTopWidth: 1,
-    borderTopColor: '#eee',
+    borderTopColor: colors.border,
   },
   replyButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#4A90D9',
+    backgroundColor: colors.primary,
     borderRadius: 12,
     padding: 16,
   },
@@ -290,11 +292,11 @@ const styles = StyleSheet.create({
     marginTop: 16,
     fontSize: 18,
     fontWeight: '600',
-    color: '#666',
+    color: colors.textSecondary,
   },
   backButton: {
     marginTop: 24,
-    backgroundColor: '#4A90D9',
+    backgroundColor: colors.primary,
     paddingHorizontal: 24,
     paddingVertical: 12,
     borderRadius: 8,

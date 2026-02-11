@@ -18,6 +18,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { fetchUndiscoveredMessagesForMap } from '@/services/messages';
 import { isWithinRadius } from '@/services/location';
 import { UndiscoveredMessageMapMeta, Coordinates } from '@/types';
+import { colors } from '@/theme';
 
 interface Props {
   navigation: any;
@@ -377,7 +378,7 @@ export default function MapScreen({ navigation, route }: Props) {
   if (locationLoading || !userLocation) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#4A90D9" />
+        <ActivityIndicator size="large" color={colors.primary} />
         <Text style={styles.loadingText}>
           {permission !== 'granted'
             ? 'Autorisation de localisation requise...'
@@ -398,7 +399,7 @@ export default function MapScreen({ navigation, route }: Props) {
   return (
     <View style={styles.container}>
       {/* Status bar spacer */}
-      <View style={{ height: insets.top, backgroundColor: '#f5f5f5' }} />
+      <View style={{ height: insets.top, backgroundColor: colors.background }} />
       <MapView
         ref={mapRef}
         style={styles.map}
@@ -462,7 +463,7 @@ export default function MapScreen({ navigation, route }: Props) {
 
       {/* Center on user button */}
       <TouchableOpacity style={[styles.centerButton, { top: insets.top + 16 }]} onPress={centerOnUser}>
-        <Ionicons name="locate" size={24} color="#4A90D9" />
+        <Ionicons name="locate" size={24} color={colors.primary} />
       </TouchableOpacity>
 
       {/* Refresh button */}
@@ -473,7 +474,7 @@ export default function MapScreen({ navigation, route }: Props) {
           loadMessages();
         }}
       >
-        <Ionicons name="refresh" size={24} color="#4A90D9" />
+        <Ionicons name="refresh" size={24} color={colors.primary} />
       </TouchableOpacity>
 
       {/* Create message button */}
@@ -481,7 +482,7 @@ export default function MapScreen({ navigation, route }: Props) {
         style={[styles.createButton, { bottom: 24 }]}
         onPress={() => navigation.navigate('CreateMessage')}
       >
-        <Ionicons name="paper-plane" size={28} color="#fff" />
+        <Ionicons name="paper-plane" size={28} color={colors.primary} />
       </TouchableOpacity>
 
       {/* Selected message card */}
@@ -503,7 +504,7 @@ export default function MapScreen({ navigation, route }: Props) {
               </Text>
             </View>
             <TouchableOpacity onPress={() => setSelectedMessage(null)}>
-              <Ionicons name="close" size={24} color="#666" />
+              <Ionicons name="close" size={24} color={colors.textMuted} />
             </TouchableOpacity>
           </View>
 
@@ -561,18 +562,18 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#fff',
+    backgroundColor: colors.background,
   },
   loadingText: {
     marginTop: 16,
     fontSize: 16,
-    color: '#666',
+    color: colors.textSecondary,
     textAlign: 'center',
     paddingHorizontal: 32,
   },
   permissionButton: {
     marginTop: 24,
-    backgroundColor: '#4A90D9',
+    backgroundColor: colors.primary,
     paddingHorizontal: 24,
     paddingVertical: 12,
     borderRadius: 8,
@@ -585,7 +586,7 @@ const styles = StyleSheet.create({
   centerButton: {
     position: 'absolute',
     right: 16,
-    backgroundColor: '#fff',
+    backgroundColor: colors.surface,
     borderRadius: 25,
     width: 50,
     height: 50,
@@ -593,14 +594,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
+    shadowOpacity: 0.3,
     shadowRadius: 4,
     elevation: 4,
   },
   refreshButton: {
     position: 'absolute',
     right: 16,
-    backgroundColor: '#fff',
+    backgroundColor: colors.surface,
     borderRadius: 25,
     width: 50,
     height: 50,
@@ -608,14 +609,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
+    shadowOpacity: 0.3,
     shadowRadius: 4,
     elevation: 4,
   },
   createButton: {
     position: 'absolute',
     right: 16,
-    backgroundColor: '#4A90D9',
+    backgroundColor: colors.background,
     borderRadius: 30,
     width: 60,
     height: 60,
@@ -631,12 +632,12 @@ const styles = StyleSheet.create({
     position: 'absolute',
     left: 16,
     right: 92,
-    backgroundColor: '#fff',
+    backgroundColor: colors.surface,
     borderRadius: 16,
     padding: 16,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
+    shadowOpacity: 0.3,
     shadowRadius: 4,
     elevation: 4,
   },
@@ -653,7 +654,7 @@ const styles = StyleSheet.create({
   senderName: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#333',
+    color: colors.textPrimary,
   },
   cardAvatar: {
     width: 32,
@@ -665,7 +666,7 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: '#4A90D9',
+    backgroundColor: colors.primary,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 10,
@@ -676,7 +677,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   readButton: {
-    backgroundColor: '#4A90D9',
+    backgroundColor: colors.primary,
     borderRadius: 8,
     paddingVertical: 12,
     alignItems: 'center',
@@ -687,7 +688,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   distanceText: {
-    color: '#999',
+    color: colors.textSecondary,
     fontSize: 14,
     textAlign: 'center',
   },
@@ -711,10 +712,10 @@ const styles = StyleSheet.create({
     elevation: 5,
   },
   markerReadable: {
-    backgroundColor: '#4A90D9',
+    backgroundColor: colors.primary,
   },
   markerUnreadable: {
-    backgroundColor: '#999',
+    backgroundColor: colors.textMuted,
   },
   markerAvatar: {
     width: 44,
@@ -739,10 +740,10 @@ const styles = StyleSheet.create({
     marginTop: -4,
   },
   pointerReadable: {
-    borderTopColor: '#4A90D9',
+    borderTopColor: colors.primary,
   },
   pointerUnreadable: {
-    borderTopColor: '#999',
+    borderTopColor: colors.textMuted,
   },
   avatarMarkerContainer: {
     width: 54,

@@ -16,6 +16,7 @@ import { Audio } from 'expo-av';
 import { useLocation } from '@/contexts/LocationContext';
 import { sendMessage, uploadMedia } from '@/services/messages';
 import { MessageContentType } from '@/types';
+import { colors } from '@/theme';
 
 interface Recipient {
   id: string;
@@ -248,7 +249,7 @@ export default function CreateMessageScreen({ navigation, route }: Props) {
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()}>
-          <Ionicons name="arrow-back" size={24} color="#333" />
+          <Ionicons name="arrow-back" size={24} color={colors.textPrimary} />
         </TouchableOpacity>
         <Text style={styles.title}>Nouveau message</Text>
         <View style={{ width: 24 }} />
@@ -263,12 +264,12 @@ export default function CreateMessageScreen({ navigation, route }: Props) {
           <Text style={styles.recipientName} numberOfLines={2}>
             {recipientsDisplay}
           </Text>
-          <Ionicons name="chevron-forward" size={20} color="#666" />
+          <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
         </TouchableOpacity>
       </View>
 
       <View style={styles.locationInfo}>
-        <Ionicons name="location" size={16} color="#4A90D9" />
+        <Ionicons name="location" size={16} color={colors.primary} />
         <Text style={styles.locationText}>
           Ce message sera ancré à votre position actuelle
         </Text>
@@ -297,7 +298,7 @@ export default function CreateMessageScreen({ navigation, route }: Props) {
             {isPlaying ? 'Lecture en cours...' : 'Audio enregistré'}
           </Text>
           <TouchableOpacity onPress={clearMedia}>
-            <Ionicons name="close-circle" size={24} color="#999" />
+            <Ionicons name="close-circle" size={24} color={colors.textSecondary} />
           </TouchableOpacity>
         </View>
       )}
@@ -306,7 +307,7 @@ export default function CreateMessageScreen({ navigation, route }: Props) {
       <TextInput
         style={styles.textInput}
         placeholder="Votre message..."
-        placeholderTextColor="#999"
+        placeholderTextColor={colors.textMuted}
         multiline
         value={textContent}
         onChangeText={setTextContent}
@@ -315,12 +316,12 @@ export default function CreateMessageScreen({ navigation, route }: Props) {
       {/* Media buttons */}
       <View style={styles.mediaButtons}>
         <TouchableOpacity style={styles.mediaButton} onPress={pickImage}>
-          <Ionicons name="image" size={24} color="#4A90D9" />
+          <Ionicons name="image" size={24} color={colors.primary} />
           <Text style={styles.mediaButtonText}>Galerie</Text>
         </TouchableOpacity>
 
         <TouchableOpacity style={styles.mediaButton} onPress={takePhoto}>
-          <Ionicons name="camera" size={24} color="#4A90D9" />
+          <Ionicons name="camera" size={24} color={colors.primary} />
           <Text style={styles.mediaButtonText}>Photo</Text>
         </TouchableOpacity>
 
@@ -366,7 +367,7 @@ export default function CreateMessageScreen({ navigation, route }: Props) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: colors.background,
   },
   content: {
     padding: 16,
@@ -381,7 +382,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#333',
+    color: colors.textPrimary,
   },
   recipientRow: {
     flexDirection: 'row',
@@ -390,7 +391,7 @@ const styles = StyleSheet.create({
   },
   recipientLabel: {
     fontSize: 16,
-    color: '#666',
+    color: colors.textSecondary,
     marginRight: 8,
   },
   recipientButton: {
@@ -398,18 +399,18 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#f5f5f5',
+    backgroundColor: colors.surfaceLight,
     borderRadius: 8,
     padding: 12,
   },
   recipientName: {
     fontSize: 16,
-    color: '#333',
+    color: colors.textPrimary,
   },
   locationInfo: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#f0f7ff',
+    backgroundColor: colors.surfaceLight,
     borderRadius: 8,
     padding: 12,
     marginBottom: 16,
@@ -417,7 +418,7 @@ const styles = StyleSheet.create({
   locationText: {
     marginLeft: 8,
     fontSize: 14,
-    color: '#4A90D9',
+    color: colors.primary,
   },
   mediaPreview: {
     marginBottom: 16,
@@ -437,7 +438,7 @@ const styles = StyleSheet.create({
   audioPreview: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#f5f5f5',
+    backgroundColor: colors.surfaceLight,
     borderRadius: 8,
     padding: 12,
     marginBottom: 16,
@@ -446,7 +447,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#4A90D9',
+    backgroundColor: colors.primary,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -454,17 +455,19 @@ const styles = StyleSheet.create({
     flex: 1,
     marginLeft: 12,
     fontSize: 14,
-    color: '#333',
+    color: colors.textPrimary,
   },
   textInput: {
     borderWidth: 1,
-    borderColor: '#ddd',
+    borderColor: colors.border,
     borderRadius: 12,
     padding: 16,
     fontSize: 16,
     minHeight: 120,
     textAlignVertical: 'top',
     marginBottom: 16,
+    backgroundColor: colors.surfaceLight,
+    color: colors.textPrimary,
   },
   mediaButtons: {
     flexDirection: 'row',
@@ -478,20 +481,20 @@ const styles = StyleSheet.create({
   mediaButtonText: {
     marginTop: 4,
     fontSize: 12,
-    color: '#666',
+    color: colors.textSecondary,
   },
   recordingButton: {
-    backgroundColor: '#ffe5e5',
+    backgroundColor: '#3a1a1a',
     borderRadius: 8,
   },
   recordingText: {
-    color: '#e74c3c',
+    color: colors.error,
   },
   sendButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#4A90D9',
+    backgroundColor: colors.primary,
     borderRadius: 12,
     padding: 16,
   },

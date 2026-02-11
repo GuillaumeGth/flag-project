@@ -25,6 +25,7 @@ import {
   uploadMedia,
 } from '@/services/messages';
 import { MessageWithUsers, MessageContentType } from '@/types';
+import { colors } from '@/theme';
 
 interface Props {
   navigation: any;
@@ -472,7 +473,7 @@ export default function ConversationScreen({ navigation, route }: Props) {
       <View style={[styles.container, { paddingTop: insets.top }]}>
         <View style={styles.header}>
           <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-            <Ionicons name="arrow-back" size={24} color="#333" />
+            <Ionicons name="arrow-back" size={24} color={colors.textPrimary} />
           </TouchableOpacity>
           <View style={[styles.headerAvatar, isBot && styles.headerAvatarBot]}>
             {otherUserAvatarUrl ? (
@@ -484,7 +485,7 @@ export default function ConversationScreen({ navigation, route }: Props) {
           <Text style={styles.headerTitle}>{otherUserName}</Text>
         </View>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#4A90D9" />
+          <ActivityIndicator size="large" color={colors.primary} />
         </View>
       </View>
     );
@@ -498,7 +499,7 @@ export default function ConversationScreen({ navigation, route }: Props) {
     >
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={24} color="#333" />
+          <Ionicons name="arrow-back" size={24} color={colors.textPrimary} />
         </TouchableOpacity>
         <View style={[styles.headerAvatar, isBot && styles.headerAvatarBot]}>
           {otherUserAvatarUrl ? (
@@ -574,7 +575,7 @@ export default function ConversationScreen({ navigation, route }: Props) {
               {isPlayingInputAudio ? 'Lecture en cours...' : 'Audio enregistré'}
             </Text>
             <TouchableOpacity onPress={clearMedia}>
-              <Ionicons name="close-circle" size={20} color="#999" />
+              <Ionicons name="close-circle" size={20} color={colors.textSecondary} />
             </TouchableOpacity>
           </View>
         )}
@@ -584,7 +585,7 @@ export default function ConversationScreen({ navigation, route }: Props) {
             <TextInput
               style={styles.input}
               placeholder="Votre message..."
-              placeholderTextColor="#999"
+              placeholderTextColor={colors.textMuted}
               value={inputText}
               onChangeText={setInputText}
               multiline
@@ -592,10 +593,10 @@ export default function ConversationScreen({ navigation, route }: Props) {
             />
             <View style={styles.inputActions}>
               <TouchableOpacity onPress={pickImage} style={styles.inputIconButton}>
-                <Ionicons name="image" size={22} color="#4A90D9" />
+                <Ionicons name="image" size={22} color={colors.primary} />
               </TouchableOpacity>
               <TouchableOpacity onPress={takePhoto} style={styles.inputIconButton}>
-                <Ionicons name="camera" size={22} color="#4A90D9" />
+                <Ionicons name="camera" size={22} color={colors.primary} />
               </TouchableOpacity>
             </View>
           </View>
@@ -637,16 +638,16 @@ export default function ConversationScreen({ navigation, route }: Props) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: colors.background,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 12,
     paddingVertical: 8,
-    backgroundColor: '#fff',
+    backgroundColor: colors.surface,
     borderBottomWidth: 1,
-    borderBottomColor: '#eee',
+    borderBottomColor: colors.border,
   },
   backButton: {
     padding: 4,
@@ -656,13 +657,13 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#f0f0f0',
+    backgroundColor: colors.surfaceLight,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 10,
   },
   headerAvatarBot: {
-    backgroundColor: '#e8f4fd',
+    backgroundColor: colors.surfaceLight,
   },
   headerAvatarImage: {
     width: 40,
@@ -672,7 +673,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 17,
     fontWeight: '600',
-    color: '#333',
+    color: colors.textPrimary,
   },
   loadingContainer: {
     flex: 1,
@@ -689,8 +690,8 @@ const styles = StyleSheet.create({
   },
   dateSeparatorText: {
     fontSize: 12,
-    color: '#999',
-    backgroundColor: '#e8e8e8',
+    color: colors.textSecondary,
+    backgroundColor: colors.surfaceLight,
     paddingHorizontal: 12,
     paddingVertical: 4,
     borderRadius: 10,
@@ -710,11 +711,11 @@ const styles = StyleSheet.create({
     borderRadius: 18,
   },
   messageBubbleLeft: {
-    backgroundColor: '#fff',
+    backgroundColor: colors.surface,
     borderBottomLeftRadius: 4,
   },
   messageBubbleRight: {
-    backgroundColor: '#4A90D9',
+    backgroundColor: colors.sent,
     borderBottomRightRadius: 4,
   },
   messageBubbleUndiscovered: {
@@ -723,14 +724,14 @@ const styles = StyleSheet.create({
   },
   messageText: {
     fontSize: 16,
-    color: '#333',
+    color: colors.textPrimary,
     lineHeight: 22,
   },
   messageTextRight: {
     color: '#fff',
   },
   messageTextBlurred: {
-    color: '#ccc',
+    color: colors.textMuted,
   },
   blurOverlay: {
     position: 'absolute',
@@ -739,11 +740,11 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     borderRadius: 18,
-    backgroundColor: 'rgba(255, 255, 255, 0.85)',
+    backgroundColor: 'rgba(30, 30, 45, 0.85)',
   },
   undiscoveredHint: {
     fontSize: 11,
-    color: '#999',
+    color: colors.textMuted,
     marginTop: 4,
     fontStyle: 'italic',
   },
@@ -760,7 +761,7 @@ const styles = StyleSheet.create({
   audioText: {
     marginLeft: 8,
     fontSize: 14,
-    color: '#4A90D9',
+    color: colors.primary,
   },
   audioTextRight: {
     color: '#fff',
@@ -779,7 +780,7 @@ const styles = StyleSheet.create({
   },
   messageTime: {
     fontSize: 11,
-    color: '#999',
+    color: colors.textMuted,
   },
   messageTimeRight: {
     color: 'rgba(255, 255, 255, 0.7)',
@@ -792,11 +793,11 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     fontSize: 16,
-    color: '#666',
+    color: colors.textSecondary,
   },
   emptySubtext: {
     fontSize: 14,
-    color: '#999',
+    color: colors.textMuted,
     marginTop: 4,
   },
   inputContainer: {
@@ -805,9 +806,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingTop: 8,
     paddingBottom: 16,
-    backgroundColor: '#fff',
+    backgroundColor: colors.surface,
     borderTopWidth: 1,
-    borderTopColor: '#eee',
+    borderTopColor: colors.border,
   },
   inputRow: {
     flexDirection: 'row',
@@ -817,7 +818,7 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#f5f5f5',
+    backgroundColor: colors.surfaceLight,
     borderRadius: 25,
     paddingHorizontal: 14,
     paddingVertical: 4,
@@ -838,17 +839,18 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     fontSize: 16,
     maxHeight: 100,
+    color: colors.textPrimary,
   },
   sendButton: {
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: '#4A90D9',
+    backgroundColor: colors.primary,
     justifyContent: 'center',
     alignItems: 'center',
   },
   sendButtonDisabled: {
-    backgroundColor: '#ccc',
+    backgroundColor: colors.textMuted,
   },
   fullscreenOverlay: {
     flex: 1,
@@ -896,7 +898,7 @@ const styles = StyleSheet.create({
   inputAudioPreview: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#f5f5f5',
+    backgroundColor: colors.surfaceLight,
     borderRadius: 8,
     padding: 8,
     marginBottom: 8,
@@ -905,7 +907,7 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: '#4A90D9',
+    backgroundColor: colors.primary,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -913,10 +915,10 @@ const styles = StyleSheet.create({
     flex: 1,
     marginLeft: 8,
     fontSize: 13,
-    color: '#333',
+    color: colors.textPrimary,
   },
   recordingButton: {
-    backgroundColor: '#ffe5e5',
+    backgroundColor: '#3a1a1a',
     borderRadius: 16,
   },
 });

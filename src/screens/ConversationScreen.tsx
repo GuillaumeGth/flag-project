@@ -551,7 +551,7 @@ export default function ConversationScreen({ navigation, route }: Props) {
         </Modal>
       )}
 
-      <View style={[styles.inputContainer, { paddingBottom: insets.bottom || 16 }]}>
+      <View style={[styles.inputContainer, { paddingBottom: insets.bottom + 6 }]}>
         {mediaUri && contentType === 'photo' && (
           <View style={styles.inputMediaPreview}>
             <Image source={{ uri: mediaUri }} style={styles.inputMediaImage} />
@@ -592,10 +592,10 @@ export default function ConversationScreen({ navigation, route }: Props) {
             />
             <View style={styles.inputActions}>
               <TouchableOpacity onPress={pickImage} style={styles.inputIconButton}>
-                <Ionicons name="image" size={20} color="#4A90D9" />
+                <Ionicons name="image" size={22} color="#4A90D9" />
               </TouchableOpacity>
               <TouchableOpacity onPress={takePhoto} style={styles.inputIconButton}>
-                <Ionicons name="camera" size={20} color="#4A90D9" />
+                <Ionicons name="camera" size={22} color="#4A90D9" />
               </TouchableOpacity>
             </View>
           </View>
@@ -802,7 +802,9 @@ const styles = StyleSheet.create({
   inputContainer: {
     flexDirection: 'column',
     alignItems: 'stretch',
-    padding: 12,
+    paddingHorizontal: 12,
+    paddingTop: 8,
+    paddingBottom: 16,
     backgroundColor: '#fff',
     borderTopWidth: 1,
     borderTopColor: '#eee',
@@ -816,9 +818,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#f5f5f5',
-    borderRadius: 20,
+    borderRadius: 25,
     paddingHorizontal: 14,
-    paddingVertical: 10,
+    paddingVertical: 4,
     marginRight: 8,
   },
   inputActions: {
@@ -826,8 +828,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   inputIconButton: {
-    paddingHorizontal: 8,
-    paddingVertical: 8,
+    paddingHorizontal: 5,
+    paddingVertical: 0,
   },
   input: {
     flex: 1,

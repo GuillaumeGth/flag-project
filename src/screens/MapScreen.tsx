@@ -263,7 +263,7 @@ export default function MapScreen({ navigation, route }: Props) {
 
   const canReadMessage = useCallback((messageLocation: Coordinates | null): boolean => {
     if (!userLocation || !messageLocation) return false;
-    return isWithinRadius(userLocation, messageLocation, 30);
+    return isWithinRadius(userLocation, messageLocation, 60);
   }, [userLocation]);
 
   const captureAvatar = useCallback(async (messageId: string) => {

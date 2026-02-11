@@ -302,7 +302,7 @@ export async function sendMessage(
       text_content: textContent,
       media_url: mediaUrl,
       location: location ? `POINT(${location.longitude} ${location.latitude})` : null,
-      radius: location ? 30 : null,
+      radius: location ? 60 : null,
       is_read: location ? false : true, // Messages without location are immediately readable
     })
     .select()

@@ -19,6 +19,7 @@ import { fetchUndiscoveredMessagesForMap, getCachedMapMessages } from '@/service
 import { isWithinRadius } from '@/services/location';
 import { UndiscoveredMessageMapMeta, Coordinates } from '@/types';
 import { colors } from '@/theme';
+import Toast from '@/components/Toast';
 
 interface Props {
   navigation: any;
@@ -44,6 +45,7 @@ export default function MapScreen({ navigation, route }: Props) {
   const [focusMarkerCoords, setFocusMarkerCoords] = useState<Coordinates | null>(null);
   const [markersReady, setMarkersReady] = useState(false);
   const [avatarImages, setAvatarImages] = useState<Record<string, string>>({});
+  const [toastData, setToastData] = useState<{ visible: boolean; message: string; type: 'success' | 'warning' | 'error' }>({ visible: false, message: '', type: 'success' });
   const avatarRefs = useRef<Record<string, View | null>>({});
   const focusTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -69,6 +71,11 @@ export default function MapScreen({ navigation, route }: Props) {
     const unsubscribe = navigation.addListener('focus', () => {
       const params = navigation.getState()?.routes?.find((r: any) => r.name === 'Map')?.params ?? route?.params;
       console.log('DEBUG Map focus params:', JSON.stringify(params));
+
+      if (params?.toast) {
+        setToastData({ visible: true, message: params.toast.message, type: params.toast.type });
+        navigation.setParams({ toast: undefined });
+      }
 
       if (params && params.messageId) {
         setCenteredMessageId(params.messageId);
@@ -430,6 +437,12 @@ export default function MapScreen({ navigation, route }: Props) {
 
   return (
     <View style={styles.container}>
+      <Toast
+        visible={toastData.visible}
+        message={toastData.message}
+        type={toastData.type}
+        onHide={() => setToastData((prev) => ({ ...prev, visible: false }))}
+      />
       {/* Status bar spacer */}
       <View style={{ height: insets.top, backgroundColor: colors.background }} />
       <MapView

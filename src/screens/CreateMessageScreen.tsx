@@ -246,12 +246,17 @@ export default function CreateMessageScreen({ navigation, route }: Props) {
         const msg = recipients.length > 1
           ? `Message envoyé à ${recipients.length} destinataires !`
           : 'Message envoyé !';
-        showToast(msg, 'success');
+        navigation.navigate('Main', {
+          screen: 'Map',
+          params: { toast: { message: msg, type: 'success' } },
+        });
+        return;
       } else if (successCount > 0) {
-        showToast(
-          `Message envoyé à ${successCount}/${recipients.length} destinataires`,
-          'warning',
-        );
+        navigation.navigate('Main', {
+          screen: 'Map',
+          params: { toast: { message: `Message envoyé à ${successCount}/${recipients.length} destinataires`, type: 'warning' } },
+        });
+        return;
       } else {
         showToast('Échec de l\'envoi', 'error', {
           label: 'Réessayer',
@@ -275,11 +280,7 @@ export default function CreateMessageScreen({ navigation, route }: Props) {
       message={toast.message}
       type={toast.type}
       action={toast.action}
-      onHide={() => {
-        const shouldGoBack = toast.type === 'success' || toast.type === 'warning';
-        hideToast();
-        if (shouldGoBack) navigation.goBack();
-      }}
+      onHide={hideToast}
     />
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <View style={styles.header}>

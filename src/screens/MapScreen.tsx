@@ -41,6 +41,7 @@ export default function MapScreen({ navigation, route }: Props) {
   const [centerLocation, setCenterLocation] = useState<Coordinates | null>(null);
   const [centeredMessageId, setCenteredMessageId] = useState<string | null>(null);
   const [focusLocation, setFocusLocation] = useState<any>(null);
+  const [focusMarkerCoords, setFocusMarkerCoords] = useState<Coordinates | null>(null);
   const [markersReady, setMarkersReady] = useState(false);
   const [avatarImages, setAvatarImages] = useState<Record<string, string>>({});
   const avatarRefs = useRef<Record<string, View | null>>({});
@@ -83,12 +84,26 @@ export default function MapScreen({ navigation, route }: Props) {
         setCenterLocation(null);
         setCenteredMessageId(null);
         setFocusLocation(null);
+        setFocusMarkerCoords(null);
         setSelectedMessage(null);
       }
     });
 
     return unsubscribe;
   }, [navigation, route]);
+
+  // Also handle route params changes directly (for when Map tab is already focused)
+  useEffect(() => {
+    const params = route?.params;
+    console.log('DEBUG Map route.params changed:', JSON.stringify(params));
+    if (params && params.focusLocation) {
+      setFocusLocation(params.focusLocation);
+      setCenteredMessageId(null);
+    } else if (params && params.messageId) {
+      setCenteredMessageId(params.messageId);
+      setFocusLocation(null);
+    }
+  }, [route?.params]);
 
   // Clear any pending timeout on unmount
   useEffect(() => {
@@ -189,6 +204,10 @@ export default function MapScreen({ navigation, route }: Props) {
       focusTimeoutRef.current = null;
     }
 
+    // Show marker at focus location
+    console.log('DEBUG setFocusMarkerCoords:', coords);
+    setFocusMarkerCoords(coords);
+
     // Animate to the focus location
     mapRef.current.animateToRegion(
       {
@@ -206,6 +225,7 @@ export default function MapScreen({ navigation, route }: Props) {
         if (!mapRef.current || !userLocation) return;
 
         setFocusLocation(null);
+        setFocusMarkerCoords(null);
 
         mapRef.current.animateToRegion(
           {
@@ -459,6 +479,17 @@ export default function MapScreen({ navigation, route }: Props) {
             </Marker>
           );
         })}
+        {focusMarkerCoords && (
+          <Marker
+            coordinate={focusMarkerCoords}
+            anchor={{ x: 0.3, y: 1 }}
+            tracksViewChanges={true}
+          >
+            <View style={styles.focusMarker}>
+              <Ionicons name="flag" size={36} color={colors.primary} />
+            </View>
+          </Marker>
+        )}
       </MapView>
 
       {/* Center on user button */}
@@ -800,5 +831,11 @@ const styles = StyleSheet.create({
     width: 52,
     height: 52,
     borderRadius: 26,
+  },
+  focusMarker: {
+    width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });

@@ -368,7 +368,7 @@ export default function CreateMessageScreen({ navigation, route }: Props) {
           <Ionicons
             name={isRecording ? 'stop' : 'mic'}
             size={24}
-            color={isRecording ? '#e74c3c' : '#4A90D9'}
+            color={isRecording ? '#e74c3c' : colors.primary}
           />
           <Text
             style={[

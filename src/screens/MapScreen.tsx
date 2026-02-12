@@ -538,7 +538,7 @@ export default function MapScreen({ navigation, route }: Props) {
         style={[styles.createButton, { bottom: 24 }]}
         onPress={() => navigation.navigate('CreateMessage')}
       >
-        <Ionicons name="paper-plane" size={28} color={colors.primary} />
+        <Ionicons name="arrow-up" size={28} color="#fff" />
       </TouchableOpacity>
 
       {/* Selected message card */}
@@ -672,7 +672,7 @@ const styles = StyleSheet.create({
   createButton: {
     position: 'absolute',
     right: 16,
-    backgroundColor: colors.background,
+    backgroundColor: colors.primary,
     borderRadius: 30,
     width: 60,
     height: 60,

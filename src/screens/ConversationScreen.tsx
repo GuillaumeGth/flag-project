@@ -380,7 +380,7 @@ export default function ConversationScreen({ navigation, route }: Props) {
                 )}
                 {item.content_type === 'audio' && (
                   <View style={styles.audioMessage}>
-                    <Ionicons name="mic" size={20} color={isFromMe ? '#fff' : '#4A90D9'} />
+                    <Ionicons name="mic" size={20} color={isFromMe ? '#fff' : colors.primary} />
                     <Text style={[styles.audioText, isFromMe && styles.audioTextRight]}>
                       Message audio
                     </Text>
@@ -426,7 +426,7 @@ export default function ConversationScreen({ navigation, route }: Props) {
                         : 'play'
                     }
                     size={20}
-                    color={isFromMe ? '#fff' : '#4A90D9'}
+                    color={isFromMe ? '#fff' : colors.primary}
                   />
                   <Text style={[styles.audioText, isFromMe && styles.audioTextRight]}>
                     {playingMessageId === item.id && isPlayingAudio

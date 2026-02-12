@@ -21,6 +21,9 @@ import CreateMessageScreen from '@/screens/CreateMessageScreen';
 import ReadMessageScreen from '@/screens/ReadMessageScreen';
 import SelectRecipientScreen from '@/screens/SelectRecipientScreen';
 import ConversationScreen from '@/screens/ConversationScreen';
+import SettingsScreen from '@/screens/SettingsScreen';
+import UserProfileScreen from '@/screens/UserProfileScreen';
+import SearchUsersScreen from '@/screens/SearchUsersScreen';
 
 // Register background task
 import './src/tasks/backgroundLocation';
@@ -119,6 +122,21 @@ function AppNavigator() {
           <Stack.Screen
             name="Conversation"
             component={ConversationScreen}
+            options={{ presentation: 'card' }}
+          />
+          <Stack.Screen
+            name="Settings"
+            component={SettingsScreen}
+            options={{ presentation: 'card' }}
+          />
+          <Stack.Screen
+            name="UserProfile"
+            component={UserProfileScreen}
+            options={{ presentation: 'card' }}
+          />
+          <Stack.Screen
+            name="SearchUsers"
+            component={SearchUsersScreen}
             options={{ presentation: 'card' }}
           />
         </>

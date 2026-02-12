@@ -318,42 +318,29 @@ export default function CreateMessageScreen({ navigation, route }: Props) {
         <View style={{ width: 24 }} />
       </View>
 
-      {!isPublic && (
-        <View style={styles.recipientRow}>
-          <Text style={styles.recipientLabel}>À :</Text>
-          <TouchableOpacity
-            style={styles.recipientButton}
-            onPress={() => navigation.navigate('SelectRecipient')}
-          >
-            <Text style={styles.recipientName} numberOfLines={2}>
-              {recipientsDisplay}
-            </Text>
-            <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
-          </TouchableOpacity>
-        </View>
-      )}
+      <View style={[styles.recipientRow, isPublic && { opacity: 0.4 }]}>
+        <Text style={styles.recipientLabel}>À :</Text>
+        <TouchableOpacity
+          style={styles.recipientButton}
+          onPress={() => navigation.navigate('SelectRecipient')}
+          disabled={isPublic}
+        >
+          <Text style={styles.recipientName} numberOfLines={2}>
+            {recipientsDisplay}
+          </Text>
+          <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
+        </TouchableOpacity>
+      </View>
 
       <View style={styles.publicToggleRow}>
-        <View style={styles.publicToggleLeft}>
-          <Ionicons name="globe-outline" size={20} color={isPublic ? colors.primary : colors.textSecondary} />
-          <View style={styles.publicToggleTextContainer}>
-            <Text style={[styles.publicToggleLabel, isPublic && { color: colors.primary }]}>Message public</Text>
-            <Text style={styles.publicToggleSubtext}>Visible par vos abonnés</Text>
-          </View>
-        </View>
+        <Ionicons name="globe-outline" size={18} color={isPublic ? colors.primary : colors.textSecondary} />
+        <Text style={[styles.publicToggleLabel, isPublic && { color: colors.primary }]}>Public</Text>
         <Switch
           value={isPublic}
           onValueChange={setIsPublic}
           trackColor={{ false: colors.border, true: colors.primary }}
           thumbColor="#fff"
         />
-      </View>
-
-      <View style={styles.locationInfo}>
-        <Ionicons name="location" size={16} color={colors.primary} />
-        <Text style={styles.locationText}>
-          Ce message sera ancré à votre position actuelle
-        </Text>
       </View>
 
       {/* Media preview */}
@@ -492,29 +479,12 @@ const styles = StyleSheet.create({
   publicToggleRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: colors.surfaceLight,
-    borderRadius: 8,
-    padding: 12,
+    gap: 8,
     marginBottom: 16,
   },
-  publicToggleLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
-  publicToggleTextContainer: {
-    marginLeft: 10,
-  },
   publicToggleLabel: {
-    fontSize: 15,
-    fontWeight: '500',
-    color: colors.textPrimary,
-  },
-  publicToggleSubtext: {
-    fontSize: 12,
+    fontSize: 14,
     color: colors.textSecondary,
-    marginTop: 2,
   },
   locationInfo: {
     flexDirection: 'row',

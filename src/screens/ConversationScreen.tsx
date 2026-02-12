@@ -486,14 +486,21 @@ export default function ConversationScreen({ navigation, route }: Props) {
           <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
             <Ionicons name="arrow-back" size={24} color={colors.textPrimary} />
           </TouchableOpacity>
-          <View style={[styles.headerAvatar, isBot && styles.headerAvatarBot]}>
-            {otherUserAvatarUrl ? (
-              <Image source={{ uri: otherUserAvatarUrl }} style={styles.headerAvatarImage} />
-            ) : (
-              <Ionicons name={isBot ? 'flag' : 'person'} size={20} color={isBot ? '#4A90D9' : '#999'} />
-            )}
-          </View>
-          <Text style={styles.headerTitle}>{otherUserName}</Text>
+          <TouchableOpacity
+            style={styles.headerProfile}
+            onPress={() => !isBot && navigation.navigate('UserProfile', { userId: otherUserId })}
+            disabled={isBot}
+            activeOpacity={isBot ? 1 : 0.7}
+          >
+            <View style={[styles.headerAvatar, isBot && styles.headerAvatarBot]}>
+              {otherUserAvatarUrl ? (
+                <Image source={{ uri: otherUserAvatarUrl }} style={styles.headerAvatarImage} />
+              ) : (
+                <Ionicons name={isBot ? 'flag' : 'person'} size={20} color={isBot ? '#4A90D9' : '#999'} />
+              )}
+            </View>
+            <Text style={styles.headerTitle}>{otherUserName}</Text>
+          </TouchableOpacity>
         </View>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={colors.primary} />
@@ -512,14 +519,21 @@ export default function ConversationScreen({ navigation, route }: Props) {
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
           <Ionicons name="arrow-back" size={24} color={colors.textPrimary} />
         </TouchableOpacity>
-        <View style={[styles.headerAvatar, isBot && styles.headerAvatarBot]}>
-          {otherUserAvatarUrl ? (
-            <Image source={{ uri: otherUserAvatarUrl }} style={styles.headerAvatarImage} />
-          ) : (
-            <Ionicons name={isBot ? 'flag' : 'person'} size={20} color={isBot ? '#4A90D9' : '#999'} />
-          )}
-        </View>
-        <Text style={styles.headerTitle}>{otherUserName}</Text>
+        <TouchableOpacity
+          style={styles.headerProfile}
+          onPress={() => !isBot && navigation.navigate('UserProfile', { userId: otherUserId })}
+          disabled={isBot}
+          activeOpacity={isBot ? 1 : 0.7}
+        >
+          <View style={[styles.headerAvatar, isBot && styles.headerAvatarBot]}>
+            {otherUserAvatarUrl ? (
+              <Image source={{ uri: otherUserAvatarUrl }} style={styles.headerAvatarImage} />
+            ) : (
+              <Ionicons name={isBot ? 'flag' : 'person'} size={20} color={isBot ? '#4A90D9' : '#999'} />
+            )}
+          </View>
+          <Text style={styles.headerTitle}>{otherUserName}</Text>
+        </TouchableOpacity>
       </View>
 
       <FlatList
@@ -663,6 +677,11 @@ const styles = StyleSheet.create({
   backButton: {
     padding: 4,
     marginRight: 8,
+  },
+  headerProfile: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
   },
   headerAvatar: {
     width: 40,

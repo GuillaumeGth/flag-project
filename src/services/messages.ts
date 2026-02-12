@@ -420,6 +420,118 @@ export async function fetchMessageById(messageId: string): Promise<MessageWithSe
   return data;
 }
 
+// Fetch current user's public messages
+export async function fetchMyPublicMessages(): Promise<Message[]> {
+  const currentUserId = await getCurrentUserId();
+  if (!currentUserId) return [];
+
+  const { data, error } = await supabase
+    .from('messages')
+    .select('*')
+    .eq('sender_id', currentUserId)
+    .eq('is_public', true)
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    console.error('Error fetching public messages:', error);
+    return [];
+  }
+
+  return data || [];
+}
+
+// Fetch public messages for a specific user (for UserProfileScreen)
+export async function fetchUserPublicMessages(userId: string): Promise<Message[]> {
+  console.log('[messages] fetchUserPublicMessages: userId =', userId);
+
+  const { data, error } = await supabase
+    .from('messages')
+    .select('*')
+    .eq('sender_id', userId)
+    .eq('is_public', true)
+    .order('created_at', { ascending: false });
+
+  console.log('[messages] fetchUserPublicMessages: data =', data?.length, 'error =', error);
+
+  if (error) {
+    console.error('Error fetching user public messages:', error);
+    return [];
+  }
+
+  return data || [];
+}
+
+// Fetch public messages from all followed users (for map display)
+export async function fetchFollowingPublicMessages(): Promise<UndiscoveredMessageMapMeta[]> {
+  const currentUserId = await getCurrentUserId();
+  if (!currentUserId) return [];
+
+  // First get list of following IDs
+  const { data: subs, error: subsError } = await supabase
+    .from('subscriptions')
+    .select('following_id')
+    .eq('follower_id', currentUserId);
+
+  if (subsError || !subs || subs.length === 0) return [];
+
+  const followingIds = subs.map(s => s.following_id);
+
+  const { data, error } = await supabase
+    .from('messages')
+    .select(`
+      id,
+      location,
+      created_at,
+      sender:users!sender_id (id, display_name, avatar_url)
+    `)
+    .in('sender_id', followingIds)
+    .eq('is_public', true)
+    .not('location', 'is', null)
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    console.error('Error fetching following public messages:', error);
+    return [];
+  }
+
+  return (data || []) as unknown as UndiscoveredMessageMapMeta[];
+}
+
+// Mark a public message as discovered by the current user
+export async function markPublicMessageDiscovered(messageId: string): Promise<boolean> {
+  const currentUserId = getCurrentUserId();
+  if (!currentUserId) return false;
+
+  const { error } = await supabase
+    .from('discovered_public_messages')
+    .upsert({ user_id: currentUserId, message_id: messageId }, { onConflict: 'user_id,message_id' });
+
+  if (error) {
+    console.error('Error marking public message as discovered:', error);
+    return false;
+  }
+  return true;
+}
+
+// Fetch IDs of public messages discovered by current user (for a given list of message IDs)
+export async function fetchDiscoveredPublicMessageIds(messageIds: string[]): Promise<Set<string>> {
+  const currentUserId = getCurrentUserId();
+  if (!currentUserId || messageIds.length === 0) return new Set();
+
+  const { data, error } = await supabase
+    .from('discovered_public_messages')
+    .select('message_id')
+    .eq('user_id', currentUserId)
+    .in('message_id', messageIds);
+
+  if (error) {
+    console.error('Error fetching discovered public messages:', error);
+    return new Set();
+  }
+
+  return new Set((data || []).map(d => d.message_id));
+}
+
 // Send a new message
 export async function sendMessage(
   recipientId: string | null,

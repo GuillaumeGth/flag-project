@@ -230,6 +230,110 @@ CREATE TRIGGER on_message_created_send_push
     AFTER INSERT ON public.messages
     FOR EACH ROW EXECUTE FUNCTION public.send_push_on_new_message();
 
+-- Discovered public messages (tracks which public messages a user has discovered on the map)
+CREATE TABLE IF NOT EXISTS public.discovered_public_messages (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+    message_id UUID NOT NULL REFERENCES public.messages(id) ON DELETE CASCADE,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    CONSTRAINT discovered_public_messages_unique UNIQUE (user_id, message_id)
+);
+
+ALTER TABLE public.discovered_public_messages ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Users can view own discoveries" ON public.discovered_public_messages;
+CREATE POLICY "Users can view own discoveries" ON public.discovered_public_messages
+    FOR SELECT USING (auth.uid() = user_id);
+
+DROP POLICY IF EXISTS "Users can mark as discovered" ON public.discovered_public_messages;
+CREATE POLICY "Users can mark as discovered" ON public.discovered_public_messages
+    FOR INSERT WITH CHECK (auth.uid() = user_id);
+
+DROP POLICY IF EXISTS "Users can update own discoveries" ON public.discovered_public_messages;
+CREATE POLICY "Users can update own discoveries" ON public.discovered_public_messages
+    FOR UPDATE USING (auth.uid() = user_id);
+
+CREATE INDEX IF NOT EXISTS discovered_public_messages_user_idx ON public.discovered_public_messages(user_id);
+
+-- Subscriptions table (follow/unfollow)
+CREATE TABLE IF NOT EXISTS public.subscriptions (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    follower_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+    following_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    CONSTRAINT subscriptions_unique UNIQUE (follower_id, following_id),
+    CONSTRAINT subscriptions_no_self CHECK (follower_id != following_id)
+);
+
+ALTER TABLE public.subscriptions ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Users can view own subscriptions" ON public.subscriptions;
+CREATE POLICY "Users can view own subscriptions" ON public.subscriptions
+    FOR SELECT USING (auth.uid() = follower_id);
+
+DROP POLICY IF EXISTS "Users can follow" ON public.subscriptions;
+CREATE POLICY "Users can follow" ON public.subscriptions
+    FOR INSERT WITH CHECK (auth.uid() = follower_id);
+
+DROP POLICY IF EXISTS "Users can unfollow" ON public.subscriptions;
+CREATE POLICY "Users can unfollow" ON public.subscriptions
+    FOR DELETE USING (auth.uid() = follower_id);
+
+CREATE INDEX IF NOT EXISTS subscriptions_follower_idx ON public.subscriptions(follower_id);
+CREATE INDEX IF NOT EXISTS subscriptions_following_idx ON public.subscriptions(following_id);
+
+-- Function to send push notification when someone gets a new follower
+CREATE OR REPLACE FUNCTION public.send_push_on_new_follow()
+RETURNS TRIGGER AS $$
+DECLARE
+    target_tokens TEXT[];
+    token TEXT;
+    follower_name TEXT;
+    expo_url TEXT := 'https://exp.host/--/api/v2/push/send';
+    payload JSONB;
+BEGIN
+    -- Collect all push tokens for the followed user
+    SELECT array_agg(expo_push_token)
+    INTO target_tokens
+    FROM public.user_push_tokens
+    WHERE user_id = NEW.following_id;
+
+    IF target_tokens IS NULL OR array_length(target_tokens, 1) = 0 THEN
+        RETURN NEW;
+    END IF;
+
+    -- Get follower display name
+    SELECT COALESCE(display_name, 'Quelqu''un')
+    INTO follower_name
+    FROM public.users
+    WHERE id = NEW.follower_id;
+
+    FOREACH token IN ARRAY target_tokens LOOP
+        payload := jsonb_build_object(
+            'to', token,
+            'sound', 'default',
+            'title', 'Nouvel abonné',
+            'body', follower_name || ' s''est abonné à vous',
+            'data', jsonb_build_object('followerId', NEW.follower_id)
+        );
+
+        PERFORM
+            http_post(
+                expo_url,
+                payload::text,
+                'application/json'
+            );
+    END LOOP;
+
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+DROP TRIGGER IF EXISTS on_subscription_created_send_push ON public.subscriptions;
+CREATE TRIGGER on_subscription_created_send_push
+    AFTER INSERT ON public.subscriptions
+    FOR EACH ROW EXECUTE FUNCTION public.send_push_on_new_follow();
+
 -- Storage bucket for media (photos, audio)
 INSERT INTO storage.buckets (id, name, public)
 VALUES ('media', 'media', true)

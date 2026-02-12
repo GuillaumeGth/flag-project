@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Audio } from 'expo-av';
-import { markMessageAsRead, fetchMessageById } from '@/services/messages';
+import { markMessageAsRead, fetchMessageById, markPublicMessageDiscovered } from '@/services/messages';
 import { MessageWithSender } from '@/types';
 import { colors } from '@/theme';
 
@@ -53,6 +53,9 @@ export default function ReadMessageScreen({ navigation, route }: Props) {
     }
 
     if (currentMessage) {
+      if (currentMessage.is_public) {
+        await markPublicMessageDiscovered(currentMessage.id);
+      }
       await markMessageAsRead(currentMessage.id);
     }
     setLoading(false);

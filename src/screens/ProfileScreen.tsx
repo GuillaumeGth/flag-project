@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -11,18 +11,50 @@ import {
   TextInput,
   KeyboardAvoidingView,
   Platform,
+  FlatList,
+  Dimensions,
+  RefreshControl,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { useAuth } from '@/contexts/AuthContext';
 import { colors } from '@/theme';
+import { fetchMyPublicMessages } from '@/services/messages';
+import { Message } from '@/types';
 
-export default function ProfileScreen() {
-  const { user, signOut, updateAvatar, updateDisplayName } = useAuth();
+type TabType = 'photo' | 'audio' | 'text';
+
+const SCREEN_WIDTH = Dimensions.get('window').width;
+const CELL_SIZE = SCREEN_WIDTH / 3;
+
+export default function ProfileScreen({ navigation }: any) {
+  const { user, updateAvatar, updateDisplayName } = useAuth();
   const [uploading, setUploading] = useState(false);
   const [editNameVisible, setEditNameVisible] = useState(false);
   const [newName, setNewName] = useState('');
   const [savingName, setSavingName] = useState(false);
+
+  const [activeTab, setActiveTab] = useState<TabType>('photo');
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const loadMessages = useCallback(async () => {
+    const data = await fetchMyPublicMessages();
+    setMessages(data);
+  }, []);
+
+  useEffect(() => {
+    loadMessages().finally(() => setLoading(false));
+  }, [loadMessages]);
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await loadMessages();
+    setRefreshing(false);
+  }, [loadMessages]);
+
+  const filteredMessages = messages.filter(m => m.content_type === activeTab);
 
   const handleChangeAvatar = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -49,17 +81,6 @@ export default function ProfileScreen() {
     }
   };
 
-  const handleSignOut = () => {
-    Alert.alert(
-      'Déconnexion',
-      'Voulez-vous vraiment vous déconnecter ?',
-      [
-        { text: 'Annuler', style: 'cancel' },
-        { text: 'Déconnexion', style: 'destructive', onPress: signOut },
-      ]
-    );
-  };
-
   const handleEditName = () => {
     setNewName(user?.display_name || '');
     setEditNameVisible(true);
@@ -82,70 +103,123 @@ export default function ProfileScreen() {
     }
   };
 
-  return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Profil</Text>
+  const renderCell = ({ item }: { item: Message }) => {
+    if (item.content_type === 'photo') {
+      return (
+        <View style={styles.cell}>
+          <Image source={{ uri: item.media_url }} style={styles.cellImage} />
+        </View>
+      );
+    }
+    if (item.content_type === 'audio') {
+      return (
+        <View style={[styles.cell, styles.cellPlaceholder]}>
+          <Ionicons name="mic" size={32} color={colors.textMuted} />
+        </View>
+      );
+    }
+    // text
+    return (
+      <View style={[styles.cell, styles.cellPlaceholder]}>
+        <Text style={styles.cellText} numberOfLines={4}>
+          {item.text_content}
+        </Text>
       </View>
+    );
+  };
 
+  const renderEmpty = () => {
+    if (loading) return null;
+    return (
+      <View style={styles.emptyContainer}>
+        <Ionicons
+          name={activeTab === 'photo' ? 'image-outline' : activeTab === 'audio' ? 'mic-outline' : 'document-text-outline'}
+          size={48}
+          color={colors.textMuted}
+        />
+        <Text style={styles.emptyText}>Aucun message public</Text>
+      </View>
+    );
+  };
+
+  const renderHeader = () => (
+    <>
       <View style={styles.profileSection}>
         <TouchableOpacity onPress={handleChangeAvatar} disabled={uploading}>
           <View style={styles.avatar}>
             {uploading ? (
-              <ActivityIndicator size="large" color={colors.primary} />
+              <ActivityIndicator size="small" color={colors.primary} />
             ) : user?.avatar_url ? (
               <Image source={{ uri: user.avatar_url }} style={styles.avatarImage} />
             ) : (
-              <Ionicons name="person" size={48} color={colors.textSecondary} />
+              <Ionicons name="person" size={24} color={colors.textSecondary} />
             )}
           </View>
           <View style={styles.avatarEditBadge}>
-            <Ionicons name="camera" size={16} color="#fff" />
+            <Ionicons name="camera" size={10} color="#fff" />
           </View>
         </TouchableOpacity>
-        <TouchableOpacity onPress={handleEditName} style={styles.nameContainer}>
-          <Text style={styles.displayName}>
-            {user?.display_name || 'Utilisateur'}
+        <View style={styles.profileInfo}>
+          <TouchableOpacity onPress={handleEditName} style={styles.nameContainer}>
+            <Text style={styles.displayName}>
+              {user?.display_name || 'Utilisateur'}
+            </Text>
+            <Ionicons name="pencil" size={14} color={colors.primary} style={styles.editIcon} />
+          </TouchableOpacity>
+          <Text style={styles.identifier}>
+            {user?.phone || user?.email || ''}
           </Text>
-          <Ionicons name="pencil" size={16} color={colors.primary} style={styles.editIcon} />
-        </TouchableOpacity>
-        <Text style={styles.identifier}>
-          {user?.phone || user?.email || ''}
-        </Text>
-      </View>
-
-      <View style={styles.menuSection}>
-        <TouchableOpacity style={styles.menuItem}>
-          <Ionicons name="person-outline" size={24} color={colors.textPrimary} />
-          <Text style={styles.menuText}>Modifier le profil</Text>
-          <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.menuItem}>
-          <Ionicons name="notifications-outline" size={24} color={colors.textPrimary} />
-          <Text style={styles.menuText}>Notifications</Text>
-          <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.menuItem}>
-          <Ionicons name="shield-outline" size={24} color={colors.textPrimary} />
-          <Text style={styles.menuText}>Confidentialité</Text>
-          <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.menuItem}>
-          <Ionicons name="help-circle-outline" size={24} color={colors.textPrimary} />
-          <Text style={styles.menuText}>Aide</Text>
-          <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
+        </View>
+        <TouchableOpacity onPress={() => navigation.navigate('Settings')} style={styles.settingsButton}>
+          <Ionicons name="settings-outline" size={24} color={colors.textPrimary} />
         </TouchableOpacity>
       </View>
 
-      <TouchableOpacity style={styles.signOutButton} onPress={handleSignOut}>
-        <Ionicons name="log-out-outline" size={24} color={colors.error} />
-        <Text style={styles.signOutText}>Se déconnecter</Text>
-      </TouchableOpacity>
+      <View style={styles.tabBar}>
+        <TouchableOpacity
+          style={[styles.tab, activeTab === 'photo' && styles.tabActive]}
+          onPress={() => setActiveTab('photo')}
+        >
+          <Ionicons name="image" size={22} color={activeTab === 'photo' ? colors.primary : colors.textMuted} />
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.tab, activeTab === 'audio' && styles.tabActive]}
+          onPress={() => setActiveTab('audio')}
+        >
+          <Ionicons name="mic" size={22} color={activeTab === 'audio' ? colors.primary : colors.textMuted} />
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.tab, activeTab === 'text' && styles.tabActive]}
+          onPress={() => setActiveTab('text')}
+        >
+          <Ionicons name="document-text" size={22} color={activeTab === 'text' ? colors.primary : colors.textMuted} />
+        </TouchableOpacity>
+      </View>
+    </>
+  );
 
-      <Text style={styles.version}>Flag v1.0.0</Text>
+  return (
+    <View style={styles.container}>
+      <View style={styles.headerSpacer} />
+
+      {loading ? (
+        <>
+          {renderHeader()}
+          <ActivityIndicator size="large" color={colors.primary} style={{ marginTop: 32 }} />
+        </>
+      ) : (
+        <FlatList
+          data={filteredMessages}
+          renderItem={renderCell}
+          keyExtractor={item => item.id}
+          numColumns={3}
+          ListHeaderComponent={renderHeader}
+          ListEmptyComponent={renderEmpty}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />
+          }
+        />
+      )}
 
       <Modal
         visible={editNameVisible}
@@ -199,99 +273,114 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.background,
   },
-  header: {
-    paddingHorizontal: 16,
-    paddingTop: 56,
-    paddingBottom: 16,
+  headerSpacer: {
+    paddingTop: 48,
   },
-  title: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: colors.textPrimary,
+  settingsButton: {
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   profileSection: {
+    flexDirection: 'row',
     alignItems: 'center',
-    padding: 24,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
   },
   avatar: {
-    width: 96,
-    height: 96,
-    borderRadius: 48,
+    width: 52,
+    height: 52,
+    borderRadius: 26,
     backgroundColor: colors.surfaceLight,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 16,
   },
   avatarImage: {
-    width: 96,
-    height: 96,
-    borderRadius: 48,
+    width: 52,
+    height: 52,
+    borderRadius: 26,
   },
   avatarEditBadge: {
     position: 'absolute',
-    bottom: 16,
-    right: 0,
+    bottom: 0,
+    right: -2,
     backgroundColor: colors.primary,
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 3,
+    borderWidth: 2,
     borderColor: colors.background,
   },
+  profileInfo: {
+    marginLeft: 12,
+    flex: 1,
+  },
   displayName: {
-    fontSize: 22,
+    fontSize: 17,
     fontWeight: '600',
     color: colors.textPrimary,
-    marginBottom: 4,
   },
   identifier: {
-    fontSize: 14,
+    fontSize: 13,
     color: colors.textSecondary,
-  },
-  menuSection: {
-    paddingVertical: 8,
-  },
-  menuItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-  },
-  menuText: {
-    flex: 1,
-    marginLeft: 16,
-    fontSize: 16,
-    color: colors.textPrimary,
-  },
-  signOutButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    marginTop: 16,
-  },
-  signOutText: {
-    marginLeft: 16,
-    fontSize: 16,
-    color: colors.error,
-  },
-  version: {
-    textAlign: 'center',
-    color: colors.textMuted,
-    fontSize: 12,
-    marginTop: 'auto',
-    paddingBottom: 32,
+    marginTop: 2,
   },
   nameContainer: {
     flexDirection: 'row',
     alignItems: 'center',
   },
   editIcon: {
-    marginLeft: 8,
+    marginLeft: 6,
+  },
+  tabBar: {
+    flexDirection: 'row',
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  tab: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: 12,
+    borderBottomWidth: 2,
+    borderBottomColor: 'transparent',
+  },
+  tabActive: {
+    borderBottomColor: colors.primary,
+  },
+  cell: {
+    width: CELL_SIZE,
+    height: CELL_SIZE,
+    borderWidth: 0.5,
+    borderColor: colors.border,
+  },
+  cellImage: {
+    width: '100%',
+    height: '100%',
+  },
+  cellPlaceholder: {
+    backgroundColor: colors.surfaceLight,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 8,
+  },
+  cellText: {
+    color: colors.textSecondary,
+    fontSize: 12,
+    textAlign: 'center',
+  },
+  emptyContainer: {
+    alignItems: 'center',
+    paddingTop: 48,
+    gap: 12,
+  },
+  emptyText: {
+    color: colors.textMuted,
+    fontSize: 14,
   },
   modalOverlay: {
     flex: 1,

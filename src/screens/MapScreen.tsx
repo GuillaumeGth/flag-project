@@ -15,7 +15,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { captureRef } from 'react-native-view-shot';
 import { useLocation } from '@/contexts/LocationContext';
 import { useAuth } from '@/contexts/AuthContext';
-import { fetchUndiscoveredMessagesForMap, getCachedMapMessages } from '@/services/messages';
+import { fetchUndiscoveredMessagesForMap, getCachedMapMessages, fetchFollowingPublicMessages } from '@/services/messages';
 import { isWithinRadius } from '@/services/location';
 import { UndiscoveredMessageMapMeta, Coordinates } from '@/types';
 import { colors } from '@/theme';
@@ -57,14 +57,14 @@ export default function MapScreen({ navigation, route }: Props) {
     }
   }, []);
 
-  // Load messages whenever the map screen is focused or user changes (after login)
+  // Load messages whenever the map screen is focused
   useFocusEffect(
     useCallback(() => {
       console.log('[MapScreen] useFocusEffect fired, user =', user?.id);
       if (user) {
         loadMessages();
       }
-    }, [user])
+    }, [])
   );
 
   // Remember which message we should center on when coming from another screen
@@ -269,11 +269,23 @@ export default function MapScreen({ navigation, route }: Props) {
       }
     }
 
-    // Then fetch incremental updates from server
+    // Then fetch incremental updates from server + following public messages
     setMarkersReady(false);
-    const data = await fetchUndiscoveredMessagesForMap();
-    console.log('[MapScreen] loadMessages: got', data.length, 'messages');
-    setMessages(data);
+    const [data, followingData] = await Promise.all([
+      fetchUndiscoveredMessagesForMap(),
+      fetchFollowingPublicMessages(),
+    ]);
+
+    // Merge and deduplicate by id
+    const mergedMap = new Map<string, UndiscoveredMessageMapMeta>();
+    for (const msg of data) mergedMap.set(msg.id, msg);
+    for (const msg of followingData) {
+      if (!mergedMap.has(msg.id)) mergedMap.set(msg.id, msg);
+    }
+    const allMessages = Array.from(mergedMap.values());
+
+    console.log('[MapScreen] loadMessages: got', data.length, 'undiscovered +', followingData.length, 'following =', allMessages.length, 'total');
+    setMessages(allMessages);
     setLoading(false);
     setTimeout(() => setMarkersReady(true), 500);
   };
@@ -534,6 +546,14 @@ export default function MapScreen({ navigation, route }: Props) {
         <Ionicons name="refresh" size={24} color={colors.primary} />
       </TouchableOpacity>
 
+      {/* Search users button */}
+      <TouchableOpacity
+        style={[styles.searchButton, { top: insets.top + 136 }]}
+        onPress={() => navigation.navigate('SearchUsers')}
+      >
+        <Ionicons name="search" size={24} color={colors.primary} />
+      </TouchableOpacity>
+
       {/* Create message button */}
       <TouchableOpacity
         style={[styles.createButton, { bottom: 24 }]}
@@ -639,6 +659,21 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: '600',
+  },
+  searchButton: {
+    position: 'absolute',
+    right: 16,
+    backgroundColor: colors.surface,
+    borderRadius: 25,
+    width: 50,
+    height: 50,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 4,
   },
   centerButton: {
     position: 'absolute',

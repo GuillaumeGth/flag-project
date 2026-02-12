@@ -1,19 +1,42 @@
 import React, { useEffect, useRef } from 'react';
-import { Animated, Text, StyleSheet, View } from 'react-native';
+import { Animated, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '@/theme';
+
+interface ToastAction {
+  label: string;
+  onPress: () => void;
+}
 
 interface ToastProps {
   visible: boolean;
   message: string;
   type?: 'success' | 'error' | 'warning';
   duration?: number;
+  action?: ToastAction;
   onHide?: () => void;
 }
 
-export default function Toast({ visible, message, type = 'success', duration = 2000, onHide }: ToastProps) {
+export default function Toast({ visible, message, type = 'success', duration = 2500, action, onHide }: ToastProps) {
   const opacity = useRef(new Animated.Value(0)).current;
   const translateY = useRef(new Animated.Value(-30)).current;
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const dismiss = () => {
+    if (timerRef.current) clearTimeout(timerRef.current);
+    Animated.parallel([
+      Animated.timing(opacity, {
+        toValue: 0,
+        duration: 300,
+        useNativeDriver: true,
+      }),
+      Animated.timing(translateY, {
+        toValue: -30,
+        duration: 300,
+        useNativeDriver: true,
+      }),
+    ]).start(() => onHide?.());
+  };
 
   useEffect(() => {
     if (visible) {
@@ -29,22 +52,12 @@ export default function Toast({ visible, message, type = 'success', duration = 2
           useNativeDriver: true,
         }),
       ]).start(() => {
-        setTimeout(() => {
-          Animated.parallel([
-            Animated.timing(opacity, {
-              toValue: 0,
-              duration: 300,
-              useNativeDriver: true,
-            }),
-            Animated.timing(translateY, {
-              toValue: -30,
-              duration: 300,
-              useNativeDriver: true,
-            }),
-          ]).start(() => onHide?.());
-        }, duration);
+        timerRef.current = setTimeout(dismiss, duration);
       });
     }
+    return () => {
+      if (timerRef.current) clearTimeout(timerRef.current);
+    };
   }, [visible]);
 
   if (!visible) return null;
@@ -61,6 +74,17 @@ export default function Toast({ visible, message, type = 'success', duration = 2
     >
       <Ionicons name={iconName} size={20} color={accentColor} />
       <Text style={styles.message}>{message}</Text>
+      {action && (
+        <TouchableOpacity
+          style={[styles.actionButton, { backgroundColor: accentColor }]}
+          onPress={() => {
+            dismiss();
+            action.onPress();
+          }}
+        >
+          <Text style={styles.actionLabel}>{action.label}</Text>
+        </TouchableOpacity>
+      )}
     </Animated.View>
   );
 }
@@ -91,5 +115,16 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     color: colors.textPrimary,
     flex: 1,
+  },
+  actionButton: {
+    marginLeft: 12,
+    paddingVertical: 6,
+    paddingHorizontal: 14,
+    borderRadius: 8,
+  },
+  actionLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#FFFFFF',
   },
 });

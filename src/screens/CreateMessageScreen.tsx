@@ -7,7 +7,6 @@ import {
   StyleSheet,
   Image,
   ActivityIndicator,
-  Alert,
   ScrollView,
 } from 'react-native';
 import Toast from '@/components/Toast';
@@ -55,12 +54,21 @@ export default function CreateMessageScreen({ navigation, route }: Props) {
   const [isRecording, setIsRecording] = useState(false);
   const [loading, setLoading] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
-  const [toast, setToast] = useState<{ visible: boolean; message: string; type: 'success' | 'warning' }>({
-    visible: false,
-    message: '',
-    type: 'success',
-  });
+  const [toast, setToast] = useState<{
+    visible: boolean;
+    message: string;
+    type: 'success' | 'warning' | 'error';
+    action?: { label: string; onPress: () => void };
+  }>({ visible: false, message: '', type: 'success' });
   const soundRef = useRef<Audio.Sound | null>(null);
+
+  const showToast = (message: string, type: 'success' | 'warning' | 'error', action?: { label: string; onPress: () => void }) => {
+    setToast({ visible: true, message, type, action });
+  };
+
+  const hideToast = () => {
+    setToast((prev) => ({ ...prev, visible: false }));
+  };
 
   const pickImage = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -77,7 +85,7 @@ export default function CreateMessageScreen({ navigation, route }: Props) {
   const takePhoto = async () => {
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
     if (status !== 'granted') {
-      Alert.alert('Permission requise', 'Accès à la caméra nécessaire');
+      showToast('Accès à la caméra nécessaire', 'error');
       return;
     }
 
@@ -95,7 +103,7 @@ export default function CreateMessageScreen({ navigation, route }: Props) {
     try {
       const { status } = await Audio.requestPermissionsAsync();
       if (status !== 'granted') {
-        Alert.alert('Permission requise', 'Accès au micro nécessaire');
+        showToast('Accès au micro nécessaire', 'error');
         return;
       }
 
@@ -179,22 +187,25 @@ export default function CreateMessageScreen({ navigation, route }: Props) {
 
   const handleSend = async () => {
     if (!userLocation) {
-      Alert.alert('Erreur', 'Position GPS non disponible');
+      showToast('Position GPS non disponible', 'error');
       return;
     }
 
     if (recipients.length === 0) {
-      Alert.alert('Erreur', 'Sélectionnez au moins un destinataire');
+      showToast('Sélectionnez au moins un destinataire', 'error', {
+        label: 'Choisir',
+        onPress: () => navigation.navigate('SelectRecipient'),
+      });
       return;
     }
 
     if (contentType === 'text' && !textContent.trim()) {
-      Alert.alert('Erreur', 'Écrivez un message');
+      showToast('Écrivez un message', 'error');
       return;
     }
 
     if ((contentType === 'photo' || contentType === 'audio') && !mediaUri) {
-      Alert.alert('Erreur', 'Ajoutez une photo ou un audio');
+      showToast('Ajoutez une photo ou un audio', 'error');
       return;
     }
 
@@ -206,7 +217,10 @@ export default function CreateMessageScreen({ navigation, route }: Props) {
       if (mediaUri && contentType !== 'text') {
         const url = await uploadMedia(mediaUri, contentType as 'photo' | 'audio');
         if (!url) {
-          Alert.alert('Erreur', 'Échec de l\'upload du média');
+          showToast('Échec de l\'upload du média', 'error', {
+            label: 'Réessayer',
+            onPress: handleSend,
+          });
           setLoading(false);
           return;
         }
@@ -232,18 +246,23 @@ export default function CreateMessageScreen({ navigation, route }: Props) {
         const msg = recipients.length > 1
           ? `Message envoyé à ${recipients.length} destinataires !`
           : 'Message envoyé !';
-        setToast({ visible: true, message: msg, type: 'success' });
+        showToast(msg, 'success');
       } else if (successCount > 0) {
-        setToast({
-          visible: true,
-          message: `Message envoyé à ${successCount}/${recipients.length} destinataires`,
-          type: 'warning',
-        });
+        showToast(
+          `Message envoyé à ${successCount}/${recipients.length} destinataires`,
+          'warning',
+        );
       } else {
-        Alert.alert('Erreur', 'Échec de l\'envoi');
+        showToast('Échec de l\'envoi', 'error', {
+          label: 'Réessayer',
+          onPress: handleSend,
+        });
       }
     } catch (error) {
-      Alert.alert('Erreur', 'Une erreur est survenue');
+      showToast('Une erreur est survenue', 'error', {
+        label: 'Réessayer',
+        onPress: handleSend,
+      });
     }
 
     setLoading(false);
@@ -255,9 +274,11 @@ export default function CreateMessageScreen({ navigation, route }: Props) {
       visible={toast.visible}
       message={toast.message}
       type={toast.type}
+      action={toast.action}
       onHide={() => {
-        setToast((prev) => ({ ...prev, visible: false }));
-        navigation.goBack();
+        const shouldGoBack = toast.type === 'success' || toast.type === 'warning';
+        hideToast();
+        if (shouldGoBack) navigation.goBack();
       }}
     />
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>

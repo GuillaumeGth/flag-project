@@ -12,7 +12,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '@/contexts/AuthContext';
-import { fetchConversations, FLAG_BOT_ID } from '@/services/messages';
+import { fetchConversations, getCachedConversations, FLAG_BOT_ID } from '@/services/messages';
 import { Conversation } from '@/types';
 import { colors } from '@/theme';
 
@@ -45,14 +45,25 @@ export default function InboxScreen({ navigation }: Props) {
 
   const loadConversations = async () => {
     console.log('[InboxScreen] loadConversations: START');
-    setLoading(true);
+
+    // Show cached data instantly if available
+    if (conversations.length === 0) {
+      const cached = await getCachedConversations();
+      if (cached && cached.length > 0) {
+        console.log('[InboxScreen] showing', cached.length, 'cached conversations');
+        setConversations(cached);
+        setLoading(false);
+      }
+    }
+
+    // Then fetch incremental updates from server
     try {
       const data = await fetchConversations();
       console.log('[InboxScreen] loadConversations: got', data.length, 'conversations');
       setConversations(data);
     } catch (error) {
       console.error('[InboxScreen] Error loading conversations:', error);
-      setConversations([]);
+      if (conversations.length === 0) setConversations([]);
     } finally {
       setLoading(false);
     }

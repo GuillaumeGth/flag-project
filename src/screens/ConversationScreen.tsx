@@ -20,6 +20,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '@/contexts/AuthContext';
 import {
   fetchConversationMessages,
+  getCachedConversationMessages,
   sendMessage,
   FLAG_BOT_ID,
   uploadMedia,
@@ -71,7 +72,17 @@ export default function ConversationScreen({ navigation, route }: Props) {
   }, []);
 
   const loadMessages = async () => {
-    setLoading(true);
+    // Show cached messages instantly if available
+    if (messages.length === 0) {
+      const cached = await getCachedConversationMessages(otherUserId);
+      if (cached && cached.length > 0) {
+        console.log('[ConversationScreen] showing', cached.length, 'cached messages');
+        setMessages(cached);
+        setLoading(false);
+      }
+    }
+
+    // Then fetch incremental updates from server
     const data = await fetchConversationMessages(otherUserId);
     setMessages(data);
     setLoading(false);

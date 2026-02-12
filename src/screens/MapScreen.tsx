@@ -15,7 +15,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { captureRef } from 'react-native-view-shot';
 import { useLocation } from '@/contexts/LocationContext';
 import { useAuth } from '@/contexts/AuthContext';
-import { fetchUndiscoveredMessagesForMap } from '@/services/messages';
+import { fetchUndiscoveredMessagesForMap, getCachedMapMessages } from '@/services/messages';
 import { isWithinRadius } from '@/services/location';
 import { UndiscoveredMessageMapMeta, Coordinates } from '@/types';
 import { colors } from '@/theme';
@@ -249,7 +249,19 @@ export default function MapScreen({ navigation, route }: Props) {
 
   const loadMessages = async () => {
     console.log('[MapScreen] loadMessages: START');
-    setLoading(true);
+
+    // Show cached data instantly if available
+    if (messages.length === 0) {
+      const cached = await getCachedMapMessages();
+      if (cached && cached.length > 0) {
+        console.log('[MapScreen] showing', cached.length, 'cached messages');
+        setMessages(cached);
+        setLoading(false);
+        setTimeout(() => setMarkersReady(true), 500);
+      }
+    }
+
+    // Then fetch incremental updates from server
     setMarkersReady(false);
     const data = await fetchUndiscoveredMessagesForMap();
     console.log('[MapScreen] loadMessages: got', data.length, 'messages');

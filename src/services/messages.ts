@@ -1,6 +1,13 @@
 import { supabase, getCachedUserId } from './supabase';
 import * as FileSystem from 'expo-file-system/legacy';
 import { Message, MessageWithSender, Coordinates, User, UndiscoveredMessageMeta, UndiscoveredMessageMapMeta, Conversation, MessageWithUsers } from '@/types';
+import {
+  getCachedData,
+  setCachedData,
+  getLastSyncTimestamp,
+  setLastSyncTimestamp,
+  CACHE_KEYS,
+} from './cache';
 
 // Default Flag Bot user ID (created via seed.sql)
 export const FLAG_BOT_ID = '00000000-0000-0000-0000-000000000001';
@@ -30,50 +37,24 @@ export async function fetchAllUsers(): Promise<User[]> {
   return (data || []).filter(user => user.id !== currentUserId);
 }
 
-// Fetch all conversations for current user
-export async function fetchConversations(): Promise<Conversation[]> {
-  console.log('[messages] fetchConversations: START');
-  const currentUserId = await getCurrentUserId();
-  console.log('[messages] fetchConversations: currentUserId =', currentUserId);
-  if (!currentUserId) {
-    console.log('[messages] fetchConversations: NO USER ID - returning empty');
-    return [];
-  }
-
-  // Fetch all messages where user is sender or recipient
-  const { data: messages, error } = await supabase
-    .from('messages')
-    .select(`
-      *,
-      sender:users!sender_id (id, display_name, avatar_url),
-      recipient:users!recipient_id (id, display_name, avatar_url)
-    `)
-    .or(`sender_id.eq.${currentUserId},recipient_id.eq.${currentUserId}`)
-    .order('created_at', { ascending: false });
-
-  console.log('[messages] fetchConversations: query done, error =', error, 'count =', messages?.length);
-  if (error) {
-    console.error('Error fetching conversations:', error);
-    return [];
-  }
-
-  // Group messages by conversation (other user)
+// Build conversations from a list of messages (with user joins)
+function buildConversations(messages: any[], currentUserId: string): Conversation[] {
   const conversationsMap = new Map<string, Conversation>();
 
-  for (const msg of messages || []) {
+  // Sort by created_at descending to ensure first entry per user is the latest message
+  const sorted = [...messages].sort(
+    (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+  );
+
+  for (const msg of sorted) {
     const isFromMe = msg.sender_id === currentUserId;
     const otherUserId = isFromMe ? msg.recipient_id : msg.sender_id;
     const otherUser = isFromMe ? msg.recipient : msg.sender;
 
-    // Skip if other user data is missing (user might have been deleted)
-    if (!otherUser || !otherUserId) {
-      console.warn('Skipping message with missing user data:', msg.id);
-      continue;
-    }
+    if (!otherUser || !otherUserId) continue;
 
     if (!conversationsMap.has(otherUserId)) {
-      // Count unread messages from this user
-      const unreadCount = (messages || []).filter(
+      const unreadCount = sorted.filter(
         m => m.sender_id === otherUserId && m.recipient_id === currentUserId && !m.is_read
       ).length;
 
@@ -100,12 +81,89 @@ export async function fetchConversations(): Promise<Conversation[]> {
   return Array.from(conversationsMap.values());
 }
 
-// Fetch all messages for a specific conversation
+// Fetch all conversations for current user (with local cache + incremental sync)
+export async function fetchConversations(): Promise<Conversation[]> {
+  console.log('[messages] fetchConversations: START');
+  const currentUserId = await getCurrentUserId();
+  console.log('[messages] fetchConversations: currentUserId =', currentUserId);
+  if (!currentUserId) {
+    console.log('[messages] fetchConversations: NO USER ID - returning empty');
+    return [];
+  }
+
+  const cacheKey = CACHE_KEYS.CONVERSATIONS_MESSAGES;
+  const lastSync = await getLastSyncTimestamp(cacheKey);
+  const cachedMessages: any[] = (await getCachedData<any[]>(cacheKey)) || [];
+
+  let query = supabase
+    .from('messages')
+    .select(`
+      *,
+      sender:users!sender_id (id, display_name, avatar_url),
+      recipient:users!recipient_id (id, display_name, avatar_url)
+    `)
+    .or(`sender_id.eq.${currentUserId},recipient_id.eq.${currentUserId}`)
+    .order('created_at', { ascending: false });
+
+  // If we have a last sync, only fetch newer messages
+  if (lastSync) {
+    query = query.gt('created_at', lastSync);
+  }
+
+  const { data: newMessages, error } = await query;
+
+  console.log('[messages] fetchConversations: query done, error =', error, 'new count =', newMessages?.length, 'cached count =', cachedMessages.length);
+  if (error) {
+    console.error('Error fetching conversations:', error);
+    // On error, still return conversations from cache
+    if (cachedMessages.length > 0) {
+      return buildConversations(cachedMessages, currentUserId);
+    }
+    return [];
+  }
+
+  // Merge: replace existing messages by id, add new ones
+  const mergedMap = new Map<string, any>();
+  for (const msg of cachedMessages) {
+    mergedMap.set(msg.id, msg);
+  }
+  for (const msg of (newMessages || [])) {
+    mergedMap.set(msg.id, msg);
+  }
+  const allMessages = Array.from(mergedMap.values());
+
+  // Update cache
+  const syncTimestamp = new Date().toISOString();
+  await setCachedData(cacheKey, allMessages);
+  await setLastSyncTimestamp(cacheKey, syncTimestamp);
+
+  return buildConversations(allMessages, currentUserId);
+}
+
+/**
+ * Get cached conversations immediately (for instant UI display).
+ * Returns null if no cache exists.
+ */
+export async function getCachedConversations(): Promise<Conversation[] | null> {
+  const currentUserId = await getCurrentUserId();
+  if (!currentUserId) return null;
+
+  const cachedMessages = await getCachedData<any[]>(CACHE_KEYS.CONVERSATIONS_MESSAGES);
+  if (!cachedMessages || cachedMessages.length === 0) return null;
+
+  return buildConversations(cachedMessages, currentUserId);
+}
+
+// Fetch all messages for a specific conversation (with local cache + incremental sync)
 export async function fetchConversationMessages(otherUserId: string): Promise<MessageWithUsers[]> {
   const currentUserId = await getCurrentUserId();
   if (!currentUserId) return [];
 
-  const { data, error } = await supabase
+  const cacheKey = CACHE_KEYS.CONVERSATION(otherUserId);
+  const lastSync = await getLastSyncTimestamp(cacheKey);
+  const cachedMessages: MessageWithUsers[] = (await getCachedData<MessageWithUsers[]>(cacheKey)) || [];
+
+  let query = supabase
     .from('messages')
     .select(`
       *,
@@ -115,12 +173,46 @@ export async function fetchConversationMessages(otherUserId: string): Promise<Me
     .or(`and(sender_id.eq.${currentUserId},recipient_id.eq.${otherUserId}),and(sender_id.eq.${otherUserId},recipient_id.eq.${currentUserId})`)
     .order('created_at', { ascending: true });
 
-  if (error) {
-    console.error('Error fetching conversation messages:', error);
-    return [];
+  if (lastSync) {
+    query = query.gt('created_at', lastSync);
   }
 
-  return data || [];
+  const { data: newMessages, error } = await query;
+
+  if (error) {
+    console.error('Error fetching conversation messages:', error);
+    return cachedMessages.length > 0 ? cachedMessages : [];
+  }
+
+  // Merge by id
+  const mergedMap = new Map<string, MessageWithUsers>();
+  for (const msg of cachedMessages) {
+    mergedMap.set(msg.id, msg);
+  }
+  for (const msg of (newMessages || []) as MessageWithUsers[]) {
+    mergedMap.set(msg.id, msg);
+  }
+
+  // Sort by created_at ascending
+  const allMessages = Array.from(mergedMap.values()).sort(
+    (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+  );
+
+  // Update cache
+  const syncTimestamp = new Date().toISOString();
+  await setCachedData(cacheKey, allMessages);
+  await setLastSyncTimestamp(cacheKey, syncTimestamp);
+
+  return allMessages;
+}
+
+/**
+ * Get cached conversation messages immediately (for instant UI display).
+ */
+export async function getCachedConversationMessages(otherUserId: string): Promise<MessageWithUsers[] | null> {
+  const cached = await getCachedData<MessageWithUsers[]>(CACHE_KEYS.CONVERSATION(otherUserId));
+  if (!cached || cached.length === 0) return null;
+  return cached;
 }
 
 // Fetch messages for current user (as recipient)
@@ -224,6 +316,7 @@ export async function fetchUndiscoveredMessagesMetadata(): Promise<UndiscoveredM
 }
 
 // Fetch only location metadata for map markers (no content for security)
+// Uses cache + incremental sync. Also removes messages that have been read.
 export async function fetchUndiscoveredMessagesForMap(): Promise<UndiscoveredMessageMapMeta[]> {
   console.log('[messages] fetchUndiscoveredMessagesForMap: START');
   const currentUserId = await getCurrentUserId();
@@ -233,7 +326,11 @@ export async function fetchUndiscoveredMessagesForMap(): Promise<UndiscoveredMes
     return [];
   }
 
-  const { data, error } = await supabase
+  const cacheKey = CACHE_KEYS.MAP_MESSAGES;
+  const lastSync = await getLastSyncTimestamp(cacheKey);
+  const cachedMessages: UndiscoveredMessageMapMeta[] = (await getCachedData<UndiscoveredMessageMapMeta[]>(cacheKey)) || [];
+
+  let query = supabase
     .from('messages')
     .select(`
       id,
@@ -244,14 +341,60 @@ export async function fetchUndiscoveredMessagesForMap(): Promise<UndiscoveredMes
     .eq('recipient_id', currentUserId)
     .eq('is_read', false)
     .order('created_at', { ascending: false });
-  console.log('[messages] fetchUndiscoveredMessagesForMap: query done, error =', error, 'count =', data?.length);
+
+  if (lastSync) {
+    query = query.gt('created_at', lastSync);
+  }
+
+  const { data: newMessages, error } = await query;
+  console.log('[messages] fetchUndiscoveredMessagesForMap: query done, error =', error, 'new count =', newMessages?.length, 'cached count =', cachedMessages.length);
 
   if (error) {
     console.error('Error fetching undiscovered messages for map:', error);
-    return [];
+    return cachedMessages.length > 0 ? cachedMessages : [];
   }
 
-  return data || [];
+  // Merge by id
+  const mergedMap = new Map<string, UndiscoveredMessageMapMeta>();
+  for (const msg of cachedMessages) {
+    mergedMap.set(msg.id, msg);
+  }
+  for (const msg of (newMessages || []) as unknown as UndiscoveredMessageMapMeta[]) {
+    mergedMap.set(msg.id, msg);
+  }
+
+  // Remove messages that have been read (check against conversations cache)
+  // We fetch the list of read message IDs to prune the cache
+  const { data: readIds } = await supabase
+    .from('messages')
+    .select('id')
+    .eq('recipient_id', currentUserId)
+    .eq('is_read', true)
+    .in('id', Array.from(mergedMap.keys()));
+
+  if (readIds) {
+    for (const { id } of readIds) {
+      mergedMap.delete(id);
+    }
+  }
+
+  const allMessages = Array.from(mergedMap.values());
+
+  // Update cache
+  const syncTimestamp = new Date().toISOString();
+  await setCachedData(cacheKey, allMessages);
+  await setLastSyncTimestamp(cacheKey, syncTimestamp);
+
+  return allMessages;
+}
+
+/**
+ * Get cached map messages immediately (for instant UI display).
+ */
+export async function getCachedMapMessages(): Promise<UndiscoveredMessageMapMeta[] | null> {
+  const cached = await getCachedData<UndiscoveredMessageMapMeta[]>(CACHE_KEYS.MAP_MESSAGES);
+  if (!cached || cached.length === 0) return null;
+  return cached;
 }
 
 // Fetch a single message by ID with full content
@@ -316,19 +459,37 @@ export async function sendMessage(
   return data;
 }
 
-// Mark message as read
+// Mark message as read and update local caches
 export async function markMessageAsRead(messageId: string): Promise<boolean> {
+  const readAt = new Date().toISOString();
+
   const { error } = await supabase
     .from('messages')
     .update({
       is_read: true,
-      read_at: new Date().toISOString(),
+      read_at: readAt,
     })
     .eq('id', messageId);
 
   if (error) {
     console.error('Error marking message as read:', error);
     return false;
+  }
+
+  // Remove from map messages cache (no longer undiscovered)
+  const mapCached = await getCachedData<UndiscoveredMessageMapMeta[]>(CACHE_KEYS.MAP_MESSAGES);
+  if (mapCached) {
+    const updated = mapCached.filter(m => m.id !== messageId);
+    await setCachedData(CACHE_KEYS.MAP_MESSAGES, updated);
+  }
+
+  // Update read status in conversations cache
+  const convCached = await getCachedData<any[]>(CACHE_KEYS.CONVERSATIONS_MESSAGES);
+  if (convCached) {
+    const updated = convCached.map(m =>
+      m.id === messageId ? { ...m, is_read: true, read_at: readAt } : m
+    );
+    await setCachedData(CACHE_KEYS.CONVERSATIONS_MESSAGES, updated);
   }
 
   return true;

@@ -5,6 +5,7 @@ import { File } from 'expo-file-system/next';
 import { decode } from 'base64-arraybuffer';
 import { supabase, supabaseReady } from '@/services/supabase';
 import { registerPushToken, unregisterPushToken } from '@/services/notifications';
+import { clearAllCache } from '@/services/cache';
 import { User, AuthState } from '@/types';
 
 WebBrowser.maybeCompleteAuthSession();
@@ -508,6 +509,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         console.log('Unregister push token error:', e)
       );
     }
+    // Clear local data cache
+    await clearAllCache();
     await supabase.auth.signOut();
   };
 

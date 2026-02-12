@@ -66,13 +66,14 @@ $$;
 CREATE TABLE IF NOT EXISTS public.messages (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     sender_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
-    recipient_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+    recipient_id UUID REFERENCES public.users(id) ON DELETE CASCADE,
     content_type TEXT NOT NULL CHECK (content_type IN ('text', 'photo', 'audio')),
     text_content TEXT,
     media_url TEXT,
     location GEOGRAPHY(POINT, 4326) NOT NULL,
     radius INTEGER DEFAULT 30,
     is_read BOOLEAN DEFAULT FALSE,
+    is_public BOOLEAN DEFAULT FALSE,
     read_at TIMESTAMPTZ,
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -84,7 +85,7 @@ ALTER TABLE public.messages ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Users can view own messages" ON public.messages;
 CREATE POLICY "Users can view own messages" ON public.messages
     FOR SELECT USING (
-        auth.uid() = sender_id OR auth.uid() = recipient_id
+        auth.uid() = sender_id OR auth.uid() = recipient_id OR is_public = true
     );
 
 DROP POLICY IF EXISTS "Users can send messages" ON public.messages;

@@ -30,6 +30,7 @@ export interface Message {
   created_at: string;
   read_at?: string;
   is_read: boolean;
+  is_public?: boolean;
 }
 
 // Message with sender info for display

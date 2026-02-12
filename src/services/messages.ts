@@ -422,11 +422,12 @@ export async function fetchMessageById(messageId: string): Promise<MessageWithSe
 
 // Send a new message
 export async function sendMessage(
-  recipientId: string,
+  recipientId: string | null,
   contentType: 'text' | 'photo' | 'audio',
   location: Coordinates | null,
   textContent?: string,
-  mediaUrl?: string
+  mediaUrl?: string,
+  isPublic?: boolean
 ): Promise<Message | null> {
   const currentUserId = await getCurrentUserId();
   if (!currentUserId) {
@@ -434,7 +435,7 @@ export async function sendMessage(
     return null;
   }
 
-  console.log('sendMessage:', { recipientId, contentType, hasText: !!textContent, hasMedia: !!mediaUrl, hasLocation: !!location });
+  console.log('sendMessage:', { recipientId, contentType, hasText: !!textContent, hasMedia: !!mediaUrl, hasLocation: !!location, isPublic });
 
   const { data, error } = await supabase
     .from('messages')
@@ -447,6 +448,7 @@ export async function sendMessage(
       location: location ? `POINT(${location.longitude} ${location.latitude})` : null,
       radius: location ? 60 : null,
       is_read: location ? false : true, // Messages without location are immediately readable
+      is_public: isPublic || false,
     })
     .select()
     .single();

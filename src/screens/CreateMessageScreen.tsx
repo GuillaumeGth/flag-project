@@ -10,6 +10,7 @@ import {
   ScrollView,
 } from 'react-native';
 import Toast from '@/components/Toast';
+import { Switch } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { Audio } from 'expo-av';
@@ -47,6 +48,7 @@ export default function CreateMessageScreen({ navigation, route }: Props) {
     ? recipients.map(r => r.name).join(', ')
     : 'Sélectionner';
 
+  const [isPublic, setIsPublic] = useState(false);
   const [contentType, setContentType] = useState<MessageContentType>('text');
   const [textContent, setTextContent] = useState('');
   const [mediaUri, setMediaUri] = useState<string | null>(null);
@@ -191,7 +193,7 @@ export default function CreateMessageScreen({ navigation, route }: Props) {
       return;
     }
 
-    if (recipients.length === 0) {
+    if (!isPublic && recipients.length === 0) {
       showToast('Sélectionnez au moins un destinataire', 'error', {
         label: 'Choisir',
         onPress: () => navigation.navigate('SelectRecipient'),
@@ -227,41 +229,66 @@ export default function CreateMessageScreen({ navigation, route }: Props) {
         uploadedMediaUrl = url;
       }
 
-      // Send message to all recipients
-      const sendPromises = recipients.map((recipient) =>
-        sendMessage(
-          recipient.id,
+      if (isPublic) {
+        // Send a single public message without recipient
+        const result = await sendMessage(
+          null,
           contentType,
           userLocation,
           textContent || undefined,
-          uploadedMediaUrl
-        )
-      );
+          uploadedMediaUrl,
+          true
+        );
 
-      const results = await Promise.all(sendPromises);
-      console.log('handleSend results:', results.map((r, i) => ({ recipient: recipients[i]?.id, success: !!r })));
-      const successCount = results.filter(Boolean).length;
-
-      if (successCount === recipients.length) {
-        const msg = recipients.length > 1
-          ? `Message envoyé à ${recipients.length} destinataires !`
-          : 'Message envoyé !';
-        navigation.navigate('Main', {
-          screen: 'Map',
-          params: { toast: { message: msg, type: 'success' } },
-        });
-        return;
-      } else if (successCount > 0) {
-        navigation.navigate('Main', {
-          screen: 'Map',
-          params: { toast: { message: `Message envoyé à ${successCount}/${recipients.length} destinataires`, type: 'warning' } },
-        });
-        return;
+        if (result) {
+          navigation.navigate('Main', {
+            screen: 'Map',
+            params: { toast: { message: 'Message public envoyé !', type: 'success' } },
+          });
+          return;
+        } else {
+          showToast('Échec de l\'envoi', 'error', {
+            label: 'Réessayer',
+            onPress: handleSend,
+          });
+        }
       } else {
-        showToast('Échec de l\'envoi', 'error', {
-          label: 'Réessayer',
-          onPress: handleSend,
-        });
+        // Send message to all recipients
+        const sendPromises = recipients.map((recipient) =>
+          sendMessage(
+            recipient.id,
+            contentType,
+            userLocation,
+            textContent || undefined,
+            uploadedMediaUrl
+          )
+        );
+
+        const results = await Promise.all(sendPromises);
+        console.log('handleSend results:', results.map((r, i) => ({ recipient: recipients[i]?.id, success: !!r })));
+        const successCount = results.filter(Boolean).length;
+
+        if (successCount === recipients.length) {
+          const msg = recipients.length > 1
+            ? `Message envoyé à ${recipients.length} destinataires !`
+            : 'Message envoyé !';
+          navigation.navigate('Main', {
+            screen: 'Map',
+            params: { toast: { message: msg, type: 'success' } },
+          });
+          return;
+        } else if (successCount > 0) {
+          navigation.navigate('Main', {
+            screen: 'Map',
+            params: { toast: { message: `Message envoyé à ${successCount}/${recipients.length} destinataires`, type: 'warning' } },
+          });
+          return;
+        } else {
+          showToast('Échec de l\'envoi', 'error', {
+            label: 'Réessayer',
+            onPress: handleSend,
+          });
+        }
       }
     } catch (error) {
       showToast('Une erreur est survenue', 'error', {
@@ -291,17 +318,35 @@ export default function CreateMessageScreen({ navigation, route }: Props) {
         <View style={{ width: 24 }} />
       </View>
 
-      <View style={styles.recipientRow}>
-        <Text style={styles.recipientLabel}>À :</Text>
-        <TouchableOpacity
-          style={styles.recipientButton}
-          onPress={() => navigation.navigate('SelectRecipient')}
-        >
-          <Text style={styles.recipientName} numberOfLines={2}>
-            {recipientsDisplay}
-          </Text>
-          <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
-        </TouchableOpacity>
+      {!isPublic && (
+        <View style={styles.recipientRow}>
+          <Text style={styles.recipientLabel}>À :</Text>
+          <TouchableOpacity
+            style={styles.recipientButton}
+            onPress={() => navigation.navigate('SelectRecipient')}
+          >
+            <Text style={styles.recipientName} numberOfLines={2}>
+              {recipientsDisplay}
+            </Text>
+            <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
+          </TouchableOpacity>
+        </View>
+      )}
+
+      <View style={styles.publicToggleRow}>
+        <View style={styles.publicToggleLeft}>
+          <Ionicons name="globe-outline" size={20} color={isPublic ? colors.primary : colors.textSecondary} />
+          <View style={styles.publicToggleTextContainer}>
+            <Text style={[styles.publicToggleLabel, isPublic && { color: colors.primary }]}>Message public</Text>
+            <Text style={styles.publicToggleSubtext}>Visible par vos abonnés</Text>
+          </View>
+        </View>
+        <Switch
+          value={isPublic}
+          onValueChange={setIsPublic}
+          trackColor={{ false: colors.border, true: colors.primary }}
+          thumbColor="#fff"
+        />
       </View>
 
       <View style={styles.locationInfo}>
@@ -443,6 +488,33 @@ const styles = StyleSheet.create({
   recipientName: {
     fontSize: 16,
     color: colors.textPrimary,
+  },
+  publicToggleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: colors.surfaceLight,
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 16,
+  },
+  publicToggleLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  publicToggleTextContainer: {
+    marginLeft: 10,
+  },
+  publicToggleLabel: {
+    fontSize: 15,
+    fontWeight: '500',
+    color: colors.textPrimary,
+  },
+  publicToggleSubtext: {
+    fontSize: 12,
+    color: colors.textSecondary,
+    marginTop: 2,
   },
   locationInfo: {
     flexDirection: 'row',

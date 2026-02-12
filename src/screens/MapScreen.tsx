@@ -20,6 +20,7 @@ import { isWithinRadius } from '@/services/location';
 import { UndiscoveredMessageMapMeta, Coordinates } from '@/types';
 import { colors } from '@/theme';
 import Toast from '@/components/Toast';
+import FontAwesome from '@expo/vector-icons/FontAwesome';
 
 interface Props {
   navigation: any;
@@ -538,7 +539,7 @@ export default function MapScreen({ navigation, route }: Props) {
         style={[styles.createButton, { bottom: 24 }]}
         onPress={() => navigation.navigate('CreateMessage')}
       >
-        <Ionicons name="arrow-up" size={28} color="#fff" />
+        <FontAwesome name="paper-plane" size={24} color={colors.primary} />        
       </TouchableOpacity>
 
       {/* Selected message card */}
@@ -672,7 +673,7 @@ const styles = StyleSheet.create({
   createButton: {
     position: 'absolute',
     right: 16,
-    backgroundColor: colors.primary,
+    backgroundColor: colors.surface,
     borderRadius: 30,
     width: 60,
     height: 60,

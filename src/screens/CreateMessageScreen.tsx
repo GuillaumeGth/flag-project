@@ -199,8 +199,11 @@ export default function CreateMessageScreen({ navigation, route }: Props) {
       return;
     }
 
-    if (contentType === 'text' && !textContent.trim()) {
-      showToast('Écrivez un message', 'error');
+    const hasText = !!textContent.trim();
+    const hasMedia = !!mediaUri;
+
+    if (!hasText && !hasMedia) {
+      showToast('Ajoutez un message ou un média', 'error');
       return;
     }
 
@@ -342,7 +345,7 @@ export default function CreateMessageScreen({ navigation, route }: Props) {
       {/* Text input */}
       <TextInput
         style={styles.textInput}
-        placeholder="Votre message..."
+        placeholder={mediaUri ? 'Ajouter un texte (optionnel)...' : 'Votre message...'}
         placeholderTextColor={colors.textMuted}
         multiline
         value={textContent}

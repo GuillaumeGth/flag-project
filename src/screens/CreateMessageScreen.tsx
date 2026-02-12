@@ -390,7 +390,10 @@ export default function CreateMessageScreen({ navigation, route }: Props) {
         {loading ? (
           <ActivityIndicator color="#fff" />
         ) : (
-          <Ionicons name="arrow-up" size={24} color="#fff" />
+          <>
+            <Ionicons name="send" size={20} color="#fff" />
+            <Text style={styles.sendButtonText}>Envoyer</Text>
+          </>
         )}
       </TouchableOpacity>
     </ScrollView>
@@ -525,13 +528,12 @@ const styles = StyleSheet.create({
     color: colors.error,
   },
   sendButton: {
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: colors.primary,
-    borderRadius: 28,
-    width: 56,
-    height: 56,
-    alignSelf: 'center',
+    borderRadius: 12,
+    padding: 16,
   },
   sendButtonDisabled: {
     opacity: 0.7,

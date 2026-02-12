@@ -69,7 +69,7 @@ export default function Toast({ visible, message, type = 'success', duration = 2
     <Animated.View
       style={[
         styles.container,
-        { opacity, transform: [{ translateY }], borderLeftColor: colors.primary },
+        { opacity, transform: [{ translateY }], borderLeftColor: accentColor },
       ]}
     >
       <Ionicons name={iconName} size={20} color={accentColor} />

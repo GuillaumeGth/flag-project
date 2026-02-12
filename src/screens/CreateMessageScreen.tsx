@@ -10,6 +10,7 @@ import {
   Alert,
   ScrollView,
 } from 'react-native';
+import Toast from '@/components/Toast';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { Audio } from 'expo-av';
@@ -54,6 +55,11 @@ export default function CreateMessageScreen({ navigation, route }: Props) {
   const [isRecording, setIsRecording] = useState(false);
   const [loading, setLoading] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [toast, setToast] = useState<{ visible: boolean; message: string; type: 'success' | 'warning' }>({
+    visible: false,
+    message: '',
+    type: 'success',
+  });
   const soundRef = useRef<Audio.Sound | null>(null);
 
   const pickImage = async () => {
@@ -223,18 +229,16 @@ export default function CreateMessageScreen({ navigation, route }: Props) {
       const successCount = results.filter(Boolean).length;
 
       if (successCount === recipients.length) {
-        const message = recipients.length > 1
+        const msg = recipients.length > 1
           ? `Message envoyé à ${recipients.length} destinataires !`
           : 'Message envoyé !';
-        Alert.alert('Succès', message, [
-          { text: 'OK', onPress: () => navigation.goBack() },
-        ]);
+        setToast({ visible: true, message: msg, type: 'success' });
       } else if (successCount > 0) {
-        Alert.alert(
-          'Envoi partiel',
-          `Message envoyé à ${successCount}/${recipients.length} destinataires`,
-          [{ text: 'OK', onPress: () => navigation.goBack() }]
-        );
+        setToast({
+          visible: true,
+          message: `Message envoyé à ${successCount}/${recipients.length} destinataires`,
+          type: 'warning',
+        });
       } else {
         Alert.alert('Erreur', 'Échec de l\'envoi');
       }
@@ -246,6 +250,16 @@ export default function CreateMessageScreen({ navigation, route }: Props) {
   };
 
   return (
+    <View style={{ flex: 1, backgroundColor: colors.background }}>
+    <Toast
+      visible={toast.visible}
+      message={toast.message}
+      type={toast.type}
+      onHide={() => {
+        setToast((prev) => ({ ...prev, visible: false }));
+        navigation.goBack();
+      }}
+    />
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()}>
@@ -361,6 +375,7 @@ export default function CreateMessageScreen({ navigation, route }: Props) {
         )}
       </TouchableOpacity>
     </ScrollView>
+    </View>
   );
 }
 

@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { fetchAllUsers, FLAG_BOT_ID } from '@/services/messages';
+import { fetchFollowedUsers, FLAG_BOT_ID } from '@/services/messages';
 import { User } from '@/types';
 import { colors } from '@/theme';
 
@@ -30,8 +30,8 @@ export default function SelectRecipientScreen({ navigation }: Props) {
 
   const loadUsers = async () => {
     setLoading(true);
-    const allUsers = await fetchAllUsers();
-    setUsers(allUsers);
+    const followedUsers = await fetchFollowedUsers();
+    setUsers(followedUsers);
     setLoading(false);
   };
 
@@ -120,10 +120,10 @@ export default function SelectRecipientScreen({ navigation }: Props) {
       ) : users.length === 0 ? (
         <View style={styles.emptyContainer}>
           <Ionicons name="people-outline" size={64} color={colors.textMuted} />
-          <Text style={styles.emptyTitle}>Aucun utilisateur</Text>
+          <Text style={styles.emptyTitle}>Aucun abonnement</Text>
           <Text style={styles.emptyText}>
-            Il n'y a pas encore d'autres utilisateurs.{'\n'}
-            Invitez des amis à rejoindre Flag !
+            Vous ne suivez personne pour le moment.{'\n'}
+            Abonnez-vous à des utilisateurs pour leur envoyer des messages !
           </Text>
         </View>
       ) : (

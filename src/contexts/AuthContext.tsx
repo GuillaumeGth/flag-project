@@ -6,6 +6,7 @@ import { decode } from 'base64-arraybuffer';
 import { supabase, supabaseReady } from '@/services/supabase';
 import { registerPushToken, unregisterPushToken } from '@/services/notifications';
 import { clearAllCache } from '@/services/cache';
+import { reportError } from '@/services/errorReporting';
 import { User, AuthState } from '@/types';
 
 WebBrowser.maybeCompleteAuthSession();
@@ -64,6 +65,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return { error: null };
     } catch (e) {
       console.log('[AuthContext] setSessionAndUpdateState: EXCEPTION', e);
+      reportError(e, 'auth.setSessionAndUpdateState');
       return { error: e as Error };
     }
   };
@@ -395,6 +397,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return { error: null };
     } catch (error) {
       console.log('Google sign in error:', error);
+      reportError(error, 'auth.signInWithGoogle');
       return { error: error as Error };
     }
   };
@@ -464,6 +467,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return { error: null };
     } catch (error) {
       console.log('Update avatar error:', error);
+      reportError(error, 'auth.updateAvatar');
       return { error: error as Error };
     }
   };
@@ -498,6 +502,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return { error: null };
     } catch (error) {
       console.log('Update display name error:', error);
+      reportError(error, 'auth.updateDisplayName');
       return { error: error as Error };
     }
   };

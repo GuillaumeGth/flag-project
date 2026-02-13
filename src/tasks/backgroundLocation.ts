@@ -3,6 +3,7 @@ import * as Location from 'expo-location';
 import { supabase } from '@/services/supabase';
 import { calculateDistance } from '@/services/location';
 import { notifyNearbyMessage } from '@/services/notifications';
+import { reportError } from '@/services/errorReporting';
 import { Coordinates } from '@/types';
 
 const LOCATION_TASK_NAME = 'background-location-task';
@@ -14,6 +15,7 @@ const notifiedMessages = new Set<string>();
 TaskManager.defineTask(LOCATION_TASK_NAME, async ({ data, error }) => {
   if (error) {
     console.error('Background location error:', error);
+    reportError(error, 'backgroundLocation.task');
     return;
   }
 
@@ -67,6 +69,7 @@ async function checkNearbyMessages(userLocation: Coordinates) {
     }
   } catch (error) {
     console.error('Error checking nearby messages:', error);
+    reportError(error, 'backgroundLocation.checkNearbyMessages');
   }
 }
 

@@ -98,5 +98,29 @@ export async function stopBackgroundLocationTracking(): Promise<void> {
   }
 }
 
+// Watch foreground location changes
+export async function watchForegroundLocation(
+  onLocationUpdate: (coords: Coordinates) => void
+): Promise<Location.LocationSubscription | null> {
+  try {
+    const subscription = await Location.watchPositionAsync(
+      {
+        accuracy: Location.Accuracy.High,
+        distanceInterval: 10, // Update every 10 meters
+      },
+      (location) => {
+        onLocationUpdate({
+          latitude: location.coords.latitude,
+          longitude: location.coords.longitude,
+        });
+      }
+    );
+    return subscription;
+  } catch (error) {
+    console.error('Error watching foreground location:', error);
+    return null;
+  }
+}
+
 // Export task name for TaskManager
 export { LOCATION_TASK_NAME };

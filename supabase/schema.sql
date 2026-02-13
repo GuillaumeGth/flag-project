@@ -403,6 +403,25 @@ USING (
 -- Error logs table + email alert on production errors
 -- ============================================================
 
+-- App config table (stores API keys and settings securely)
+CREATE TABLE IF NOT EXISTS public.app_config (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL
+);
+
+ALTER TABLE public.app_config ENABLE ROW LEVEL SECURITY;
+
+-- No client access — only service_role and triggers (SECURITY DEFINER) can read
+DROP POLICY IF EXISTS "No client access to app_config" ON public.app_config;
+CREATE POLICY "No client access to app_config" ON public.app_config
+    FOR ALL USING (false);
+
+-- Insert default config rows (to be updated via Supabase dashboard SQL editor)
+INSERT INTO public.app_config (key, value) VALUES
+    ('resend_api_key', ''),
+    ('error_alert_email', '')
+ON CONFLICT (key) DO NOTHING;
+
 CREATE TABLE IF NOT EXISTS public.error_logs (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     error_message TEXT NOT NULL,
@@ -428,9 +447,9 @@ CREATE POLICY "Service role can read error logs" ON public.error_logs
 CREATE INDEX IF NOT EXISTS error_logs_created_at_idx ON public.error_logs(created_at DESC);
 
 -- Function to send email alert via Resend API when an error is logged
--- Requires setting the Resend API key and recipient email as database secrets:
---   ALTER DATABASE postgres SET app.resend_api_key = 're_xxx';
---   ALTER DATABASE postgres SET app.error_alert_email = 'you@example.com';
+-- Configure via the app_config table:
+--   UPDATE public.app_config SET value = 're_xxx' WHERE key = 'resend_api_key';
+--   UPDATE public.app_config SET value = 'you@example.com' WHERE key = 'error_alert_email';
 CREATE OR REPLACE FUNCTION public.send_error_email_alert()
 RETURNS TRIGGER AS $$
 DECLARE
@@ -438,9 +457,9 @@ DECLARE
     alert_email TEXT;
     payload JSONB;
 BEGIN
-    -- Read config from database settings
-    resend_key := current_setting('app.resend_api_key', true);
-    alert_email := current_setting('app.error_alert_email', true);
+    -- Read config from app_config table
+    SELECT value INTO resend_key FROM public.app_config WHERE key = 'resend_api_key';
+    SELECT value INTO alert_email FROM public.app_config WHERE key = 'error_alert_email';
 
     -- Skip if not configured
     IF resend_key IS NULL OR resend_key = '' OR alert_email IS NULL OR alert_email = '' THEN

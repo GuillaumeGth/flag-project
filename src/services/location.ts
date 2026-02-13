@@ -1,6 +1,7 @@
 import * as Location from 'expo-location';
 import * as TaskManager from 'expo-task-manager';
 import { Coordinates } from '@/types';
+import { reportError } from './errorReporting';
 
 const LOCATION_TASK_NAME = 'background-location-task';
 
@@ -60,6 +61,7 @@ export async function getCurrentLocation(): Promise<Coordinates | null> {
     };
   } catch (error) {
     console.error('Error getting location:', error);
+    reportError(error, 'location.getCurrentLocation');
     return null;
   }
 }
@@ -84,6 +86,7 @@ export async function startBackgroundLocationTracking(): Promise<boolean> {
     return true;
   } catch (error) {
     console.error('Error starting background location:', error);
+    reportError(error, 'location.startBackgroundLocationTracking');
     return false;
   }
 }
@@ -118,6 +121,7 @@ export async function watchForegroundLocation(
     return subscription;
   } catch (error) {
     console.error('Error watching foreground location:', error);
+    reportError(error, 'location.watchForegroundLocation');
     return null;
   }
 }

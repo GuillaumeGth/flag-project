@@ -398,3 +398,85 @@ USING (
     bucket_id = 'avatars'
     AND auth.uid()::text = (storage.foldername(name))[1]
 );
+
+-- ============================================================
+-- Error logs table + email alert on production errors
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS public.error_logs (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    error_message TEXT NOT NULL,
+    error_context TEXT,          -- e.g. service/function name
+    error_stack TEXT,
+    user_id UUID REFERENCES public.users(id) ON DELETE SET NULL,
+    metadata JSONB DEFAULT '{}', -- extra info (screen, OS, app version, etc.)
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE public.error_logs ENABLE ROW LEVEL SECURITY;
+
+-- Allow authenticated users to insert their own error logs
+DROP POLICY IF EXISTS "Users can insert error logs" ON public.error_logs;
+CREATE POLICY "Users can insert error logs" ON public.error_logs
+    FOR INSERT WITH CHECK (auth.uid() = user_id);
+
+-- Only service_role can read error logs (no client access)
+DROP POLICY IF EXISTS "Service role can read error logs" ON public.error_logs;
+CREATE POLICY "Service role can read error logs" ON public.error_logs
+    FOR SELECT USING (false);
+
+CREATE INDEX IF NOT EXISTS error_logs_created_at_idx ON public.error_logs(created_at DESC);
+
+-- Function to send email alert via Resend API when an error is logged
+-- Requires setting the Resend API key and recipient email as database secrets:
+--   ALTER DATABASE postgres SET app.resend_api_key = 're_xxx';
+--   ALTER DATABASE postgres SET app.error_alert_email = 'you@example.com';
+CREATE OR REPLACE FUNCTION public.send_error_email_alert()
+RETURNS TRIGGER AS $$
+DECLARE
+    resend_key TEXT;
+    alert_email TEXT;
+    payload JSONB;
+BEGIN
+    -- Read config from database settings
+    resend_key := current_setting('app.resend_api_key', true);
+    alert_email := current_setting('app.error_alert_email', true);
+
+    -- Skip if not configured
+    IF resend_key IS NULL OR resend_key = '' OR alert_email IS NULL OR alert_email = '' THEN
+        RAISE LOG 'send_error_email_alert: skipped, missing resend_api_key or error_alert_email';
+        RETURN NEW;
+    END IF;
+
+    payload := jsonb_build_object(
+        'from', 'Flag App <alerts@flag-app.com>',
+        'to', json_build_array(alert_email),
+        'subject', '[Flag] Erreur prod: ' || LEFT(NEW.error_message, 80),
+        'html', '<h2>Erreur en production</h2>'
+            || '<p><strong>Contexte:</strong> ' || COALESCE(NEW.error_context, 'N/A') || '</p>'
+            || '<p><strong>Message:</strong> ' || NEW.error_message || '</p>'
+            || '<p><strong>Stack:</strong></p><pre>' || COALESCE(NEW.error_stack, 'N/A') || '</pre>'
+            || '<p><strong>User ID:</strong> ' || COALESCE(NEW.user_id::text, 'anonyme') || '</p>'
+            || '<p><strong>Metadata:</strong></p><pre>' || COALESCE(NEW.metadata::text, '{}') || '</pre>'
+            || '<p><strong>Date:</strong> ' || NEW.created_at::text || '</p>'
+    );
+
+    PERFORM http((
+        'POST',
+        'https://api.resend.com/emails',
+        ARRAY[http_header('Authorization', 'Bearer ' || resend_key)],
+        'application/json',
+        payload::text
+    )::http_request);
+
+    RETURN NEW;
+EXCEPTION WHEN OTHERS THEN
+    RAISE LOG 'send_error_email_alert failed: % %', SQLERRM, SQLSTATE;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+DROP TRIGGER IF EXISTS on_error_log_send_email ON public.error_logs;
+CREATE TRIGGER on_error_log_send_email
+    AFTER INSERT ON public.error_logs
+    FOR EACH ROW EXECUTE FUNCTION public.send_error_email_alert();

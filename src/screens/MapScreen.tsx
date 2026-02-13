@@ -486,6 +486,7 @@ export default function MapScreen({ navigation, route }: Props) {
           if (!location) return null;
           const sender = message.sender;
           const capturedImage = avatarImages[message.id];
+          const isPublic = message.is_public === true;
 
           // Avatar with captured image
           if (sender?.avatar_url) {
@@ -509,7 +510,10 @@ export default function MapScreen({ navigation, route }: Props) {
               image={require('../assets/red-circle.png')}
 
             >
-              <View style={styles.initialsMarker}>
+              <View style={[
+                styles.initialsMarker,
+                isPublic && styles.publicMarkerBorder,
+              ]}>
                 <Text style={styles.initialsText}>
                   {getInitials(sender?.display_name)}
                 </Text>
@@ -605,13 +609,17 @@ export default function MapScreen({ navigation, route }: Props) {
         {messages.map((message) => {
           const sender = message.sender;
           if (!sender?.avatar_url || avatarImages[message.id]) return null;
+          const isPublic = message.is_public === true;
 
           return (
             <View
               key={message.id}
               ref={(ref) => { avatarRefs.current[message.id] = ref; }}
               collapsable={false}
-              style={styles.captureAvatar}
+              style={[
+                styles.captureAvatar,
+                isPublic && styles.captureAvatarPublic,
+              ]}
             >
               <Image
                 source={{ uri: sender.avatar_url }}
@@ -858,12 +866,18 @@ const styles = StyleSheet.create({
   initialsMarker: {
     width: 42,
     height: 42,
-    
     borderRadius: 25,
     justifyContent: 'center',
     alignItems: 'center',
-    
-    
+  },
+  publicMarkerBorder: {
+    borderWidth: 3,
+    borderColor: colors.primary,
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.8,
+    shadowRadius: 6,
+    elevation: 8,
   },
   initialsText: {
     fontSize: 18,
@@ -887,6 +901,14 @@ const styles = StyleSheet.create({
     marginBottom: 5,
     borderWidth: 2,
     borderColor: '#fff',
+  },
+  captureAvatarPublic: {
+    borderWidth: 3,
+    borderColor: colors.primary,
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.8,
+    shadowRadius: 6,
   },
   captureAvatarImage: {
     width: 52,

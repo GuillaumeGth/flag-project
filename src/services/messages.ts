@@ -336,6 +336,7 @@ export async function fetchUndiscoveredMessagesForMap(): Promise<UndiscoveredMes
       id,
       location,
       created_at,
+      is_public,
       sender:users!sender_id (id, display_name, avatar_url)
     `)
     .eq('recipient_id', currentUserId)
@@ -482,6 +483,7 @@ export async function fetchFollowingPublicMessages(): Promise<UndiscoveredMessag
       id,
       location,
       created_at,
+      is_public,
       sender:users!sender_id (id, display_name, avatar_url)
     `)
     .in('sender_id', followingIds)

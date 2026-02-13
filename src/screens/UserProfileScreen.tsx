@@ -9,12 +9,13 @@ import {
   FlatList,
   Dimensions,
   RefreshControl,
+  Modal,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '@/theme';
 import { supabase } from '@/services/supabase';
 import { fetchUserPublicMessages, fetchDiscoveredPublicMessageIds } from '@/services/messages';
-import { follow, unfollow, isFollowing } from '@/services/subscriptions';
+import { follow, unfollow, isFollowing, fetchFollowerCount } from '@/services/subscriptions';
 import { Message, User } from '@/types';
 
 type TabType = 'photo' | 'audio' | 'text';
@@ -36,8 +37,10 @@ export default function UserProfileScreen({ navigation, route }: Props) {
   const [activeTab, setActiveTab] = useState<TabType>('photo');
   const [messages, setMessages] = useState<Message[]>([]);
   const [discoveredIds, setDiscoveredIds] = useState<Set<string>>(new Set());
+  const [followerCount, setFollowerCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [viewingMessage, setViewingMessage] = useState<Message | null>(null);
 
   const loadProfile = useCallback(async () => {
     const { data } = await supabase
@@ -63,25 +66,36 @@ export default function UserProfileScreen({ navigation, route }: Props) {
     setFollowing(result);
   }, [userId]);
 
+  const loadFollowerCount = useCallback(async () => {
+    const count = await fetchFollowerCount(userId);
+    setFollowerCount(count);
+  }, [userId]);
+
   useEffect(() => {
-    Promise.all([loadProfile(), loadMessages(), checkFollowing()])
+    Promise.all([loadProfile(), loadMessages(), checkFollowing(), loadFollowerCount()])
       .finally(() => setLoading(false));
   }, [loadProfile, loadMessages, checkFollowing]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    await Promise.all([loadMessages(), checkFollowing()]);
+    await Promise.all([loadMessages(), checkFollowing(), loadFollowerCount()]);
     setRefreshing(false);
-  }, [loadMessages, checkFollowing]);
+  }, [loadMessages, checkFollowing, loadFollowerCount]);
 
   const handleToggleFollow = async () => {
     setFollowLoading(true);
     if (following) {
       const ok = await unfollow(userId);
-      if (ok) setFollowing(false);
+      if (ok) {
+        setFollowing(false);
+        setFollowerCount(c => Math.max(0, c - 1));
+      }
     } else {
       const ok = await follow(userId);
-      if (ok) setFollowing(true);
+      if (ok) {
+        setFollowing(true);
+        setFollowerCount(c => c + 1);
+      }
     }
     setFollowLoading(false);
   };
@@ -93,7 +107,17 @@ export default function UserProfileScreen({ navigation, route }: Props) {
 
     if (!isDiscovered) {
       return (
-        <View style={[styles.cell, styles.cellUndiscovered]}>
+        <TouchableOpacity
+          style={[styles.cell, styles.cellUndiscovered]}
+          onPress={() => {
+            const loc = item.location;
+            if (loc && typeof loc === 'object' && 'latitude' in loc) {
+              navigation.navigate('Map', {
+                focusLocation: { latitude: loc.latitude, longitude: loc.longitude },
+              });
+            }
+          }}
+        >
           {item.content_type === 'photo' && item.media_url && (
             <Image source={{ uri: item.media_url }} style={styles.cellImageBlurred} blurRadius={150} />
           )}
@@ -108,15 +132,15 @@ export default function UserProfileScreen({ navigation, route }: Props) {
           <View style={styles.lockOverlay}>
             <Ionicons name="eye-off" size={40} color="rgba(190,170,255,0.2)" />
           </View>
-        </View>
+        </TouchableOpacity>
       );
     }
 
     if (item.content_type === 'photo') {
       return (
-        <View style={styles.cell}>
+        <TouchableOpacity style={styles.cell} onPress={() => setViewingMessage(item)}>
           <Image source={{ uri: item.media_url }} style={styles.cellImage} />
-        </View>
+        </TouchableOpacity>
       );
     }
     if (item.content_type === 'audio') {
@@ -166,8 +190,8 @@ export default function UserProfileScreen({ navigation, route }: Props) {
           <Text style={styles.displayName}>
             {userProfile?.display_name || 'Utilisateur'}
           </Text>
-          <Text style={styles.identifier}>
-            {userProfile?.phone || userProfile?.email || ''}
+          <Text style={styles.followerCount}>
+            {followerCount} abonné{followerCount !== 1 ? 's' : ''}
           </Text>
         </View>
         <TouchableOpacity
@@ -230,6 +254,42 @@ export default function UserProfileScreen({ navigation, route }: Props) {
           }
         />
       )}
+
+      <Modal
+        visible={!!viewingMessage}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setViewingMessage(null)}
+      >
+        <View style={styles.photoViewerOverlay}>
+          {viewingMessage?.media_url && (
+            <Image
+              source={{ uri: viewingMessage.media_url }}
+              style={styles.photoViewerImage}
+              resizeMode="contain"
+            />
+          )}
+          <TouchableOpacity style={styles.photoViewerClose} onPress={() => setViewingMessage(null)}>
+            <Ionicons name="close" size={28} color="#fff" />
+          </TouchableOpacity>
+          {viewingMessage?.location && (
+            <TouchableOpacity
+              style={styles.photoViewerLocationButton}
+              onPress={() => {
+                const loc = viewingMessage.location;
+                setViewingMessage(null);
+                navigation.navigate('Main', {
+                  screen: 'Map',
+                  params: { focusLocation: loc },
+                });
+              }}
+            >
+              <Ionicons name="location" size={20} color="#fff" />
+              <Text style={styles.photoViewerLocationText}>Voir sur la carte</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -276,7 +336,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: colors.textPrimary,
   },
-  identifier: {
+  followerCount: {
     fontSize: 13,
     color: colors.textSecondary,
     marginTop: 2,
@@ -368,5 +428,42 @@ const styles = StyleSheet.create({
   emptyText: {
     color: colors.textMuted,
     fontSize: 14,
+  },
+  photoViewerOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.95)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  photoViewerImage: {
+    width: '100%',
+    height: '100%',
+  },
+  photoViewerClose: {
+    position: 'absolute',
+    top: 50,
+    right: 20,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  photoViewerLocationButton: {
+    position: 'absolute',
+    bottom: 60,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(124,92,252,0.85)',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 24,
+    gap: 8,
+  },
+  photoViewerLocationText: {
+    color: '#fff',
+    fontSize: 15,
+    fontWeight: '600',
   },
 });

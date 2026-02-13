@@ -20,6 +20,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { useAuth } from '@/contexts/AuthContext';
 import { colors } from '@/theme';
 import { fetchMyPublicMessages } from '@/services/messages';
+import { fetchFollowerCount } from '@/services/subscriptions';
 import { Message } from '@/types';
 
 type TabType = 'photo' | 'audio' | 'text';
@@ -36,23 +37,31 @@ export default function ProfileScreen({ navigation }: any) {
 
   const [activeTab, setActiveTab] = useState<TabType>('photo');
   const [messages, setMessages] = useState<Message[]>([]);
+  const [followerCount, setFollowerCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [viewingMessage, setViewingMessage] = useState<Message | null>(null);
 
   const loadMessages = useCallback(async () => {
     const data = await fetchMyPublicMessages();
     setMessages(data);
   }, []);
 
+  const loadFollowerCount = useCallback(async () => {
+    if (!user?.id) return;
+    const count = await fetchFollowerCount(user.id);
+    setFollowerCount(count);
+  }, [user?.id]);
+
   useEffect(() => {
-    loadMessages().finally(() => setLoading(false));
-  }, [loadMessages]);
+    Promise.all([loadMessages(), loadFollowerCount()]).finally(() => setLoading(false));
+  }, [loadMessages, loadFollowerCount]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    await loadMessages();
+    await Promise.all([loadMessages(), loadFollowerCount()]);
     setRefreshing(false);
-  }, [loadMessages]);
+  }, [loadMessages, loadFollowerCount]);
 
   const filteredMessages = messages.filter(m => m.content_type === activeTab);
 
@@ -106,9 +115,9 @@ export default function ProfileScreen({ navigation }: any) {
   const renderCell = ({ item }: { item: Message }) => {
     if (item.content_type === 'photo') {
       return (
-        <View style={styles.cell}>
+        <TouchableOpacity style={styles.cell} onPress={() => setViewingMessage(item)}>
           <Image source={{ uri: item.media_url }} style={styles.cellImage} />
-        </View>
+        </TouchableOpacity>
       );
     }
     if (item.content_type === 'audio') {
@@ -168,6 +177,9 @@ export default function ProfileScreen({ navigation }: any) {
           </TouchableOpacity>
           <Text style={styles.identifier}>
             {user?.phone || user?.email || ''}
+          </Text>
+          <Text style={styles.followerCount}>
+            {followerCount} abonné{followerCount !== 1 ? 's' : ''}
           </Text>
         </View>
         <TouchableOpacity onPress={() => navigation.navigate('Settings')} style={styles.settingsButton}>
@@ -264,6 +276,42 @@ export default function ProfileScreen({ navigation }: any) {
           </View>
         </KeyboardAvoidingView>
       </Modal>
+
+      <Modal
+        visible={!!viewingMessage}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setViewingMessage(null)}
+      >
+        <View style={styles.photoViewerOverlay}>
+          {viewingMessage?.media_url && (
+            <Image
+              source={{ uri: viewingMessage.media_url }}
+              style={styles.photoViewerImage}
+              resizeMode="contain"
+            />
+          )}
+          <TouchableOpacity style={styles.photoViewerClose} onPress={() => setViewingMessage(null)}>
+            <Ionicons name="close" size={28} color="#fff" />
+          </TouchableOpacity>
+          {viewingMessage?.location && (
+            <TouchableOpacity
+              style={styles.photoViewerLocationButton}
+              onPress={() => {
+                const loc = viewingMessage.location;
+                setViewingMessage(null);
+                navigation.navigate('Main', {
+                  screen: 'Map',
+                  params: { focusLocation: loc },
+                });
+              }}
+            >
+              <Ionicons name="location" size={20} color="#fff" />
+              <Text style={styles.photoViewerLocationText}>Voir sur la carte</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -328,6 +376,11 @@ const styles = StyleSheet.create({
   identifier: {
     fontSize: 13,
     color: colors.textSecondary,
+    marginTop: 2,
+  },
+  followerCount: {
+    fontSize: 12,
+    color: colors.textMuted,
     marginTop: 2,
   },
   nameContainer: {
@@ -439,5 +492,42 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '500',
     color: '#fff',
+  },
+  photoViewerOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.95)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  photoViewerImage: {
+    width: '100%',
+    height: '100%',
+  },
+  photoViewerClose: {
+    position: 'absolute',
+    top: 50,
+    right: 20,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  photoViewerLocationButton: {
+    position: 'absolute',
+    bottom: 60,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(124,92,252,0.85)',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 24,
+    gap: 8,
+  },
+  photoViewerLocationText: {
+    color: '#fff',
+    fontSize: 15,
+    fontWeight: '600',
   },
 });

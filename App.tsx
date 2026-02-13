@@ -55,7 +55,7 @@ function MainTabs() {
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.textMuted,
         tabBarStyle: {
-          paddingTop: 8,
+          paddingVertical: 8,
           minHeight: 60,
           backgroundColor: colors.surface,
           borderTopColor: colors.border,

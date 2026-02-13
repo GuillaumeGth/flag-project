@@ -43,7 +43,7 @@ export default function ConversationScreen({ navigation, route }: Props) {
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [inputText, setInputText] = useState('');
-  const [fullImageUrl, setFullImageUrl] = useState<string | null>(null);
+  const [fullImageMessage, setFullImageMessage] = useState<MessageWithUsers | null>(null);
   const [audioSound, setAudioSound] = useState<Audio.Sound | null>(null);
   const [playingMessageId, setPlayingMessageId] = useState<string | null>(null);
   const [isPlayingAudio, setIsPlayingAudio] = useState(false);
@@ -408,7 +408,7 @@ export default function ConversationScreen({ navigation, route }: Props) {
               {item.content_type === 'photo' && item.media_url && (
                 <TouchableOpacity
                   activeOpacity={0.9}
-                  onPress={() => setFullImageUrl(item.media_url || null)}
+                  onPress={() => setFullImageMessage(item)}
                 >
                   <Image source={{ uri: item.media_url }} style={styles.messageImage} />
                 </TouchableOpacity>
@@ -551,28 +551,44 @@ export default function ConversationScreen({ navigation, route }: Props) {
         }
       />
 
-      {fullImageUrl && (
+      {fullImageMessage && (
         <Modal
           visible
           transparent
           animationType="fade"
-          onRequestClose={() => setFullImageUrl(null)}
+          onRequestClose={() => setFullImageMessage(null)}
         >
           <View style={styles.fullscreenOverlay}>
             <TouchableOpacity
               style={styles.fullscreenCloseButton}
-              onPress={() => setFullImageUrl(null)}
+              onPress={() => setFullImageMessage(null)}
               activeOpacity={0.8}
             >
               <Ionicons name="close" size={28} color="#fff" />
             </TouchableOpacity>
             <View style={styles.fullscreenImageContainer}>
               <Image
-                source={{ uri: fullImageUrl }}
+                source={{ uri: fullImageMessage.media_url! }}
                 style={styles.fullscreenImage}
                 resizeMode="contain"
               />
             </View>
+            {fullImageMessage.location && (
+              <TouchableOpacity
+                style={styles.fullscreenLocationButton}
+                onPress={() => {
+                  const loc = fullImageMessage.location;
+                  setFullImageMessage(null);
+                  navigation.navigate('Main', {
+                    screen: 'Map',
+                    params: { focusLocation: loc },
+                  });
+                }}
+              >
+                <Ionicons name="location" size={20} color="#fff" />
+                <Text style={styles.fullscreenLocationText}>Voir sur la carte</Text>
+              </TouchableOpacity>
+            )}
           </View>
         </Modal>
       )}
@@ -909,6 +925,22 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.6)',
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  fullscreenLocationButton: {
+    position: 'absolute',
+    bottom: 60,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(124,92,252,0.85)',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 24,
+    gap: 8,
+  },
+  fullscreenLocationText: {
+    color: '#fff',
+    fontSize: 15,
+    fontWeight: '600',
   },
   inputMediaPreview: {
     marginBottom: 8,

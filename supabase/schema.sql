@@ -269,7 +269,7 @@ ALTER TABLE public.subscriptions ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS "Users can view own subscriptions" ON public.subscriptions;
 CREATE POLICY "Users can view own subscriptions" ON public.subscriptions
-    FOR SELECT USING (auth.uid() = follower_id);
+    FOR SELECT USING (auth.uid() = follower_id OR auth.uid() = following_id);
 
 DROP POLICY IF EXISTS "Users can follow" ON public.subscriptions;
 CREATE POLICY "Users can follow" ON public.subscriptions

@@ -50,6 +50,7 @@ export interface UndiscoveredMessageMapMeta {
   id: string;
   location: string | Coordinates; // PostGIS POINT or Coordinates
   created_at: string;
+  is_public?: boolean;
   sender?: Pick<User, 'id' | 'display_name' | 'avatar_url'>;
 }
 

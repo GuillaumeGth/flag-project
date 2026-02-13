@@ -70,3 +70,16 @@ export async function fetchFollowingIds(): Promise<string[]> {
 
   return (data || []).map(row => row.following_id);
 }
+
+export async function fetchFollowerCount(userId: string): Promise<number> {
+  const { count, error } = await supabase
+    .from('subscriptions')
+    .select('*', { count: 'exact', head: true })
+    .eq('following_id', userId);
+
+  if (error) {
+    console.error('Error fetching follower count:', error);
+    return 0;
+  }
+  return count || 0;
+}

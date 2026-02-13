@@ -19,22 +19,33 @@ function getCurrentUserId(): string | null {
   return userId;
 }
 
-// Fetch all users (for recipient selection)
-export async function fetchAllUsers(): Promise<User[]> {
+// Fetch only users the current user is subscribed to (for recipient selection)
+export async function fetchFollowedUsers(): Promise<User[]> {
   const currentUserId = await getCurrentUserId();
+  if (!currentUserId) return [];
+
+  // Get IDs of users the current user follows
+  const { data: subs, error: subsError } = await supabase
+    .from('subscriptions')
+    .select('following_id')
+    .eq('follower_id', currentUserId);
+
+  if (subsError || !subs || subs.length === 0) return [];
+
+  const followingIds = subs.map(s => s.following_id);
 
   const { data, error } = await supabase
     .from('users')
     .select('*')
+    .in('id', followingIds)
     .order('display_name', { ascending: true });
 
   if (error) {
-    console.error('Error fetching users:', error);
+    console.error('Error fetching followed users:', error);
     return [];
   }
 
-  // Filter out current user
-  return (data || []).filter(user => user.id !== currentUserId);
+  return data || [];
 }
 
 // Build conversations from a list of messages (with user joins)
@@ -532,7 +543,7 @@ export async function fetchDiscoveredPublicMessageIds(messageIds: string[]): Pro
   return new Set((data || []).map(d => d.message_id));
 }
 
-// Send a new message
+// Send a new message (only to users the sender is subscribed to)
 export async function sendMessage(
   recipientId: string | null,
   contentType: 'text' | 'photo' | 'audio',
@@ -545,6 +556,21 @@ export async function sendMessage(
   if (!currentUserId) {
     console.error('sendMessage: No authenticated user');
     return null;
+  }
+
+  // For private messages, verify the sender is subscribed to the recipient
+  if (recipientId && !isPublic) {
+    const { data: sub, error: subError } = await supabase
+      .from('subscriptions')
+      .select('id')
+      .eq('follower_id', currentUserId)
+      .eq('following_id', recipientId)
+      .maybeSingle();
+
+    if (subError || !sub) {
+      console.error('sendMessage: Not subscribed to recipient', recipientId);
+      return null;
+    }
   }
 
   console.log('sendMessage:', { recipientId, contentType, hasText: !!textContent, hasMedia: !!mediaUrl, hasLocation: !!location, isPublic });

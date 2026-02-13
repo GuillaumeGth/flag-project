@@ -90,7 +90,20 @@ CREATE POLICY "Users can view own messages" ON public.messages
 
 DROP POLICY IF EXISTS "Users can send messages" ON public.messages;
 CREATE POLICY "Users can send messages" ON public.messages
-    FOR INSERT WITH CHECK (auth.uid() = sender_id);
+    FOR INSERT WITH CHECK (
+        auth.uid() = sender_id
+        AND (
+            -- Public messages don't require a subscription
+            is_public = true
+            -- Private messages require the sender to be subscribed to the recipient
+            OR recipient_id IS NULL
+            OR EXISTS (
+                SELECT 1 FROM public.subscriptions
+                WHERE follower_id = auth.uid()
+                AND following_id = recipient_id
+            )
+        )
+    );
 
 DROP POLICY IF EXISTS "Recipients can update messages" ON public.messages;
 CREATE POLICY "Recipients can update messages" ON public.messages

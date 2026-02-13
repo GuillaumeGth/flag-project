@@ -22,8 +22,6 @@ import { colors } from '@/theme';
 import { fetchMyPublicMessages } from '@/services/messages';
 import { Message } from '@/types';
 
-type TabType = 'photo' | 'audio' | 'text';
-
 const SCREEN_WIDTH = Dimensions.get('window').width;
 const CELL_SIZE = SCREEN_WIDTH / 3;
 
@@ -34,7 +32,6 @@ export default function ProfileScreen({ navigation }: any) {
   const [newName, setNewName] = useState('');
   const [savingName, setSavingName] = useState(false);
 
-  const [activeTab, setActiveTab] = useState<TabType>('photo');
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -53,8 +50,6 @@ export default function ProfileScreen({ navigation }: any) {
     await loadMessages();
     setRefreshing(false);
   }, [loadMessages]);
-
-  const filteredMessages = messages.filter(m => m.content_type === activeTab);
 
   const handleChangeAvatar = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -133,7 +128,7 @@ export default function ProfileScreen({ navigation }: any) {
     return (
       <View style={styles.emptyContainer}>
         <Ionicons
-          name={activeTab === 'photo' ? 'image-outline' : activeTab === 'audio' ? 'mic-outline' : 'document-text-outline'}
+          name="albums-outline"
           size={48}
           color={colors.textMuted}
         />
@@ -175,26 +170,6 @@ export default function ProfileScreen({ navigation }: any) {
         </TouchableOpacity>
       </View>
 
-      <View style={styles.tabBar}>
-        <TouchableOpacity
-          style={[styles.tab, activeTab === 'photo' && styles.tabActive]}
-          onPress={() => setActiveTab('photo')}
-        >
-          <Ionicons name="image" size={22} color={activeTab === 'photo' ? colors.primary : colors.textMuted} />
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.tab, activeTab === 'audio' && styles.tabActive]}
-          onPress={() => setActiveTab('audio')}
-        >
-          <Ionicons name="mic" size={22} color={activeTab === 'audio' ? colors.primary : colors.textMuted} />
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.tab, activeTab === 'text' && styles.tabActive]}
-          onPress={() => setActiveTab('text')}
-        >
-          <Ionicons name="document-text" size={22} color={activeTab === 'text' ? colors.primary : colors.textMuted} />
-        </TouchableOpacity>
-      </View>
     </>
   );
 
@@ -209,7 +184,7 @@ export default function ProfileScreen({ navigation }: any) {
         </>
       ) : (
         <FlatList
-          data={filteredMessages}
+          data={messages}
           renderItem={renderCell}
           keyExtractor={item => item.id}
           numColumns={3}
@@ -336,21 +311,6 @@ const styles = StyleSheet.create({
   },
   editIcon: {
     marginLeft: 6,
-  },
-  tabBar: {
-    flexDirection: 'row',
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-  },
-  tab: {
-    flex: 1,
-    alignItems: 'center',
-    paddingVertical: 12,
-    borderBottomWidth: 2,
-    borderBottomColor: 'transparent',
-  },
-  tabActive: {
-    borderBottomColor: colors.primary,
   },
   cell: {
     width: CELL_SIZE,

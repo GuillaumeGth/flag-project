@@ -8,6 +8,7 @@ import {
   setLastSyncTimestamp,
   CACHE_KEYS,
 } from './cache';
+import { reportError } from './errorReporting';
 
 // Default Flag Bot user ID (created via seed.sql)
 export const FLAG_BOT_ID = '00000000-0000-0000-0000-000000000001';
@@ -19,22 +20,34 @@ function getCurrentUserId(): string | null {
   return userId;
 }
 
-// Fetch all users (for recipient selection)
-export async function fetchAllUsers(): Promise<User[]> {
+// Fetch only users the current user is subscribed to (for recipient selection)
+export async function fetchFollowedUsers(): Promise<User[]> {
   const currentUserId = await getCurrentUserId();
+  if (!currentUserId) return [];
+
+  // Get IDs of users the current user follows
+  const { data: subs, error: subsError } = await supabase
+    .from('subscriptions')
+    .select('following_id')
+    .eq('follower_id', currentUserId);
+
+  if (subsError || !subs || subs.length === 0) return [];
+
+  const followingIds = subs.map(s => s.following_id);
 
   const { data, error } = await supabase
     .from('users')
     .select('*')
+    .in('id', followingIds)
     .order('display_name', { ascending: true });
 
   if (error) {
-    console.error('Error fetching users:', error);
+    console.error('Error fetching followed users:', error);
+    reportError(error, 'messages.fetchFollowedUsers');
     return [];
   }
 
-  // Filter out current user
-  return (data || []).filter(user => user.id !== currentUserId);
+  return data || [];
 }
 
 // Build conversations from a list of messages (with user joins)
@@ -115,6 +128,7 @@ export async function fetchConversations(): Promise<Conversation[]> {
   console.log('[messages] fetchConversations: query done, error =', error, 'new count =', newMessages?.length, 'cached count =', cachedMessages.length);
   if (error) {
     console.error('Error fetching conversations:', error);
+    reportError(error, 'messages.fetchConversations');
     // On error, still return conversations from cache
     if (cachedMessages.length > 0) {
       return buildConversations(cachedMessages, currentUserId);
@@ -181,6 +195,7 @@ export async function fetchConversationMessages(otherUserId: string): Promise<Me
 
   if (error) {
     console.error('Error fetching conversation messages:', error);
+    reportError(error, 'messages.fetchConversationMessages');
     return cachedMessages.length > 0 ? cachedMessages : [];
   }
 
@@ -235,6 +250,7 @@ export async function fetchMyMessages(): Promise<MessageWithSender[]> {
 
   if (error) {
     console.error('Error fetching messages:', error);
+    reportError(error, 'messages.fetchMyMessages');
     return [];
   }
 
@@ -262,6 +278,7 @@ export async function fetchUnreadMessages(): Promise<MessageWithSender[]> {
 
   if (error) {
     console.error('Error fetching unread messages:', error);
+    reportError(error, 'messages.fetchUnreadMessages');
     return [];
   }
 
@@ -289,6 +306,7 @@ export async function fetchReadMessages(): Promise<MessageWithSender[]> {
 
   if (error) {
     console.error('Error fetching read messages:', error);
+    reportError(error, 'messages.fetchReadMessages');
     return [];
   }
 
@@ -309,6 +327,7 @@ export async function fetchUndiscoveredMessagesMetadata(): Promise<UndiscoveredM
 
   if (error) {
     console.error('Error fetching undiscovered messages metadata:', error);
+    reportError(error, 'messages.fetchUndiscoveredMessagesMetadata');
     return [];
   }
 
@@ -352,6 +371,7 @@ export async function fetchUndiscoveredMessagesForMap(): Promise<UndiscoveredMes
 
   if (error) {
     console.error('Error fetching undiscovered messages for map:', error);
+    reportError(error, 'messages.fetchUndiscoveredMessagesForMap');
     return cachedMessages.length > 0 ? cachedMessages : [];
   }
 
@@ -415,6 +435,7 @@ export async function fetchMessageById(messageId: string): Promise<MessageWithSe
 
   if (error) {
     console.error('Error fetching message by id:', error);
+    reportError(error, 'messages.fetchMessageById');
     return null;
   }
 
@@ -435,6 +456,7 @@ export async function fetchMyPublicMessages(): Promise<Message[]> {
 
   if (error) {
     console.error('Error fetching public messages:', error);
+    reportError(error, 'messages.fetchMyPublicMessages');
     return [];
   }
 
@@ -456,6 +478,7 @@ export async function fetchUserPublicMessages(userId: string): Promise<Message[]
 
   if (error) {
     console.error('Error fetching user public messages:', error);
+    reportError(error, 'messages.fetchUserPublicMessages');
     return [];
   }
 
@@ -493,6 +516,7 @@ export async function fetchFollowingPublicMessages(): Promise<UndiscoveredMessag
 
   if (error) {
     console.error('Error fetching following public messages:', error);
+    reportError(error, 'messages.fetchFollowingPublicMessages');
     return [];
   }
 
@@ -510,6 +534,7 @@ export async function markPublicMessageDiscovered(messageId: string): Promise<bo
 
   if (error) {
     console.error('Error marking public message as discovered:', error);
+    reportError(error, 'messages.markPublicMessageDiscovered');
     return false;
   }
   return true;
@@ -528,13 +553,14 @@ export async function fetchDiscoveredPublicMessageIds(messageIds: string[]): Pro
 
   if (error) {
     console.error('Error fetching discovered public messages:', error);
+    reportError(error, 'messages.fetchDiscoveredPublicMessageIds');
     return new Set();
   }
 
   return new Set((data || []).map(d => d.message_id));
 }
 
-// Send a new message
+// Send a new message (only to users the sender is subscribed to)
 export async function sendMessage(
   recipientId: string | null,
   contentType: 'text' | 'photo' | 'audio',
@@ -547,6 +573,21 @@ export async function sendMessage(
   if (!currentUserId) {
     console.error('sendMessage: No authenticated user');
     return null;
+  }
+
+  // For private messages, verify the sender is subscribed to the recipient
+  if (recipientId && !isPublic) {
+    const { data: sub, error: subError } = await supabase
+      .from('subscriptions')
+      .select('id')
+      .eq('follower_id', currentUserId)
+      .eq('following_id', recipientId)
+      .maybeSingle();
+
+    if (subError || !sub) {
+      console.error('sendMessage: Not subscribed to recipient', recipientId);
+      return null;
+    }
   }
 
   console.log('sendMessage:', { recipientId, contentType, hasText: !!textContent, hasMedia: !!mediaUrl, hasLocation: !!location, isPublic });
@@ -569,6 +610,7 @@ export async function sendMessage(
 
   if (error) {
     console.error('sendMessage error:', error.message, '| code:', error.code, '| details:', error.details, '| hint:', error.hint);
+    reportError(error, 'messages.sendMessage', { recipientId, contentType, isPublic });
     return null;
   }
 
@@ -589,6 +631,7 @@ export async function markMessageAsRead(messageId: string): Promise<boolean> {
 
   if (error) {
     console.error('Error marking message as read:', error);
+    reportError(error, 'messages.markMessageAsRead');
     return false;
   }
 
@@ -646,6 +689,7 @@ export async function uploadMedia(
 
     if (error) {
       console.error('Error uploading media:', error.message, error);
+      reportError(error, 'messages.uploadMedia', { type });
       return null;
     }
 
@@ -656,6 +700,7 @@ export async function uploadMedia(
     return urlData.publicUrl;
   } catch (e) {
     console.error('Exception during media upload:', e);
+    reportError(e, 'messages.uploadMedia');
     return null;
   }
 }

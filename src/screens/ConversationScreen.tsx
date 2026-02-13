@@ -25,6 +25,7 @@ import {
   FLAG_BOT_ID,
   uploadMedia,
 } from '@/services/messages';
+import { isFollowing } from '@/services/subscriptions';
 import { MessageWithUsers, MessageContentType } from '@/types';
 import { colors } from '@/theme';
 
@@ -48,6 +49,8 @@ export default function ConversationScreen({ navigation, route }: Props) {
   const [playingMessageId, setPlayingMessageId] = useState<string | null>(null);
   const [isPlayingAudio, setIsPlayingAudio] = useState(false);
 
+  const [canSendMessages, setCanSendMessages] = useState<boolean>(true);
+
   // Local media state for composing a message
   const [contentType, setContentType] = useState<MessageContentType>('text');
   const [mediaUri, setMediaUri] = useState<string | null>(null);
@@ -60,6 +63,7 @@ export default function ConversationScreen({ navigation, route }: Props) {
 
   useEffect(() => {
     loadMessages();
+    checkCanSend();
 
     return () => {
       if (audioSound) {
@@ -70,6 +74,11 @@ export default function ConversationScreen({ navigation, route }: Props) {
       }
     };
   }, []);
+
+  const checkCanSend = async () => {
+    const following = await isFollowing(otherUserId);
+    setCanSendMessages(following);
+  };
 
   const loadMessages = async () => {
     // Show cached messages instantly if available
@@ -593,6 +602,16 @@ export default function ConversationScreen({ navigation, route }: Props) {
         </Modal>
       )}
 
+      {!canSendMessages ? (
+        <View style={[styles.inputContainer, { paddingBottom: insets.bottom + 6 }]}>
+          <View style={styles.notFollowingContainer}>
+            <Ionicons name="lock-closed-outline" size={18} color={colors.textMuted} />
+            <Text style={styles.notFollowingText}>
+              Abonnez-vous pour envoyer des messages
+            </Text>
+          </View>
+        </View>
+      ) : (
       <View style={[styles.inputContainer, { paddingBottom: insets.bottom + 6 }]}>
         {mediaUri && contentType === 'photo' && (
           <View style={styles.inputMediaPreview}>
@@ -672,6 +691,7 @@ export default function ConversationScreen({ navigation, route }: Props) {
           </TouchableOpacity>
         </View>
       </View>
+      )}
     </KeyboardAvoidingView>
   );
 }
@@ -982,5 +1002,16 @@ const styles = StyleSheet.create({
   recordingButton: {
     backgroundColor: '#3a1a1a',
     borderRadius: 16,
+  },
+  notFollowingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    gap: 8,
+  },
+  notFollowingText: {
+    fontSize: 14,
+    color: colors.textMuted,
   },
 });

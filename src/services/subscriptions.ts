@@ -1,4 +1,5 @@
 import { supabase, getCachedUserId } from './supabase';
+import { reportError } from './errorReporting';
 
 function getCurrentUserId(): string | null {
   return getCachedUserId();
@@ -14,6 +15,7 @@ export async function follow(userId: string): Promise<boolean> {
 
   if (error) {
     console.error('Error following user:', error);
+    reportError(error, 'subscriptions.follow');
     return false;
   }
   return true;
@@ -31,6 +33,7 @@ export async function unfollow(userId: string): Promise<boolean> {
 
   if (error) {
     console.error('Error unfollowing user:', error);
+    reportError(error, 'subscriptions.unfollow');
     return false;
   }
   return true;
@@ -49,6 +52,7 @@ export async function isFollowing(userId: string): Promise<boolean> {
 
   if (error) {
     console.error('Error checking follow status:', error);
+    reportError(error, 'subscriptions.isFollowing');
     return false;
   }
   return !!data;
@@ -65,6 +69,7 @@ export async function fetchFollowingIds(): Promise<string[]> {
 
   if (error) {
     console.error('Error fetching following ids:', error);
+    reportError(error, 'subscriptions.fetchFollowingIds');
     return [];
   }
 

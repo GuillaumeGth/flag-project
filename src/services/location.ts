@@ -1,6 +1,7 @@
 import * as Location from 'expo-location';
 import * as TaskManager from 'expo-task-manager';
 import { Coordinates } from '@/types';
+import { reportError } from './errorReporting';
 
 const LOCATION_TASK_NAME = 'background-location-task';
 
@@ -60,6 +61,7 @@ export async function getCurrentLocation(): Promise<Coordinates | null> {
     };
   } catch (error) {
     console.error('Error getting location:', error);
+    reportError(error, 'location.getCurrentLocation');
     return null;
   }
 }
@@ -84,6 +86,7 @@ export async function startBackgroundLocationTracking(): Promise<boolean> {
     return true;
   } catch (error) {
     console.error('Error starting background location:', error);
+    reportError(error, 'location.startBackgroundLocationTracking');
     return false;
   }
 }
@@ -95,6 +98,31 @@ export async function stopBackgroundLocationTracking(): Promise<void> {
   );
   if (isTracking) {
     await Location.stopLocationUpdatesAsync(LOCATION_TASK_NAME);
+  }
+}
+
+// Watch foreground location changes
+export async function watchForegroundLocation(
+  onLocationUpdate: (coords: Coordinates) => void
+): Promise<Location.LocationSubscription | null> {
+  try {
+    const subscription = await Location.watchPositionAsync(
+      {
+        accuracy: Location.Accuracy.High,
+        distanceInterval: 10, // Update every 10 meters
+      },
+      (location) => {
+        onLocationUpdate({
+          latitude: location.coords.latitude,
+          longitude: location.coords.longitude,
+        });
+      }
+    );
+    return subscription;
+  } catch (error) {
+    console.error('Error watching foreground location:', error);
+    reportError(error, 'location.watchForegroundLocation');
+    return null;
   }
 }
 

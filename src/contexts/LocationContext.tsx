@@ -1,10 +1,11 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
 import * as Location from 'expo-location';
 import { Coordinates, LocationState } from '@/types';
 import {
   getCurrentLocation,
   requestForegroundPermission,
   startBackgroundLocationTracking,
+  watchForegroundLocation,
 } from '@/services/location';
 
 interface LocationContextType extends LocationState {
@@ -23,10 +24,22 @@ export function LocationProvider({ children }: { children: React.ReactNode }) {
     permission: 'undetermined',
     loading: true,
   });
+  const subscriptionRef = useRef<Location.LocationSubscription | null>(null);
 
   useEffect(() => {
     checkPermissionAndGetLocation();
+    return () => {
+      subscriptionRef.current?.remove();
+    };
   }, []);
+
+  const startLocationWatch = async () => {
+    if (subscriptionRef.current) return;
+    const subscription = await watchForegroundLocation((coords) => {
+      setState((prev) => ({ ...prev, current: coords }));
+    });
+    subscriptionRef.current = subscription;
+  };
 
   const checkPermissionAndGetLocation = async () => {
     const { status } = await Location.getForegroundPermissionsAsync();
@@ -42,6 +55,7 @@ export function LocationProvider({ children }: { children: React.ReactNode }) {
         current: location,
         loading: false,
       }));
+      await startLocationWatch();
     } else {
       setState((prev) => ({ ...prev, loading: false }));
     }
@@ -57,6 +71,7 @@ export function LocationProvider({ children }: { children: React.ReactNode }) {
     if (granted) {
       const location = await getCurrentLocation();
       setState((prev) => ({ ...prev, current: location }));
+      await startLocationWatch();
     }
 
     return granted;

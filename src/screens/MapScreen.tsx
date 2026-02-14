@@ -316,7 +316,7 @@ export default function MapScreen({ navigation, route }: Props) {
 
   const canReadMessage = useCallback((messageLocation: Coordinates | null): boolean => {
     if (!userLocation || !messageLocation) return false;
-    return isWithinRadius(userLocation, messageLocation, 60);
+    return isWithinRadius(userLocation, messageLocation, 100);
   }, [userLocation]);
 
   const captureAvatar = useCallback(async (messageId: string) => {
@@ -501,24 +501,14 @@ export default function MapScreen({ navigation, route }: Props) {
             );
           }
 
-          // Initials marker (use children)
+          // Simple marker (no initials)
           return (
             <Marker
               key={message.id}
               coordinate={location}
               onPress={() => handleMarkerPress(message)}
               image={require('../assets/red-circle.png')}
-
-            >
-              <View style={[
-                styles.initialsMarker,
-                isPublic && styles.publicMarkerBorder,
-              ]}>
-                <Text style={styles.initialsText}>
-                  {getInitials(sender?.display_name)}
-                </Text>
-              </View>
-            </Marker>
+            />
           );
         })}
         {focusMarkerCoords && (

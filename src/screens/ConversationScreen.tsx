@@ -25,7 +25,7 @@ import {
   FLAG_BOT_ID,
   uploadMedia,
 } from '@/services/messages';
-import { isFollowing } from '@/services/subscriptions';
+import { isEitherFollowing } from '@/services/subscriptions';
 import { MessageWithUsers, MessageContentType } from '@/types';
 import { colors } from '@/theme';
 
@@ -76,8 +76,12 @@ export default function ConversationScreen({ navigation, route }: Props) {
   }, []);
 
   const checkCanSend = async () => {
-    const following = await isFollowing(otherUserId);
-    setCanSendMessages(following);
+    if (isBot) {
+      setCanSendMessages(true);
+      return;
+    }
+    const eitherFollowing = await isEitherFollowing(otherUserId);
+    setCanSendMessages(eitherFollowing);
   };
 
   const loadMessages = async () => {

@@ -95,12 +95,13 @@ CREATE POLICY "Users can send messages" ON public.messages
         AND (
             -- Public messages don't require a subscription
             is_public = true
-            -- Private messages require the sender to be subscribed to the recipient
+            -- No recipient (broadcast)
             OR recipient_id IS NULL
+            -- Private messages require a subscription in either direction
             OR EXISTS (
                 SELECT 1 FROM public.subscriptions
-                WHERE follower_id = auth.uid()
-                AND following_id = recipient_id
+                WHERE (follower_id = auth.uid() AND following_id = recipient_id)
+                   OR (follower_id = recipient_id AND following_id = auth.uid())
             )
         )
     );

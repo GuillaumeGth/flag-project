@@ -76,6 +76,24 @@ export async function fetchFollowingIds(): Promise<string[]> {
   return (data || []).map(row => row.following_id);
 }
 
+export async function isEitherFollowing(userId: string): Promise<boolean> {
+  const currentUserId = getCurrentUserId();
+  if (!currentUserId) return false;
+
+  const { data, error } = await supabase
+    .from('subscriptions')
+    .select('id')
+    .or(`and(follower_id.eq.${currentUserId},following_id.eq.${userId}),and(follower_id.eq.${userId},following_id.eq.${currentUserId})`)
+    .limit(1);
+
+  if (error) {
+    console.error('Error checking mutual follow status:', error);
+    reportError(error, 'subscriptions.isEitherFollowing');
+    return false;
+  }
+  return !!(data && data.length > 0);
+}
+
 export async function fetchFollowerCount(userId: string): Promise<number> {
   const { count, error } = await supabase
     .from('subscriptions')

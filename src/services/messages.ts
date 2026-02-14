@@ -575,17 +575,16 @@ export async function sendMessage(
     return null;
   }
 
-  // For private messages, verify the sender is subscribed to the recipient
+  // For private messages, verify there is a subscription between sender and recipient
   if (recipientId && !isPublic) {
     const { data: sub, error: subError } = await supabase
       .from('subscriptions')
       .select('id')
-      .eq('follower_id', currentUserId)
-      .eq('following_id', recipientId)
-      .maybeSingle();
+      .or(`and(follower_id.eq.${currentUserId},following_id.eq.${recipientId}),and(follower_id.eq.${recipientId},following_id.eq.${currentUserId})`)
+      .limit(1);
 
-    if (subError || !sub) {
-      console.error('sendMessage: Not subscribed to recipient', recipientId);
+    if (subError || !sub || sub.length === 0) {
+      console.error('sendMessage: No subscription between users', recipientId);
       return null;
     }
   }

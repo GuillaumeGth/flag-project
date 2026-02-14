@@ -145,6 +145,8 @@ export default function ConversationScreen({ navigation, route }: Props) {
         }
         setIsPlayingInputAudio(false);
         await loadMessages();
+      } else {
+        Alert.alert('Erreur', "Le message n'a pas pu être envoyé");
       }
     } catch (error) {
       console.error('Error sending conversation message:', error);

@@ -80,18 +80,30 @@ export async function isEitherFollowing(userId: string): Promise<boolean> {
   const currentUserId = getCurrentUserId();
   if (!currentUserId) return false;
 
-  const { data, error } = await supabase
+  // Check if current user follows the other user
+  const { data: fwd, error: fwdError } = await supabase
     .from('subscriptions')
     .select('id')
-    .or(`and(follower_id.eq.${currentUserId},following_id.eq.${userId}),and(follower_id.eq.${userId},following_id.eq.${currentUserId})`)
-    .limit(1);
+    .eq('follower_id', currentUserId)
+    .eq('following_id', userId)
+    .maybeSingle();
 
-  if (error) {
-    console.error('Error checking mutual follow status:', error);
-    reportError(error, 'subscriptions.isEitherFollowing');
+  if (!fwdError && fwd) return true;
+
+  // Check if the other user follows the current user
+  const { data: rev, error: revError } = await supabase
+    .from('subscriptions')
+    .select('id')
+    .eq('follower_id', userId)
+    .eq('following_id', currentUserId)
+    .maybeSingle();
+
+  if (revError) {
+    console.error('Error checking mutual follow status:', revError);
+    reportError(revError, 'subscriptions.isEitherFollowing');
     return false;
   }
-  return !!(data && data.length > 0);
+  return !!rev;
 }
 
 export async function fetchFollowerCount(userId: string): Promise<number> {

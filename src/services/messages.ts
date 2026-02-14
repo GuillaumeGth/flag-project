@@ -151,7 +151,30 @@ export async function fetchConversations(): Promise<Conversation[]> {
   await setCachedData(cacheKey, allMessages);
   await setLastSyncTimestamp(cacheKey, syncTimestamp);
 
-  return buildConversations(allMessages, currentUserId);
+  const conversations = buildConversations(allMessages, currentUserId);
+  return filterExistingUsers(conversations);
+}
+
+/**
+ * Filter out conversations where the other user no longer exists in the database.
+ */
+async function filterExistingUsers(conversations: Conversation[]): Promise<Conversation[]> {
+  if (conversations.length === 0) return conversations;
+
+  const userIds = conversations.map(c => c.otherUser.id);
+  const { data: existingUsers, error } = await supabase
+    .from('users')
+    .select('id')
+    .in('id', userIds);
+
+  if (error || !existingUsers) {
+    // On error, return all conversations rather than hiding them
+    console.error('Error checking existing users:', error);
+    return conversations;
+  }
+
+  const existingIds = new Set(existingUsers.map(u => u.id));
+  return conversations.filter(c => existingIds.has(c.otherUser.id));
 }
 
 /**
@@ -165,7 +188,8 @@ export async function getCachedConversations(): Promise<Conversation[] | null> {
   const cachedMessages = await getCachedData<any[]>(CACHE_KEYS.CONVERSATIONS_MESSAGES);
   if (!cachedMessages || cachedMessages.length === 0) return null;
 
-  return buildConversations(cachedMessages, currentUserId);
+  const conversations = buildConversations(cachedMessages, currentUserId);
+  return filterExistingUsers(conversations);
 }
 
 // Fetch all messages for a specific conversation (with local cache + incremental sync)

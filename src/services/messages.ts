@@ -575,32 +575,7 @@ export async function sendMessage(
     return null;
   }
 
-  // For private messages, verify there is a subscription between sender and recipient
-  if (recipientId && !isPublic) {
-    // Check forward: sender follows recipient
-    const { data: fwd } = await supabase
-      .from('subscriptions')
-      .select('id')
-      .eq('follower_id', currentUserId)
-      .eq('following_id', recipientId)
-      .maybeSingle();
-
-    if (!fwd) {
-      // Check reverse: recipient follows sender
-      const { data: rev, error: revError } = await supabase
-        .from('subscriptions')
-        .select('id')
-        .eq('follower_id', recipientId)
-        .eq('following_id', currentUserId)
-        .maybeSingle();
-
-      if (revError || !rev) {
-        console.error('sendMessage: No subscription between users', recipientId);
-        return null;
-      }
-    }
-  }
-
+  // Subscription check is handled by the database RLS policy on messages table
   console.log('sendMessage:', { recipientId, contentType, hasText: !!textContent, hasMedia: !!mediaUrl, hasLocation: !!location, isPublic });
 
   const { data, error } = await supabase

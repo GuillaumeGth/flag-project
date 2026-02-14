@@ -70,7 +70,7 @@ CREATE TABLE IF NOT EXISTS public.messages (
     content_type TEXT NOT NULL CHECK (content_type IN ('text', 'photo', 'audio')),
     text_content TEXT,
     media_url TEXT,
-    location GEOGRAPHY(POINT, 4326) NOT NULL,
+    location GEOGRAPHY(POINT, 4326),
     radius INTEGER DEFAULT 30,
     is_read BOOLEAN DEFAULT FALSE,
     is_public BOOLEAN DEFAULT FALSE,

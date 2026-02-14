@@ -11,7 +11,6 @@ import {
   Platform,
   Image,
   Modal,
-  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Audio } from 'expo-av';
@@ -28,6 +27,7 @@ import {
 import { isEitherFollowing } from '@/services/subscriptions';
 import { MessageWithUsers, MessageContentType } from '@/types';
 import { colors } from '@/theme';
+import { reportError } from '@/services/errorReporting';
 
 interface Props {
   navigation: any;
@@ -118,7 +118,8 @@ export default function ConversationScreen({ navigation, route }: Props) {
       if (hasMedia && mediaUri && contentType !== 'text') {
         const url = await uploadMedia(mediaUri, contentType as 'photo' | 'audio');
         if (!url) {
-          Alert.alert('Erreur', "Échec de l'upload du média");
+          console.error('ConversationScreen: media upload failed');
+          reportError(new Error("Échec de l'upload du média"), 'ConversationScreen.handleSend.uploadMedia');
           setSending(false);
           return;
         }
@@ -146,11 +147,12 @@ export default function ConversationScreen({ navigation, route }: Props) {
         setIsPlayingInputAudio(false);
         await loadMessages();
       } else {
-        Alert.alert('Erreur', "Le message n'a pas pu être envoyé");
+        console.error('ConversationScreen: message could not be sent');
+        reportError(new Error("Le message n'a pas pu être envoyé"), 'ConversationScreen.handleSend');
       }
     } catch (error) {
       console.error('Error sending conversation message:', error);
-      Alert.alert('Erreur', "Une erreur est survenue lors de l'envoi");
+      reportError(error, 'ConversationScreen.handleSend.catch');
     }
 
     setSending(false);
@@ -171,7 +173,8 @@ export default function ConversationScreen({ navigation, route }: Props) {
   const takePhoto = async () => {
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
     if (status !== 'granted') {
-      Alert.alert('Permission requise', 'Accès à la caméra nécessaire');
+      console.error('ConversationScreen: camera permission denied');
+      reportError(new Error('Camera permission denied'), 'ConversationScreen.takePhoto.permission');
       return;
     }
 
@@ -189,7 +192,8 @@ export default function ConversationScreen({ navigation, route }: Props) {
     try {
       const { status } = await Audio.requestPermissionsAsync();
       if (status !== 'granted') {
-        Alert.alert('Permission requise', 'Accès au micro nécessaire');
+        console.error('ConversationScreen: microphone permission denied');
+        reportError(new Error('Microphone permission denied'), 'ConversationScreen.startRecording.permission');
         return;
       }
 

@@ -7,7 +7,6 @@ interface ToastAction {
   label: string;
   onPress: () => void;
 }
-
 interface ToastProps {
   visible: boolean;
   message: string;

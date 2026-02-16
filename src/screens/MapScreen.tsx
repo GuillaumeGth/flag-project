@@ -16,7 +16,7 @@ import { captureRef } from 'react-native-view-shot';
 import { useLocation } from '@/contexts/LocationContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { fetchUndiscoveredMessagesForMap, getCachedMapMessages, fetchFollowingPublicMessages } from '@/services/messages';
-import { isWithinRadius } from '@/services/location';
+import { isWithinRadius, calculateDistance } from '@/services/location';
 import { UndiscoveredMessageMapMeta, Coordinates } from '@/types';
 import { colors } from '@/theme';
 import Toast from '@/components/Toast';
@@ -319,6 +319,15 @@ export default function MapScreen({ navigation, route }: Props) {
     return isWithinRadius(userLocation, messageLocation, 100);
   }, [userLocation]);
 
+  const formatDistance = useCallback((messageLocation: Coordinates | null): string | null => {
+    if (!userLocation || !messageLocation) return null;
+    const distance = calculateDistance(userLocation, messageLocation);
+    if (distance < 1000) {
+      return `${Math.round(distance)}m`;
+    }
+    return `${(distance / 1000).toFixed(1)}km`;
+  }, [userLocation]);
+
   const captureAvatar = useCallback(async (messageId: string) => {
     const ref = avatarRefs.current[messageId];
     if (!ref || avatarImages[messageId]) return;
@@ -579,6 +588,15 @@ export default function MapScreen({ navigation, route }: Props) {
             </TouchableOpacity>
           </View>
 
+          {formatDistance(getMessageLocation(selectedMessage)) && (
+            <View style={styles.distanceRow}>
+              <Ionicons name="navigate-outline" size={14} color={colors.textSecondary} />
+              <Text style={styles.distanceLabel}>
+                {formatDistance(getMessageLocation(selectedMessage))}
+              </Text>
+            </View>
+          )}
+
           {canReadMessage(getMessageLocation(selectedMessage)) ? (
             <TouchableOpacity
               style={styles.readButton}
@@ -776,6 +794,18 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 14,
     fontWeight: '600',
+  },
+  distanceRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 8,
+  },
+  distanceLabel: {
+    color: colors.textSecondary,
+    fontSize: 13,
+    fontWeight: '600',
+    marginLeft: 4,
   },
   distanceText: {
     color: colors.textSecondary,

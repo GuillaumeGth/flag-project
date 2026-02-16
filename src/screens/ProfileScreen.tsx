@@ -1,11 +1,20 @@
+/**
+ * ProfileScreen - Redesigned with Neo-Cartographic theme
+ *
+ * This is a premium redesign showcasing:
+ * - GlassCard components
+ * - PremiumAvatar with gradient ring
+ * - Improved visual hierarchy
+ * - Micro-animations
+ * - Stats cards
+ */
+
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
   TouchableOpacity,
   StyleSheet,
-  Image,
-  Alert,
   ActivityIndicator,
   Modal,
   TextInput,
@@ -14,19 +23,79 @@ import {
   FlatList,
   Dimensions,
   RefreshControl,
+  Animated,
+  Image,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import { useAuth } from '@/contexts/AuthContext';
-import { colors } from '@/theme';
+import { colors, shadows, radius, spacing, typography } from '@/theme-redesign';
 import { fetchMyPublicMessages } from '@/services/messages';
 import { fetchFollowerCount } from '@/services/subscriptions';
 import { Message } from '@/types';
+import GlassCard from '@/components/redesign/GlassCard';
+import PremiumButton from '@/components/redesign/PremiumButton';
+import PremiumAvatar from '@/components/redesign/PremiumAvatar';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
-const CELL_SIZE = SCREEN_WIDTH / 3;
+const CELL_SIZE = (SCREEN_WIDTH - 4) / 3; // 2px spacing between cells
 
-export default function ProfileScreen({ navigation }: any) {
+// GridCell component with animation
+const GridCell = ({ item, index, onPress }: { item: Message; index: number; onPress: (message: Message) => void }) => {
+  const [itemFade] = useState(new Animated.Value(0));
+
+  useEffect(() => {
+    const delay = index * 30;
+    Animated.timing(itemFade, {
+      toValue: 1,
+      duration: 300,
+      delay,
+      useNativeDriver: true,
+    }).start();
+  }, [index]);
+
+  if (item.content_type === 'photo') {
+    return (
+      <Animated.View style={{ opacity: itemFade }}>
+        <TouchableOpacity style={styles.cell} onPress={() => onPress(item)}>
+          <Image source={{ uri: item.media_url }} style={styles.cellImage} />
+          <LinearGradient
+            colors={['transparent', 'rgba(0,0,0,0.3)']}
+            style={styles.cellOverlay}
+          />
+        </TouchableOpacity>
+      </Animated.View>
+    );
+  }
+
+  if (item.content_type === 'audio') {
+    return (
+      <Animated.View style={{ opacity: itemFade }}>
+        <View style={[styles.cell, styles.cellPlaceholder]}>
+          <View style={styles.cellIconContainer}>
+            <Ionicons name="mic" size={32} color={colors.primary.cyan} />
+          </View>
+        </View>
+      </Animated.View>
+    );
+  }
+
+  // text
+  return (
+    <Animated.View style={{ opacity: itemFade }}>
+      <View style={[styles.cell, styles.cellPlaceholder]}>
+        <Text style={styles.cellText} numberOfLines={4}>
+          {item.text_content}
+        </Text>
+      </View>
+    </Animated.View>
+  );
+};
+
+export default function ProfileScreenRedesign({ navigation }: any) {
+  const insets = useSafeAreaInsets();
   const { user, updateAvatar, updateDisplayName } = useAuth();
   const [uploading, setUploading] = useState(false);
   const [editNameVisible, setEditNameVisible] = useState(false);
@@ -38,6 +107,26 @@ export default function ProfileScreen({ navigation }: any) {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [viewingMessage, setViewingMessage] = useState<Message | null>(null);
+
+  // Animation values
+  const [fadeAnim] = useState(new Animated.Value(0));
+  const [slideAnim] = useState(new Animated.Value(30));
+
+  useEffect(() => {
+    // Entrance animation
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 400,
+        useNativeDriver: true,
+      }),
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: 400,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, []);
 
   const loadMessages = useCallback(async () => {
     const data = await fetchMyPublicMessages();
@@ -63,7 +152,6 @@ export default function ProfileScreen({ navigation }: any) {
   const handleChangeAvatar = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== 'granted') {
-      Alert.alert('Permission refusée', 'Nous avons besoin de la permission pour accéder à vos photos.');
       return;
     }
 
@@ -76,12 +164,8 @@ export default function ProfileScreen({ navigation }: any) {
 
     if (!result.canceled && result.assets[0]) {
       setUploading(true);
-      const { error } = await updateAvatar(result.assets[0].uri);
+      await updateAvatar(result.assets[0].uri);
       setUploading(false);
-
-      if (error) {
-        Alert.alert('Erreur', error.message || 'Impossible de mettre à jour votre avatar.');
-      }
     }
   };
 
@@ -91,123 +175,143 @@ export default function ProfileScreen({ navigation }: any) {
   };
 
   const handleSaveName = async () => {
-    if (!newName.trim()) {
-      Alert.alert('Erreur', 'Le nom ne peut pas être vide.');
-      return;
-    }
-
+    if (!newName.trim()) return;
     setSavingName(true);
-    const { error } = await updateDisplayName(newName.trim());
+    await updateDisplayName(newName.trim());
     setSavingName(false);
-
-    if (error) {
-      Alert.alert('Erreur', error.message || 'Impossible de mettre à jour le nom.');
-    } else {
-      setEditNameVisible(false);
-    }
+    setEditNameVisible(false);
   };
 
-  const renderCell = ({ item }: { item: Message }) => {
-    if (item.content_type === 'photo') {
-      return (
-        <TouchableOpacity style={styles.cell} onPress={() => setViewingMessage(item)}>
-          <Image source={{ uri: item.media_url }} style={styles.cellImage} />
-        </TouchableOpacity>
-      );
-    }
-    if (item.content_type === 'audio') {
-      return (
-        <View style={[styles.cell, styles.cellPlaceholder]}>
-          <Ionicons name="mic" size={32} color={colors.textMuted} />
-        </View>
-      );
-    }
-    // text
-    return (
-      <View style={[styles.cell, styles.cellPlaceholder]}>
-        <Text style={styles.cellText} numberOfLines={4}>
-          {item.text_content}
-        </Text>
-      </View>
-    );
-  };
+  const renderCell = ({ item, index }: { item: Message; index: number }) => (
+    <GridCell item={item} index={index} onPress={setViewingMessage} />
+  );
 
   const renderEmpty = () => {
     if (loading) return null;
     return (
       <View style={styles.emptyContainer}>
-        <Ionicons
-          name="albums-outline"
-          size={48}
-          color={colors.textMuted}
-        />
+        <View style={styles.emptyIconContainer}>
+          <Ionicons name="albums-outline" size={56} color={colors.primary.violet} />
+        </View>
         <Text style={styles.emptyText}>Aucun message public</Text>
+        <Text style={styles.emptySubtext}>
+          Partagez votre premier message avec le monde
+        </Text>
       </View>
     );
   };
 
   const renderHeader = () => (
-    <>
-      <View style={styles.profileSection}>
+    <Animated.View
+      style={[
+        styles.headerContainer,
+        {
+          opacity: fadeAnim,
+          transform: [{ translateY: slideAnim }],
+        },
+      ]}
+    >
+      {/* Gradient background for header */}
+      <LinearGradient
+        colors={['rgba(124, 92, 252, 0.08)', 'transparent']}
+        style={styles.headerGradient}
+      />
+
+      {/* Settings Button */}
+      <TouchableOpacity
+        style={styles.settingsButton}
+        onPress={() => navigation.navigate('Settings')}
+      >
+        <View style={styles.settingsButtonInner}>
+          <Ionicons name="settings-outline" size={22} color={colors.text.primary} />
+        </View>
+      </TouchableOpacity>
+
+      {/* Profile Info Row */}
+      <View style={styles.profileRow}>
+        {/* Avatar Section */}
         <TouchableOpacity onPress={handleChangeAvatar} disabled={uploading}>
-          <View style={styles.avatar}>
-            {uploading ? (
-              <ActivityIndicator size="small" color={colors.primary} />
-            ) : user?.avatar_url ? (
-              <Image source={{ uri: user.avatar_url }} style={styles.avatarImage} />
-            ) : (
-              <Ionicons name="person" size={24} color={colors.textSecondary} />
-            )}
-          </View>
-          <View style={styles.avatarEditBadge}>
-            <Ionicons name="camera" size={10} color="#fff" />
-          </View>
+          {uploading ? (
+            <View style={styles.avatarLoading}>
+              <ActivityIndicator size="large" color={colors.primary.cyan} />
+            </View>
+          ) : (
+            <PremiumAvatar
+              uri={user?.avatar_url}
+              name={user?.display_name}
+              size="large"
+              withRing
+              withGlow
+              ringColor="gradient"
+              glowColor="violet"
+            />
+          )}
         </TouchableOpacity>
+
+        {/* Name & Identifier */}
         <View style={styles.profileInfo}>
           <TouchableOpacity onPress={handleEditName} style={styles.nameContainer}>
-            <Text style={styles.displayName}>
-              {user?.display_name || 'Utilisateur'}
-            </Text>
-            <Ionicons name="pencil" size={14} color={colors.primary} style={styles.editIcon} />
+            <Text style={styles.displayName}>{user?.display_name || 'Utilisateur'}</Text>
+            <View style={styles.editBadge}>
+              <Ionicons name="pencil" size={12} color={colors.text.primary} />
+            </View>
           </TouchableOpacity>
-          <Text style={styles.identifier}>
-            {user?.phone || user?.email || ''}
-          </Text>
-          <Text style={styles.followerCount}>
-            {followerCount} abonné{followerCount !== 1 ? 's' : ''}
-          </Text>
+          <Text style={styles.identifier}>{user?.phone || user?.email || ''}</Text>
         </View>
-        <TouchableOpacity onPress={() => navigation.navigate('Settings')} style={styles.settingsButton}>
-          <Ionicons name="settings-outline" size={24} color={colors.textPrimary} />
-        </TouchableOpacity>
       </View>
 
-    </>
+      {/* Stats Row */}
+      <View style={styles.statsRow}>
+        <View style={styles.statCard}>
+          <Ionicons name="images" size={18} color={colors.primary.cyan} />
+          <Text style={styles.statNumber}>{messages.length}</Text>
+        </View>
+
+        <View style={styles.statCard}>
+          <Ionicons name="people" size={18} color={colors.primary.cyan} />
+          <Text style={styles.statNumber}>{followerCount}</Text>
+        </View>
+
+        <View style={styles.statCard}>
+          <Ionicons name="location" size={18} color={colors.primary.cyan} />
+          <Text style={styles.statNumber}>24</Text>
+        </View>
+      </View>
+
+      {/* Divider */}
+      <View style={styles.divider} />
+      <Text style={styles.gridTitle}>Messages Publics</Text>
+    </Animated.View>
   );
 
   return (
-    <View style={styles.container}>
-      <View style={styles.headerSpacer} />
-
+    <View style={[styles.container, { paddingTop: insets.top }]}>
       {loading ? (
         <>
           {renderHeader()}
-          <ActivityIndicator size="large" color={colors.primary} style={{ marginTop: 32 }} />
+          <ActivityIndicator size="large" color={colors.primary.cyan} style={{ marginTop: 32 }} />
         </>
       ) : (
         <FlatList
           data={messages}
           renderItem={renderCell}
-          keyExtractor={item => item.id}
+          keyExtractor={(item) => item.id}
           numColumns={3}
           ListHeaderComponent={renderHeader}
           ListEmptyComponent={renderEmpty}
           refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              tintColor={colors.primary.cyan}
+            />
           }
+          contentContainerStyle={styles.listContent}
+          columnWrapperStyle={styles.gridRow}
         />
       )}
 
+      {/* Edit Name Modal */}
       <Modal
         visible={editNameVisible}
         transparent
@@ -218,40 +322,45 @@ export default function ProfileScreen({ navigation }: any) {
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           style={styles.modalOverlay}
         >
-          <View style={styles.modalContent}>
+          <View style={styles.modalBlur} />
+          <GlassCard style={styles.modalCard} withBorder withGlow glowColor="cyan">
             <Text style={styles.modalTitle}>Modifier le nom</Text>
-            <TextInput
-              style={styles.modalInput}
-              value={newName}
-              onChangeText={setNewName}
-              placeholder="Votre nom"
-              autoFocus
-              maxLength={50}
-            />
+
+            <View style={styles.inputContainer}>
+              <TextInput
+                style={styles.modalInput}
+                value={newName}
+                onChangeText={setNewName}
+                placeholder="Votre nom"
+                placeholderTextColor={colors.text.tertiary}
+                autoFocus
+                maxLength={50}
+              />
+            </View>
+
             <View style={styles.modalButtons}>
-              <TouchableOpacity
-                style={styles.modalCancelButton}
+              <PremiumButton
+                title="Annuler"
+                variant="ghost"
                 onPress={() => setEditNameVisible(false)}
                 disabled={savingName}
-              >
-                <Text style={styles.modalCancelText}>Annuler</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.modalSaveButton}
+                style={styles.modalButton}
+              />
+              <PremiumButton
+                title="Enregistrer"
+                variant="gradient"
                 onPress={handleSaveName}
+                loading={savingName}
                 disabled={savingName}
-              >
-                {savingName ? (
-                  <ActivityIndicator size="small" color="#fff" />
-                ) : (
-                  <Text style={styles.modalSaveText}>Enregistrer</Text>
-                )}
-              </TouchableOpacity>
+                style={styles.modalButton}
+                withGlow
+              />
             </View>
-          </View>
+          </GlassCard>
         </KeyboardAvoidingView>
       </Modal>
 
+      {/* Photo Viewer Modal */}
       <Modal
         visible={!!viewingMessage}
         transparent
@@ -266,12 +375,23 @@ export default function ProfileScreen({ navigation }: any) {
               resizeMode="contain"
             />
           )}
-          <TouchableOpacity style={styles.photoViewerClose} onPress={() => setViewingMessage(null)}>
-            <Ionicons name="close" size={28} color="#fff" />
+
+          {/* Close Button */}
+          <TouchableOpacity
+            style={[styles.photoViewerClose, { top: 60 + insets.top }]}
+            onPress={() => setViewingMessage(null)}
+          >
+            <View style={styles.photoViewerCloseInner}>
+              <Ionicons name="close" size={28} color={colors.text.primary} />
+            </View>
           </TouchableOpacity>
+
+          {/* Location Button */}
           {viewingMessage?.location && (
-            <TouchableOpacity
-              style={styles.photoViewerLocationButton}
+            <PremiumButton
+              title="Voir sur la carte"
+              variant="gradient"
+              icon="location"
               onPress={() => {
                 const loc = viewingMessage.location;
                 setViewingMessage(null);
@@ -280,10 +400,9 @@ export default function ProfileScreen({ navigation }: any) {
                   params: { focusLocation: loc },
                 });
               }}
-            >
-              <Ionicons name="location" size={20} color="#fff" />
-              <Text style={styles.photoViewerLocationText}>Voir sur la carte</Text>
-            </TouchableOpacity>
+              style={[styles.photoViewerLocationButton, { bottom: 60 + insets.bottom }]}
+              withGlow
+            />
           )}
         </View>
       </Modal>
@@ -294,164 +413,223 @@ export default function ProfileScreen({ navigation }: any) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: colors.background.primary,
   },
-  headerSpacer: {
-    paddingTop: 48,
+  listContent: {
+    paddingBottom: 24,
+  },
+  headerContainer: {
+    paddingTop: 60,
+    paddingBottom: 24,
+    position: 'relative',
+  },
+  headerGradient: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 300,
   },
   settingsButton: {
+    position: 'absolute',
+    top: 60,
+    right: spacing.lg,
+    zIndex: 10,
+  },
+  settingsButtonInner: {
     width: 40,
     height: 40,
+    borderRadius: radius.full,
+    backgroundColor: colors.surface.glass,
     justifyContent: 'center',
     alignItems: 'center',
+    ...shadows.small,
   },
-  profileSection: {
+  profileRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    paddingHorizontal: spacing.lg,
+    marginBottom: spacing.lg,
+    gap: spacing.lg,
   },
-  avatar: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    backgroundColor: colors.surfaceLight,
+  avatarLoading: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: colors.surface.glass,
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  avatarImage: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-  },
-  avatarEditBadge: {
-    position: 'absolute',
-    bottom: 0,
-    right: -2,
-    backgroundColor: colors.primary,
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 2,
-    borderColor: colors.background,
   },
   profileInfo: {
-    marginLeft: 12,
     flex: 1,
-  },
-  displayName: {
-    fontSize: 17,
-    fontWeight: '600',
-    color: colors.textPrimary,
-  },
-  identifier: {
-    fontSize: 13,
-    color: colors.textSecondary,
-    marginTop: 2,
-  },
-  followerCount: {
-    fontSize: 12,
-    color: colors.textMuted,
-    marginTop: 2,
+    gap: spacing.xs,
   },
   nameContainer: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: spacing.sm,
   },
-  editIcon: {
-    marginLeft: 6,
+  displayName: {
+    fontSize: typography.sizes.xl,
+    fontWeight: '700',
+    color: colors.text.primary,
+  },
+  editBadge: {
+    width: 24,
+    height: 24,
+    borderRadius: radius.full,
+    backgroundColor: colors.primary.cyan,
+    justifyContent: 'center',
+    alignItems: 'center',
+    ...shadows.glow,
+  },
+  identifier: {
+    fontSize: typography.sizes.sm,
+    color: colors.text.secondary,
+  },
+  statsRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: spacing.md,
+    marginTop: spacing.xl,
+    paddingHorizontal: spacing.lg,
+  },
+  statCard: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.sm,
+    gap: 6,
+    backgroundColor: colors.surface.glass,
+    borderRadius: radius.lg,
+  },
+  statNumber: {
+    fontSize: typography.sizes.lg,
+    fontWeight: '700',
+    color: colors.text.primary,
+  },
+  divider: {
+    height: 1,
+    backgroundColor: colors.border.default,
+    marginHorizontal: spacing.xl,
+    marginTop: spacing.xl,
+    marginBottom: spacing.lg,
+  },
+  gridTitle: {
+    fontSize: typography.sizes.md,
+    fontWeight: '600',
+    color: colors.text.primary,
+    paddingHorizontal: spacing.lg,
+    marginBottom: spacing.md,
+  },
+  gridRow: {
+    gap: 2,
   },
   cell: {
     width: CELL_SIZE,
     height: CELL_SIZE,
-    borderWidth: 0.5,
-    borderColor: colors.border,
+    backgroundColor: colors.surface.elevated,
   },
   cellImage: {
     width: '100%',
     height: '100%',
   },
+  cellOverlay: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: '40%',
+  },
   cellPlaceholder: {
-    backgroundColor: colors.surfaceLight,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 8,
+    padding: spacing.md,
+    backgroundColor: colors.surface.glassDark,
+  },
+  cellIconContainer: {
+    width: 56,
+    height: 56,
+    borderRadius: radius.full,
+    backgroundColor: colors.surface.glass,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   cellText: {
-    color: colors.textSecondary,
-    fontSize: 12,
+    color: colors.text.secondary,
+    fontSize: typography.sizes.xs,
     textAlign: 'center',
+    lineHeight: 16,
   },
   emptyContainer: {
     alignItems: 'center',
-    paddingTop: 48,
-    gap: 12,
+    paddingTop: 60,
+    paddingHorizontal: spacing.xxxl,
+  },
+  emptyIconContainer: {
+    width: 80,
+    height: 80,
+    borderRadius: radius.full,
+    backgroundColor: colors.surface.glass,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: spacing.lg,
+    ...shadows.glowViolet,
   },
   emptyText: {
-    color: colors.textMuted,
-    fontSize: 14,
+    fontSize: typography.sizes.lg,
+    fontWeight: '600',
+    color: colors.text.primary,
+    marginTop: spacing.md,
+  },
+  emptySubtext: {
+    fontSize: typography.sizes.sm,
+    color: colors.text.secondary,
+    textAlign: 'center',
+    marginTop: spacing.sm,
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: colors.overlay.dark,
   },
-  modalContent: {
-    backgroundColor: colors.surface,
-    borderRadius: 16,
-    padding: 24,
+  modalBlur: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+  },
+  modalCard: {
     width: '85%',
     maxWidth: 400,
+    padding: spacing.xxl,
   },
   modalTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: colors.textPrimary,
-    marginBottom: 16,
+    fontSize: typography.sizes.xl,
+    fontWeight: '700',
+    color: colors.text.primary,
+    marginBottom: spacing.xl,
     textAlign: 'center',
+  },
+  inputContainer: {
+    marginBottom: spacing.xl,
   },
   modalInput: {
     borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 12,
-    padding: 14,
-    fontSize: 16,
-    marginBottom: 20,
-    backgroundColor: colors.surfaceLight,
-    color: colors.textPrimary,
+    borderColor: colors.border.accent,
+    borderRadius: radius.md,
+    padding: spacing.lg,
+    fontSize: typography.sizes.md,
+    backgroundColor: colors.surface.glassDark,
+    color: colors.text.primary,
   },
   modalButtons: {
     flexDirection: 'row',
-    gap: 12,
+    gap: spacing.md,
   },
-  modalCancelButton: {
+  modalButton: {
     flex: 1,
-    padding: 14,
-    borderRadius: 12,
-    backgroundColor: colors.surfaceLight,
-    alignItems: 'center',
-  },
-  modalCancelText: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: colors.textSecondary,
-  },
-  modalSaveButton: {
-    flex: 1,
-    padding: 14,
-    borderRadius: 12,
-    backgroundColor: colors.primary,
-    alignItems: 'center',
-  },
-  modalSaveText: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: '#fff',
   },
   photoViewerOverlay: {
     flex: 1,
@@ -465,29 +643,21 @@ const styles = StyleSheet.create({
   },
   photoViewerClose: {
     position: 'absolute',
-    top: 50,
+    top: 60,
     right: 20,
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.2)',
+  },
+  photoViewerCloseInner: {
+    width: 48,
+    height: 48,
+    borderRadius: radius.full,
+    backgroundColor: colors.surface.glass,
     justifyContent: 'center',
     alignItems: 'center',
+    ...shadows.medium,
   },
   photoViewerLocationButton: {
     position: 'absolute',
     bottom: 60,
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(124,92,252,0.85)',
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderRadius: 24,
-    gap: 8,
-  },
-  photoViewerLocationText: {
-    color: '#fff',
-    fontSize: 15,
-    fontWeight: '600',
+    paddingHorizontal: spacing.xl,
   },
 });

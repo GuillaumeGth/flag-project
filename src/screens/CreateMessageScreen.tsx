@@ -17,7 +17,7 @@ import { Audio } from 'expo-av';
 import { useLocation } from '@/contexts/LocationContext';
 import { sendMessage, uploadMedia } from '@/services/messages';
 import { MessageContentType } from '@/types';
-import { colors } from '@/theme';
+import { colors, shadows, radius, spacing, typography } from '@/theme-redesign';
 
 interface Recipient {
   id: string;
@@ -301,7 +301,7 @@ export default function CreateMessageScreen({ navigation, route }: Props) {
   };
 
   return (
-    <View style={{ flex: 1, backgroundColor: colors.background }}>
+    <View style={{ flex: 1, backgroundColor: colors.background.primary }}>
     <Toast
       visible={toast.visible}
       message={toast.message}
@@ -312,7 +312,7 @@ export default function CreateMessageScreen({ navigation, route }: Props) {
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()}>
-          <Ionicons name="arrow-back" size={24} color={colors.textPrimary} />
+          <Ionicons name="arrow-back" size={24} color={colors.text.primary} />
         </TouchableOpacity>
         <Text style={styles.title}>Nouveau message</Text>
         <View style={{ width: 24 }} />
@@ -328,18 +328,18 @@ export default function CreateMessageScreen({ navigation, route }: Props) {
           <Text style={styles.recipientName} numberOfLines={2}>
             {recipientsDisplay}
           </Text>
-          <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
+          <Ionicons name="chevron-forward" size={20} color={colors.text.secondary} />
         </TouchableOpacity>
       </View>
 
       <View style={styles.publicToggleRow}>
-        <Ionicons name="globe-outline" size={18} color={isPublic ? colors.primary : colors.textSecondary} />
-        <Text style={[styles.publicToggleLabel, isPublic && { color: colors.primary }]}>Public</Text>
+        <Ionicons name="globe-outline" size={18} color={isPublic ? colors.primary.cyan : colors.text.secondary} />
+        <Text style={[styles.publicToggleLabel, isPublic && { color: colors.primary.cyan }]}>Public</Text>
         <Switch
           value={isPublic}
           onValueChange={setIsPublic}
-          trackColor={{ false: colors.border, true: colors.primary }}
-          thumbColor="#fff"
+          trackColor={{ false: colors.border.default, true: colors.primary.cyan }}
+          thumbColor={colors.text.primary}
         />
       </View>
 
@@ -348,7 +348,7 @@ export default function CreateMessageScreen({ navigation, route }: Props) {
         <View style={styles.mediaPreview}>
           <Image source={{ uri: mediaUri }} style={styles.previewImage} />
           <TouchableOpacity style={styles.clearMedia} onPress={clearMedia}>
-            <Ionicons name="close-circle" size={28} color="#fff" />
+            <Ionicons name="close-circle" size={28} color={colors.text.primary} />
           </TouchableOpacity>
         </View>
       )}
@@ -359,14 +359,14 @@ export default function CreateMessageScreen({ navigation, route }: Props) {
             <Ionicons
               name={isPlaying ? 'pause' : 'play'}
               size={24}
-              color="#fff"
+              color={colors.text.primary}
             />
           </TouchableOpacity>
           <Text style={styles.audioText}>
             {isPlaying ? 'Lecture en cours...' : 'Audio enregistré'}
           </Text>
           <TouchableOpacity onPress={clearMedia}>
-            <Ionicons name="close-circle" size={24} color={colors.textSecondary} />
+            <Ionicons name="close-circle" size={24} color={colors.text.secondary} />
           </TouchableOpacity>
         </View>
       )}
@@ -375,7 +375,7 @@ export default function CreateMessageScreen({ navigation, route }: Props) {
       <TextInput
         style={styles.textInput}
         placeholder="Votre message..."
-        placeholderTextColor={colors.textMuted}
+        placeholderTextColor={colors.text.tertiary}
         multiline
         value={textContent}
         onChangeText={setTextContent}
@@ -384,12 +384,12 @@ export default function CreateMessageScreen({ navigation, route }: Props) {
       {/* Media buttons */}
       <View style={styles.mediaButtons}>
         <TouchableOpacity style={styles.mediaButton} onPress={pickImage}>
-          <Ionicons name="image" size={24} color={colors.primary} />
+          <Ionicons name="image" size={24} color={colors.primary.cyan} />
           <Text style={styles.mediaButtonText}>Galerie</Text>
         </TouchableOpacity>
 
         <TouchableOpacity style={styles.mediaButton} onPress={takePhoto}>
-          <Ionicons name="camera" size={24} color={colors.primary} />
+          <Ionicons name="camera" size={24} color={colors.primary.cyan} />
           <Text style={styles.mediaButtonText}>Photo</Text>
         </TouchableOpacity>
 
@@ -400,7 +400,7 @@ export default function CreateMessageScreen({ navigation, route }: Props) {
           <Ionicons
             name={isRecording ? 'stop' : 'mic'}
             size={24}
-            color={isRecording ? '#e74c3c' : colors.primary}
+            color={isRecording ? colors.error : colors.primary.cyan}
           />
           <Text
             style={[
@@ -420,10 +420,10 @@ export default function CreateMessageScreen({ navigation, route }: Props) {
         disabled={loading}
       >
         {loading ? (
-          <ActivityIndicator color="#fff" />
+          <ActivityIndicator color={colors.text.primary} />
         ) : (
           <>
-            <Ionicons name="send" size={20} color="#fff" />
+            <Ionicons name="send" size={20} color={colors.text.primary} />
             <Text style={styles.sendButtonText}>Envoyer</Text>
           </>
         )}
@@ -436,135 +436,135 @@ export default function CreateMessageScreen({ navigation, route }: Props) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: colors.background.primary,
   },
   content: {
-    padding: 16,
+    padding: spacing.lg,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 24,
+    marginBottom: spacing.xxl,
     marginTop: 48,
   },
   title: {
-    fontSize: 18,
+    fontSize: typography.sizes.lg,
     fontWeight: '600',
-    color: colors.textPrimary,
+    color: colors.text.primary,
   },
   recipientRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: spacing.md,
   },
   recipientLabel: {
-    fontSize: 16,
-    color: colors.textSecondary,
-    marginRight: 8,
+    fontSize: typography.sizes.md,
+    color: colors.text.secondary,
+    marginRight: spacing.sm,
   },
   recipientButton: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: colors.surfaceLight,
-    borderRadius: 8,
-    padding: 12,
+    backgroundColor: colors.surface.glass,
+    borderRadius: radius.md,
+    padding: spacing.md,
   },
   recipientName: {
-    fontSize: 16,
-    color: colors.textPrimary,
+    fontSize: typography.sizes.md,
+    color: colors.text.primary,
   },
   publicToggleRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    marginBottom: 16,
+    gap: spacing.sm,
+    marginBottom: spacing.md,
   },
   publicToggleLabel: {
-    fontSize: 14,
-    color: colors.textSecondary,
+    fontSize: typography.sizes.sm,
+    color: colors.text.secondary,
   },
   locationInfo: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.surfaceLight,
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 16,
+    backgroundColor: colors.surface.glass,
+    borderRadius: radius.md,
+    padding: spacing.md,
+    marginBottom: spacing.md,
   },
   locationText: {
-    marginLeft: 8,
-    fontSize: 14,
-    color: colors.primary,
+    marginLeft: spacing.sm,
+    fontSize: typography.sizes.sm,
+    color: colors.primary.cyan,
   },
   mediaPreview: {
-    marginBottom: 16,
-    borderRadius: 12,
+    marginBottom: spacing.md,
+    borderRadius: radius.lg,
     overflow: 'hidden',
   },
   previewImage: {
     width: '100%',
     height: 200,
-    borderRadius: 12,
+    borderRadius: radius.lg,
   },
   clearMedia: {
     position: 'absolute',
-    top: 8,
-    right: 8,
+    top: spacing.sm,
+    right: spacing.sm,
   },
   audioPreview: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.surfaceLight,
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 16,
+    backgroundColor: colors.surface.glass,
+    borderRadius: radius.md,
+    padding: spacing.md,
+    marginBottom: spacing.md,
   },
   playButton: {
     width: 40,
     height: 40,
-    borderRadius: 20,
-    backgroundColor: colors.primary,
+    borderRadius: radius.full,
+    backgroundColor: colors.primary.cyan,
     justifyContent: 'center',
     alignItems: 'center',
   },
   audioText: {
     flex: 1,
-    marginLeft: 12,
-    fontSize: 14,
-    color: colors.textPrimary,
+    marginLeft: spacing.md,
+    fontSize: typography.sizes.sm,
+    color: colors.text.primary,
   },
   textInput: {
     borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 12,
-    padding: 16,
-    fontSize: 16,
+    borderColor: colors.border.default,
+    borderRadius: radius.lg,
+    padding: spacing.lg,
+    fontSize: typography.sizes.md,
     minHeight: 120,
     textAlignVertical: 'top',
-    marginBottom: 16,
-    backgroundColor: colors.surfaceLight,
-    color: colors.textPrimary,
+    marginBottom: spacing.md,
+    backgroundColor: colors.surface.glass,
+    color: colors.text.primary,
   },
   mediaButtons: {
     flexDirection: 'row',
     justifyContent: 'space-around',
-    marginBottom: 24,
+    marginBottom: spacing.xxl,
   },
   mediaButton: {
     alignItems: 'center',
-    padding: 12,
+    padding: spacing.md,
   },
   mediaButtonText: {
-    marginTop: 4,
-    fontSize: 12,
-    color: colors.textSecondary,
+    marginTop: spacing.xs,
+    fontSize: typography.sizes.xs,
+    color: colors.text.secondary,
   },
   recordingButton: {
-    backgroundColor: '#3a1a1a',
-    borderRadius: 8,
+    backgroundColor: colors.surface.glassDark,
+    borderRadius: radius.md,
   },
   recordingText: {
     color: colors.error,
@@ -573,17 +573,18 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.primary,
-    borderRadius: 12,
-    padding: 16,
+    backgroundColor: colors.primary.cyan,
+    borderRadius: radius.lg,
+    padding: spacing.lg,
+    ...shadows.medium,
   },
   sendButtonDisabled: {
     opacity: 0.7,
   },
   sendButtonText: {
-    marginLeft: 8,
-    fontSize: 16,
+    marginLeft: spacing.sm,
+    fontSize: typography.sizes.md,
     fontWeight: '600',
-    color: '#fff',
+    color: colors.text.primary,
   },
 });

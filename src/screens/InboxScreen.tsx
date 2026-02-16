@@ -1,3 +1,14 @@
+/**
+ * InboxScreen - Redesigned with Neo-Cartographic theme
+ *
+ * Improvements:
+ * - GlassCard for conversation items
+ * - Premium avatars with rings for unread
+ * - Gradient unread badges
+ * - Better visual hierarchy
+ * - Stagger animations
+ */
+
 import React, { useEffect, useState, useCallback } from 'react';
 import {
   View,
@@ -7,25 +18,31 @@ import {
   StyleSheet,
   ActivityIndicator,
   RefreshControl,
-  Image,
+  Animated,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '@/contexts/AuthContext';
 import { fetchConversations, getCachedConversations, FLAG_BOT_ID } from '@/services/messages';
 import { Conversation } from '@/types';
-import { colors } from '@/theme';
+import { colors, shadows, radius, spacing, typography } from '@/theme-redesign';
+import GlassCard from '@/components/redesign/GlassCard';
+import PremiumAvatar from '@/components/redesign/PremiumAvatar';
 
 interface Props {
   navigation: any;
 }
 
-export default function InboxScreen({ navigation }: Props) {
+export default function InboxScreenRedesign({ navigation }: Props) {
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+
+  // Animation values for stagger effect
+  const [itemAnimations] = useState<Animated.Value[]>([]);
 
   useEffect(() => {
     console.log('[InboxScreen] useEffect[user] fired, user =', user?.id);
@@ -46,13 +63,13 @@ export default function InboxScreen({ navigation }: Props) {
   const loadConversations = async () => {
     console.log('[InboxScreen] loadConversations: START');
 
-    // Show cached data instantly if available
+    // Show cached data instantly if available, but keep loading=true
     if (conversations.length === 0) {
       const cached = await getCachedConversations();
       if (cached && cached.length > 0) {
         console.log('[InboxScreen] showing', cached.length, 'cached conversations');
         setConversations(cached);
-        setLoading(false);
+        // Keep loading=true to prevent flicker
       }
     }
 
@@ -61,6 +78,10 @@ export default function InboxScreen({ navigation }: Props) {
       const data = await fetchConversations();
       console.log('[InboxScreen] loadConversations: got', data.length, 'conversations');
       setConversations(data);
+
+      // Initialize animations at full opacity (no animation on initial load)
+      const newAnimations = data.map(() => new Animated.Value(1));
+      itemAnimations.splice(0, itemAnimations.length, ...newAnimations);
     } catch (error) {
       console.error('[InboxScreen] Error loading conversations:', error);
       if (conversations.length === 0) setConversations([]);
@@ -103,7 +124,6 @@ export default function InboxScreen({ navigation }: Props) {
     const { lastMessage } = conversation;
     const isUndiscovered = !lastMessage.is_from_me && !lastMessage.is_read;
 
-    // Si le dernier message est un message non découvert reçu, ne pas afficher de preview
     if (isUndiscovered) {
       return 'Nouveau message à découvrir';
     }
@@ -122,87 +142,121 @@ export default function InboxScreen({ navigation }: Props) {
     }
   };
 
-  const renderConversation = ({ item }: { item: Conversation }) => {
+  const renderConversation = ({ item, index }: { item: Conversation; index: number }) => {
     const isBot = item.id === FLAG_BOT_ID;
     const hasUnread = item.unreadCount > 0;
 
-    return (
-      <TouchableOpacity
-        style={styles.conversationItem}
-        onPress={() => navigation.navigate('Conversation', {
-          otherUserId: item.id,
-          otherUserName: item.otherUser.display_name || 'Utilisateur',
-          otherUserAvatarUrl: item.otherUser.avatar_url,
-        })}
-        activeOpacity={0.7}
-      >
-        <View style={[styles.avatar, isBot && styles.botAvatar]}>
-          {item.otherUser.avatar_url ? (
-            <Image source={{ uri: item.otherUser.avatar_url }} style={styles.avatarImage} />
-          ) : (
-            <Ionicons
-              name={isBot ? 'flag' : 'person'}
-              size={24}
-              color={isBot ? '#4A90D9' : '#999'}
-            />
-          )}
-        </View>
+    const animatedStyle = itemAnimations[index]
+      ? {
+          opacity: itemAnimations[index],
+          transform: [
+            {
+              translateY: itemAnimations[index].interpolate({
+                inputRange: [0, 1],
+                outputRange: [20, 0],
+              }),
+            },
+          ],
+        }
+      : {};
 
-        <View style={styles.conversationContent}>
-          <View style={styles.conversationHeader}>
-            <Text style={[styles.userName, hasUnread && styles.userNameUnread]}>
-              {item.otherUser.display_name || 'Utilisateur'}
-            </Text>
-            <Text style={[styles.date, hasUnread && styles.dateUnread]}>
-              {formatDate(item.lastMessage.created_at)}
-            </Text>
-          </View>
-          <View style={styles.previewRow}>
-            <Text
-              style={[styles.preview, hasUnread && styles.previewUnread]}
-              numberOfLines={1}
-            >
-              {getMessagePreview(item)}
-            </Text>
-            {hasUnread && (
-              <View style={styles.undiscoveredBadge}>
-                <Ionicons name="eye-off" size={14} color={colors.textSecondary} />
-                <View style={styles.unreadBadge}>
-                  <Text style={styles.unreadCount}>
-                    {item.unreadCount > 9 ? '9+' : item.unreadCount}
+    return (
+      <Animated.View style={[styles.conversationContainer, animatedStyle]}>
+        <TouchableOpacity
+          onPress={() =>
+            navigation.navigate('Conversation', {
+              otherUserId: item.id,
+              otherUserName: item.otherUser.display_name || 'Utilisateur',
+              otherUserAvatarUrl: item.otherUser.avatar_url,
+            })
+          }
+          activeOpacity={0.9}
+        >
+          <GlassCard
+            withBorder={hasUnread}
+            withGlow={hasUnread && !isBot}
+            glowColor={isBot ? 'cyan' : 'violet'}
+            style={isBot ? [styles.conversationCard, styles.botCard] : styles.conversationCard}
+          >
+            <View style={styles.conversationLayout}>
+              {/* Avatar */}
+              <PremiumAvatar
+                uri={item.otherUser.avatar_url}
+                name={item.otherUser.display_name}
+                size="medium"
+                withRing={hasUnread}
+                ringColor={isBot ? 'cyan' : 'gradient'}
+                withGlow={hasUnread}
+                glowColor={isBot ? 'cyan' : 'violet'}
+                isBot={isBot}
+              />
+
+              {/* Content */}
+              <View style={styles.conversationContent}>
+                <View style={styles.conversationHeader}>
+                  <Text style={[styles.userName, hasUnread && styles.userNameUnread]}>
+                    {item.otherUser.display_name || 'Utilisateur'}
+                  </Text>
+                  <Text style={[styles.date, hasUnread && styles.dateUnread]}>
+                    {formatDate(item.lastMessage.created_at)}
                   </Text>
                 </View>
+
+                <View style={styles.previewRow}>
+                  <Text
+                    style={[styles.preview, hasUnread && styles.previewUnread]}
+                    numberOfLines={1}
+                  >
+                    {getMessagePreview(item)}
+                  </Text>
+
+                  {hasUnread && (
+                    <View style={styles.unreadBadge}>
+                      <Ionicons name="eye-off" size={12} color={colors.text.primary} />
+                      <Text style={styles.unreadCount}>
+                        {item.unreadCount > 9 ? '9+' : item.unreadCount}
+                      </Text>
+                    </View>
+                  )}
+                </View>
               </View>
-            )}
-          </View>
-        </View>
-      </TouchableOpacity>
+            </View>
+          </GlassCard>
+        </TouchableOpacity>
+      </Animated.View>
     );
   };
 
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={colors.primary} />
+        <ActivityIndicator size="large" color={colors.primary.cyan} />
       </View>
     );
   }
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
+      {/* Header with gradient background */}
+      <View style={styles.headerGradient} />
+
       <View style={styles.header}>
         <Text style={styles.title}>Messages</Text>
         <TouchableOpacity
           style={styles.newMessageButton}
           onPress={() => navigation.navigate('SelectRecipient')}
         >
-          <Ionicons name="create-outline" size={24} color={colors.primary} />
+          <View style={styles.newMessageButtonInner}>
+            <Ionicons name="create-outline" size={24} color={colors.primary.cyan} />
+          </View>
         </TouchableOpacity>
       </View>
 
       {conversations.length === 0 ? (
         <View style={styles.emptyContainer}>
-          <Ionicons name="chatbubbles-outline" size={64} color={colors.textMuted} />
+          <View style={styles.emptyIconContainer}>
+            <Ionicons name="chatbubbles-outline" size={64} color={colors.primary.violet} />
+          </View>
           <Text style={styles.emptyText}>Aucune conversation</Text>
           <Text style={styles.emptySubtext}>
             Commencez une conversation en appuyant sur le bouton +
@@ -210,6 +264,7 @@ export default function InboxScreen({ navigation }: Props) {
           <TouchableOpacity
             style={styles.startButton}
             onPress={() => navigation.navigate('SelectRecipient')}
+            activeOpacity={0.9}
           >
             <Text style={styles.startButtonText}>Nouvelle conversation</Text>
           </TouchableOpacity>
@@ -220,7 +275,11 @@ export default function InboxScreen({ navigation }: Props) {
           keyExtractor={(item) => item.id}
           renderItem={renderConversation}
           refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              tintColor={colors.primary.cyan}
+            />
           }
           contentContainerStyle={styles.listContent}
         />
@@ -232,144 +291,162 @@ export default function InboxScreen({ navigation }: Props) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: colors.background.primary,
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: colors.background,
+    backgroundColor: colors.background.primary,
+  },
+  headerGradient: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 200,
+    backgroundColor: 'rgba(124, 92, 252, 0.03)',
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 16,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.lg,
     borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    borderBottomColor: colors.border.default,
   },
   title: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: colors.textPrimary,
+    fontSize: typography.sizes.xxxl,
+    fontWeight: '700',
+    color: colors.text.primary,
   },
   newMessageButton: {
-    padding: 8,
+    padding: spacing.sm,
   },
-  listContent: {
-    paddingVertical: 8,
-  },
-  conversationItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-  },
-  avatar: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: colors.surfaceLight,
+  newMessageButtonInner: {
+    width: 44,
+    height: 44,
+    borderRadius: radius.full,
+    backgroundColor: colors.surface.glass,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 12,
+    ...shadows.small,
   },
-  botAvatar: {
-    backgroundColor: colors.surfaceLight,
+  listContent: {
+    padding: spacing.md,
+    gap: spacing.xs,
   },
-  avatarImage: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+  conversationContainer: {
+    marginBottom: 0,
+  },
+  conversationCard: {
+    padding: 0,
+  },
+  botCard: {
+    backgroundColor: 'rgba(0, 229, 255, 0.03)',
+  },
+  conversationLayout: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: spacing.xs,
+    paddingVertical: spacing.xs,
   },
   conversationContent: {
     flex: 1,
+    marginLeft: spacing.sm,
   },
   conversationHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 4,
+    marginBottom: 2,
   },
   userName: {
-    fontSize: 16,
+    fontSize: typography.sizes.md,
     fontWeight: '500',
-    color: colors.textPrimary,
+    color: colors.text.primary,
   },
   userNameUnread: {
     fontWeight: '700',
+    color: colors.text.primary,
   },
   date: {
-    fontSize: 12,
-    color: colors.textMuted,
+    fontSize: typography.sizes.xs,
+    color: colors.text.tertiary,
   },
   dateUnread: {
-    color: colors.primary,
+    color: colors.primary.cyan,
+    fontWeight: '600',
   },
   previewRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: spacing.sm,
   },
   preview: {
     flex: 1,
-    fontSize: 14,
-    color: colors.textSecondary,
+    fontSize: typography.sizes.sm,
+    color: colors.text.secondary,
   },
   previewUnread: {
-    color: colors.textPrimary,
+    color: colors.text.primary,
     fontWeight: '500',
   },
-  undiscoveredBadge: {
+  unreadBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginLeft: 8,
-    gap: 6,
-  },
-  unreadBadge: {
-    backgroundColor: colors.primary,
-    borderRadius: 10,
-    minWidth: 20,
-    height: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 6,
+    gap: 4,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 4,
+    borderRadius: radius.full,
+    backgroundColor: colors.primary.cyan,
+    ...shadows.glow,
   },
   unreadCount: {
-    color: '#fff',
-    fontSize: 12,
-    fontWeight: '600',
+    color: colors.text.primary,
+    fontSize: typography.sizes.xs,
+    fontWeight: '700',
   },
   emptyContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 32,
+    padding: spacing.xxxl,
+  },
+  emptyIconContainer: {
+    width: 100,
+    height: 100,
+    borderRadius: radius.full,
+    backgroundColor: colors.surface.glass,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: spacing.xl,
+    ...shadows.glowViolet,
   },
   emptyText: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: colors.textSecondary,
-    marginTop: 16,
+    fontSize: typography.sizes.xl,
+    fontWeight: '700',
+    color: colors.text.primary,
+    marginTop: spacing.md,
   },
   emptySubtext: {
-    fontSize: 14,
-    color: colors.textMuted,
+    fontSize: typography.sizes.sm,
+    color: colors.text.secondary,
     textAlign: 'center',
-    marginTop: 8,
-    marginBottom: 24,
+    marginTop: spacing.sm,
+    marginBottom: spacing.xxl,
   },
   startButton: {
-    backgroundColor: colors.primary,
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 24,
+    paddingHorizontal: spacing.xxl,
+    paddingVertical: spacing.lg,
+    borderRadius: radius.lg,
+    backgroundColor: colors.primary.cyan,
+    ...shadows.medium,
   },
   startButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
+    color: colors.text.primary,
+    fontSize: typography.sizes.md,
+    fontWeight: '700',
   },
 });

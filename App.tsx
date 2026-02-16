@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { StatusBar } from 'expo-status-bar';
-import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { NavigationContainer, NavigationContainerRef } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
@@ -8,6 +8,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as SecureStore from 'expo-secure-store';
 
 import { colors } from '@/theme';
+import { colors as colorsRedesign, spacing } from '@/theme-redesign';
 import { AuthProvider, useAuth } from '@/contexts/AuthContext';
 import { LocationProvider } from '@/contexts/LocationContext';
 import { addNotificationResponseListener } from '@/services/notifications';
@@ -32,6 +33,9 @@ const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
 
 function MainTabs() {
+  const insets = useSafeAreaInsets();
+  const tabBarHeight = 50 + insets.bottom;
+
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
@@ -50,15 +54,17 @@ function MainTabs() {
             iconName = 'help-outline';
           }
 
-          return <Ionicons name={iconName} size={size} color={color} />;
+          return <Ionicons name={iconName} size={24} color={color} />;
         },
-        tabBarActiveTintColor: colors.primary,
-        tabBarInactiveTintColor: colors.textMuted,
+        tabBarActiveTintColor: colorsRedesign.primary.cyan,
+        tabBarInactiveTintColor: colorsRedesign.text.tertiary,
         tabBarStyle: {
-          paddingVertical: 8,
-          minHeight: 60,
-          backgroundColor: colors.surface,
-          borderTopColor: colors.border,
+          backgroundColor: colorsRedesign.surface.elevated,
+          borderTopWidth: 1,
+          borderTopColor: colorsRedesign.border.default,
+          height: tabBarHeight,
+          paddingBottom: insets.bottom,
+          paddingTop: spacing.xs,
         },
       })}
     >

@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '@/theme';
+import { colors as colorsRedesign, spacing, radius, typography } from '@/theme-redesign';
 import { supabase } from '@/services/supabase';
 import { fetchUserPublicMessages, fetchDiscoveredPublicMessageIds } from '@/services/messages';
 import { follow, unfollow, isFollowing, fetchFollowerCount } from '@/services/subscriptions';
@@ -195,7 +196,7 @@ export default function UserProfileScreen({ navigation, route }: Props) {
           disabled={followLoading}
         >
           {followLoading ? (
-            <ActivityIndicator size="small" color={following ? colors.primary : '#fff'} />
+            <ActivityIndicator size="small" color={following ? colors.primary : colors.text.primary} />
           ) : (
             <Text style={[styles.followButtonText, following && styles.followButtonTextActive]}>
               {following ? 'Abonn\u00e9' : "S'abonner"}
@@ -204,6 +205,26 @@ export default function UserProfileScreen({ navigation, route }: Props) {
         </TouchableOpacity>
       </View>
 
+      {/* Stats Row */}
+      <View style={styles.statsRow}>
+        <View style={styles.statCard}>
+          <Ionicons name="images" size={18} color={colorsRedesign.primary.cyan} />
+          <Text style={styles.statNumber}>{messages.length}</Text>
+        </View>
+
+        <View style={styles.statCard}>
+          <Ionicons name="people" size={18} color={colorsRedesign.primary.cyan} />
+          <Text style={styles.statNumber}>{followerCount}</Text>
+        </View>
+
+        <View style={styles.statCard}>
+          <Ionicons name="location" size={18} color={colorsRedesign.primary.cyan} />
+          <Text style={styles.statNumber}>{messages.length}</Text>
+        </View>
+      </View>
+
+      <View style={styles.divider} />
+      <Text style={styles.gridTitle}>Messages Publics</Text>
     </>
   );
 
@@ -245,7 +266,7 @@ export default function UserProfileScreen({ navigation, route }: Props) {
             />
           )}
           <TouchableOpacity style={styles.photoViewerClose} onPress={() => setViewingMessage(null)}>
-            <Ionicons name="close" size={28} color="#fff" />
+            <Ionicons name="close" size={28} color={colors.text.primary} />
           </TouchableOpacity>
           {viewingMessage?.location && (
             <TouchableOpacity
@@ -259,7 +280,7 @@ export default function UserProfileScreen({ navigation, route }: Props) {
                 });
               }}
             >
-              <Ionicons name="location" size={20} color="#fff" />
+              <Ionicons name="location" size={20} color={colors.text.primary} />
               <Text style={styles.photoViewerLocationText}>Voir sur la carte</Text>
             </TouchableOpacity>
           )}
@@ -332,10 +353,47 @@ const styles = StyleSheet.create({
   followButtonText: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#fff',
+    color: colors.text.primary,
   },
   followButtonTextActive: {
     color: colors.primary,
+  },
+  statsRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: spacing.md,
+    marginTop: spacing.lg,
+    paddingHorizontal: spacing.lg,
+  },
+  statCard: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.sm,
+    gap: 6,
+    backgroundColor: colorsRedesign.surface.glass,
+    borderRadius: radius.lg,
+  },
+  statNumber: {
+    fontSize: typography.sizes.lg,
+    fontWeight: '700',
+    color: colorsRedesign.text.primary,
+  },
+  divider: {
+    height: 1,
+    backgroundColor: colorsRedesign.border.default,
+    marginHorizontal: spacing.xl,
+    marginTop: spacing.lg,
+    marginBottom: spacing.md,
+  },
+  gridTitle: {
+    fontSize: typography.sizes.md,
+    fontWeight: '600',
+    color: colorsRedesign.text.primary,
+    paddingHorizontal: spacing.lg,
+    marginBottom: spacing.sm,
   },
   cell: {
     width: CELL_SIZE,
@@ -422,7 +480,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   photoViewerLocationText: {
-    color: '#fff',
+    color: colors.text.primary,
     fontSize: 15,
     fontWeight: '600',
   },

@@ -1,3 +1,15 @@
+/**
+ * ConversationScreen - Redesigned with Neo-Cartographic theme
+ *
+ * Improvements:
+ * - Glass header with gradient background
+ * - Premium message bubbles with subtle glass effect
+ * - Gradient send button
+ * - Better photo/audio UI
+ * - Smooth message animations
+ * - Premium input area
+ */
+
 import React, { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import {
   View,
@@ -11,8 +23,10 @@ import {
   Platform,
   Image,
   Modal,
+  Animated,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Audio } from 'expo-av';
 import * as ImagePicker from 'expo-image-picker';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -26,15 +40,18 @@ import {
 } from '@/services/messages';
 import { isEitherFollowing } from '@/services/subscriptions';
 import { MessageWithUsers, MessageContentType } from '@/types';
-import { colors } from '@/theme';
+import { colors, shadows, radius, spacing, typography } from '@/theme-redesign';
 import { reportError } from '@/services/errorReporting';
+import GlassCard from '@/components/redesign/GlassCard';
+import PremiumButton from '@/components/redesign/PremiumButton';
+import PremiumAvatar from '@/components/redesign/PremiumAvatar';
 
 interface Props {
   navigation: any;
   route: any;
 }
 
-export default function ConversationScreen({ navigation, route }: Props) {
+export default function ConversationScreenRedesign({ navigation, route }: Props) {
   const { otherUserId, otherUserName, otherUserAvatarUrl } = route.params;
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
@@ -48,10 +65,9 @@ export default function ConversationScreen({ navigation, route }: Props) {
   const [audioSound, setAudioSound] = useState<Audio.Sound | null>(null);
   const [playingMessageId, setPlayingMessageId] = useState<string | null>(null);
   const [isPlayingAudio, setIsPlayingAudio] = useState(false);
-
   const [canSendMessages, setCanSendMessages] = useState<boolean>(true);
 
-  // Local media state for composing a message
+  // Local media state
   const [contentType, setContentType] = useState<MessageContentType>('text');
   const [mediaUri, setMediaUri] = useState<string | null>(null);
   const [recording, setRecording] = useState<Audio.Recording | null>(null);
@@ -59,7 +75,10 @@ export default function ConversationScreen({ navigation, route }: Props) {
   const [isPlayingInputAudio, setIsPlayingInputAudio] = useState(false);
   const inputSoundRef = useRef<Audio.Sound | null>(null);
 
-  const isBot = otherUserId === FLAG_BOT_ID;
+  const isBot = useMemo(() => otherUserId === FLAG_BOT_ID, [otherUserId]);
+
+  // Animation values
+  const [messageAnimations] = useState<Map<string, Animated.Value>>(new Map());
 
   useEffect(() => {
     loadMessages();
@@ -75,6 +94,16 @@ export default function ConversationScreen({ navigation, route }: Props) {
     };
   }, []);
 
+  // Scroll to bottom when messages load (only once, when loading completes)
+  useEffect(() => {
+    if (messages.length > 0 && !loading) {
+      // Use requestAnimationFrame for smoother rendering
+      requestAnimationFrame(() => {
+        flatListRef.current?.scrollToOffset({ offset: 0, animated: false });
+      });
+    }
+  }, [loading]); // Only depend on loading, not messages.length
+
   const checkCanSend = async () => {
     if (isBot) {
       setCanSendMessages(true);
@@ -85,23 +114,22 @@ export default function ConversationScreen({ navigation, route }: Props) {
   };
 
   const loadMessages = async () => {
-    // Show cached messages instantly if available
+    // Load cached messages first, but don't hide loading yet
     if (messages.length === 0) {
       const cached = await getCachedConversationMessages(otherUserId);
       if (cached && cached.length > 0) {
         console.log('[ConversationScreen] showing', cached.length, 'cached messages');
         setMessages(cached);
-        setLoading(false);
+        // Keep loading=true to avoid flicker
       }
     }
 
-    // Then fetch incremental updates from server
+    // Fetch fresh messages
     const data = await fetchConversationMessages(otherUserId);
     setMessages(data);
     setLoading(false);
   };
 
-  // Reverse messages for inverted FlatList (newest at bottom)
   const reversedMessages = useMemo(() => [...messages].reverse(), [messages]);
 
   const handleSend = async () => {
@@ -131,7 +159,7 @@ export default function ConversationScreen({ navigation, route }: Props) {
       const message = await sendMessage(
         otherUserId,
         finalContentType,
-        null, // No geolocation for conversation messages
+        null,
         hasText ? inputText.trim() : undefined,
         uploadedMediaUrl
       );
@@ -160,7 +188,7 @@ export default function ConversationScreen({ navigation, route }: Props) {
 
   const pickImage = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      mediaTypes: ['images'],
       quality: 0.8,
     });
 
@@ -200,17 +228,16 @@ export default function ConversationScreen({ navigation, route }: Props) {
       await Audio.setAudioModeAsync({
         allowsRecordingIOS: true,
         playsInSilentModeIOS: true,
-        staysActiveInBackground: false,
-        playThroughEarpieceAndroid: false,
       });
 
-      const { recording } = await Audio.Recording.createAsync(
+      const { recording: newRecording } = await Audio.Recording.createAsync(
         Audio.RecordingOptionsPresets.HIGH_QUALITY
       );
-      setRecording(recording);
+      setRecording(newRecording);
       setIsRecording(true);
     } catch (error) {
-      console.error('Error starting recording (conversation):', error);
+      console.error('Failed to start recording:', error);
+      reportError(error, 'ConversationScreen.startRecording.catch');
     }
   };
 
@@ -225,54 +252,56 @@ export default function ConversationScreen({ navigation, route }: Props) {
     if (uri) {
       setMediaUri(uri);
       setContentType('audio');
-    }
-  };
 
-  const clearMedia = async () => {
-    if (inputSoundRef.current) {
-      await inputSoundRef.current.unloadAsync();
-      inputSoundRef.current = null;
+      const { sound } = await Audio.Sound.createAsync({ uri });
+      inputSoundRef.current = sound;
     }
-    setIsPlayingInputAudio(false);
-    setMediaUri(null);
-    setContentType('text');
   };
 
   const playInputAudio = async () => {
-    if (!mediaUri) return;
+    if (!inputSoundRef.current || !mediaUri) return;
 
-    try {
-      if (isPlayingInputAudio && inputSoundRef.current) {
-        await inputSoundRef.current.stopAsync();
-        setIsPlayingInputAudio(false);
-        return;
-      }
-
-      await Audio.setAudioModeAsync({
-        allowsRecordingIOS: false,
-        playsInSilentModeIOS: true,
-        staysActiveInBackground: false,
-        playThroughEarpieceAndroid: false,
-      });
-
-      if (inputSoundRef.current) {
-        await inputSoundRef.current.unloadAsync();
-      }
-
-      const { sound } = await Audio.Sound.createAsync({ uri: mediaUri });
-      inputSoundRef.current = sound;
-
-      sound.setOnPlaybackStatusUpdate((status) => {
+    if (isPlayingInputAudio) {
+      await inputSoundRef.current.pauseAsync();
+      setIsPlayingInputAudio(false);
+    } else {
+      await inputSoundRef.current.replayAsync();
+      setIsPlayingInputAudio(true);
+      inputSoundRef.current.setOnPlaybackStatusUpdate((status) => {
         if (status.isLoaded && status.didJustFinish) {
           setIsPlayingInputAudio(false);
         }
       });
-
-      await sound.playAsync();
-      setIsPlayingInputAudio(true);
-    } catch (error) {
-      console.error('Error playing input audio (conversation):', error);
     }
+  };
+
+  const handleAudioPress = async (message: MessageWithUsers) => {
+    if (!message.media_url) return;
+
+    if (playingMessageId === message.id && isPlayingAudio) {
+      if (audioSound) {
+        await audioSound.pauseAsync();
+        setIsPlayingAudio(false);
+      }
+      return;
+    }
+
+    if (audioSound) {
+      await audioSound.unloadAsync();
+    }
+
+    const { sound } = await Audio.Sound.createAsync({ uri: message.media_url });
+    setAudioSound(sound);
+    setPlayingMessageId(message.id);
+    setIsPlayingAudio(true);
+
+    await sound.playAsync();
+    sound.setOnPlaybackStatusUpdate((status) => {
+      if (status.isLoaded && status.didJustFinish) {
+        setIsPlayingAudio(false);
+        setPlayingMessageId(null);
+      }
+    });
   };
 
   const formatTime = (dateString: string) => {
@@ -285,137 +314,86 @@ export default function ConversationScreen({ navigation, route }: Props) {
 
   const formatDateSeparator = (dateString: string) => {
     const date = new Date(dateString);
-    const now = new Date();
-    const diff = now.getTime() - date.getTime();
-    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+    const today = new Date();
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
 
-    if (days === 0) {
+    if (date.toDateString() === today.toDateString()) {
       return "Aujourd'hui";
-    } else if (days === 1) {
+    } else if (date.toDateString() === yesterday.toDateString()) {
       return 'Hier';
     } else {
       return date.toLocaleDateString('fr-FR', {
-        weekday: 'long',
         day: 'numeric',
         month: 'long',
       });
     }
   };
 
-  const handleAudioPress = useCallback(
-    async (message: MessageWithUsers) => {
-      if (!message.media_url) return;
-
-      try {
-        await Audio.setAudioModeAsync({
-          allowsRecordingIOS: false,
-          playsInSilentModeIOS: true,
-          staysActiveInBackground: false,
-          playThroughEarpieceAndroid: false,
-        });
-
-        // If tapping the currently playing message
-        if (playingMessageId === message.id && audioSound) {
-          const status = await audioSound.getStatusAsync();
-          if ('isLoaded' in status && status.isLoaded && status.isPlaying) {
-            await audioSound.pauseAsync();
-            setIsPlayingAudio(false);
-          } else {
-            await audioSound.playAsync();
-            setIsPlayingAudio(true);
-          }
-          return;
-        }
-
-        // New message or no sound yet: unload previous
-        if (audioSound) {
-          await audioSound.unloadAsync();
-        }
-
-        const { sound } = await Audio.Sound.createAsync({ uri: message.media_url });
-        setAudioSound(sound);
-        setPlayingMessageId(message.id);
-        setIsPlayingAudio(true);
-
-        sound.setOnPlaybackStatusUpdate((status) => {
-          if (status.isLoaded && status.didJustFinish) {
-            setIsPlayingAudio(false);
-            setPlayingMessageId(null);
-          }
-        });
-
-        await sound.playAsync();
-      } catch (error) {
-        console.error('Error playing audio in conversation:', error);
-      }
-    },
-    [audioSound, playingMessageId]
-  );
-
-  const shouldShowDateSeparator = (index: number) => {
-    // With inverted list, compare with next item (which appears above visually)
-    if (index === reversedMessages.length - 1) return true;
-    const currentDate = new Date(reversedMessages[index].created_at).toDateString();
-    const nextDate = new Date(reversedMessages[index + 1].created_at).toDateString();
-    return currentDate !== nextDate;
+  const getAnimationValue = (messageId: string): Animated.Value => {
+    if (!messageAnimations.has(messageId)) {
+      // Start at 1 (fully visible) to avoid animation on initial load
+      messageAnimations.set(messageId, new Animated.Value(1));
+    }
+    return messageAnimations.get(messageId)!;
   };
 
   const renderMessage = ({ item, index }: { item: MessageWithUsers; index: number }) => {
     const isFromMe = item.sender_id === user?.id;
-    const showDateSeparator = shouldShowDateSeparator(index);
-    const isUndiscovered = !isFromMe && !item.is_read;
+    const prevMessage = index < reversedMessages.length - 1 ? reversedMessages[index + 1] : null;
+    const showDateSeparator = prevMessage
+      ? new Date(item.created_at).toDateString() !== new Date(prevMessage.created_at).toDateString()
+      : index === reversedMessages.length - 1;
 
-    const handleUndiscoveredPress = () => {
-      if (isUndiscovered && item.location) {
-        navigation.navigate('Main', {
-          screen: 'Map',
-          params: {
-            messageId: item.id,
-            canOpen: false,
-          },
-        });
-      }
-    };
+    const isUndiscovered = !isFromMe && !item.is_read && item.location;
+
+    const animValue = getAnimationValue(item.id);
 
     return (
-      <View>
-        <View
-          style={[
-            styles.messageContainer,
-            isFromMe ? styles.messageContainerRight : styles.messageContainerLeft,
-          ]}
-        >
+      <Animated.View
+        style={[
+          styles.messageContainer,
+          {
+            opacity: animValue,
+            transform: [
+              {
+                translateY: animValue.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [20, 0],
+                }),
+              },
+            ],
+          },
+        ]}
+      >
+        {showDateSeparator && (
+          <View style={styles.dateSeparator}>
+            <Text style={styles.dateSeparatorText}>
+              {formatDateSeparator(item.created_at)}
+            </Text>
+          </View>
+        )}
+
+        <View style={[styles.messageRow, isFromMe && styles.messageRowRight]}>
           {isUndiscovered ? (
-            <TouchableOpacity activeOpacity={0.7} onPress={handleUndiscoveredPress}>
-              <View
-                style={[
-                  styles.messageBubble,
-                  isFromMe ? styles.messageBubbleRight : styles.messageBubbleLeft,
-                  styles.messageBubbleUndiscovered,
-                ]}
-              >
-                {item.content_type === 'photo' && item.media_url && (
-                  <Image source={{ uri: item.media_url }} style={styles.messageImage} blurRadius={20} />
-                )}
-                {item.content_type === 'audio' && (
-                  <View style={styles.audioMessage}>
-                    <Ionicons name="mic" size={20} color={isFromMe ? '#fff' : colors.primary} />
-                    <Text style={[styles.audioText, isFromMe && styles.audioTextRight]}>
-                      Message audio
-                    </Text>
-                  </View>
-                )}
-                {item.text_content ? (
-                  <Text style={[styles.messageText, isFromMe && styles.messageTextRight, styles.messageTextBlurred]}>
-                    {'••••••••••••••••'}
-                  </Text>
-                ) : null}
-                <Text style={[styles.messageTime, isFromMe && styles.messageTimeRight]}>
+            <TouchableOpacity
+              onPress={() => {
+                navigation.navigate('Main', {
+                  screen: 'Map',
+                  params: { messageId: item.id },
+                });
+              }}
+              activeOpacity={0.9}
+            >
+              <GlassCard style={styles.undiscoveredBubble}>
+                <View style={styles.blurredContent}>
+                  <Ionicons name="lock-closed" size={20} color={colors.primary.magenta} />
+                  <Text style={styles.undiscoveredText}>Message géolocalisé</Text>
+                </View>
+                <Text style={styles.messageTime}>
                   {formatTime(item.created_at)}
-                  {isFromMe ? (item.is_read ? ' ✓✓' : ' ✓') : ''}
                 </Text>
-                <View style={styles.blurOverlay} />
-              </View>
+              </GlassCard>
             </TouchableOpacity>
           ) : (
             <View
@@ -424,6 +402,7 @@ export default function ConversationScreen({ navigation, route }: Props) {
                 isFromMe ? styles.messageBubbleRight : styles.messageBubbleLeft,
               ]}
             >
+              {/* Photo */}
               {item.content_type === 'photo' && item.media_url && (
                 <TouchableOpacity
                   activeOpacity={0.9}
@@ -432,21 +411,25 @@ export default function ConversationScreen({ navigation, route }: Props) {
                   <Image source={{ uri: item.media_url }} style={styles.messageImage} />
                 </TouchableOpacity>
               )}
+
+              {/* Audio */}
               {item.content_type === 'audio' && item.media_url && (
                 <TouchableOpacity
                   style={styles.audioMessage}
                   activeOpacity={0.7}
                   onPress={() => handleAudioPress(item)}
                 >
-                  <Ionicons
-                    name={
-                      playingMessageId === item.id && isPlayingAudio
-                        ? 'pause'
-                        : 'play'
-                    }
-                    size={20}
-                    color={isFromMe ? '#fff' : colors.primary}
-                  />
+                  <View style={styles.audioIconContainer}>
+                    <Ionicons
+                      name={
+                        playingMessageId === item.id && isPlayingAudio
+                          ? 'pause'
+                          : 'play'
+                      }
+                      size={18}
+                      color={isFromMe ? colors.text.primary : colors.primary.cyan}
+                    />
+                  </View>
                   <Text style={[styles.audioText, isFromMe && styles.audioTextRight]}>
                     {playingMessageId === item.id && isPlayingAudio
                       ? 'En lecture...'
@@ -454,12 +437,16 @@ export default function ConversationScreen({ navigation, route }: Props) {
                   </Text>
                 </TouchableOpacity>
               )}
-              {item.text_content ? (
+
+              {/* Text */}
+              {item.text_content && (
                 <Text style={[styles.messageText, isFromMe && styles.messageTextRight]}>
                   {item.text_content}
                 </Text>
-              ) : null}
-              <View style={[styles.messageFooter, !item.location && styles.messageFooterNoFlag]}>
+              )}
+
+              {/* Footer with flag and time */}
+              <View style={styles.messageFooter}>
                 {item.location && (
                   <TouchableOpacity
                     activeOpacity={0.7}
@@ -473,7 +460,11 @@ export default function ConversationScreen({ navigation, route }: Props) {
                     }}
                     style={styles.flagButton}
                   >
-                    <Ionicons name="flag" size={12} color={isFromMe ? 'rgba(255, 255, 255, 0.7)' : '#4A90D9'} />
+                    <Ionicons
+                      name="flag"
+                      size={12}
+                      color={isFromMe ? colors.text.secondary : colors.primary.cyan}
+                    />
                   </TouchableOpacity>
                 )}
                 <Text style={[styles.messageTime, isFromMe && styles.messageTimeRight]}>
@@ -483,60 +474,54 @@ export default function ConversationScreen({ navigation, route }: Props) {
               </View>
             </View>
           )}
-          {isUndiscovered && (
-            <Text style={styles.undiscoveredHint}>Approchez-vous pour découvrir</Text>
-          )}
         </View>
-        {showDateSeparator && (
-          <View style={styles.dateSeparator}>
-            <Text style={styles.dateSeparatorText}>
-              {formatDateSeparator(item.created_at)}
-            </Text>
-          </View>
+
+        {isUndiscovered && (
+          <Text style={styles.undiscoveredHint}>Tap to view on map</Text>
         )}
-      </View>
+      </Animated.View>
     );
   };
 
   if (loading) {
     return (
       <View style={[styles.container, { paddingTop: insets.top }]}>
+        {/* Header */}
+        <LinearGradient
+          colors={['rgba(124, 92, 252, 0.08)', 'transparent']}
+          style={styles.headerGradient}
+        />
         <View style={styles.header}>
           <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-            <Ionicons name="arrow-back" size={24} color={colors.textPrimary} />
+            <Ionicons name="arrow-back" size={24} color={colors.text.primary} />
           </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.headerProfile}
-            onPress={() => !isBot && navigation.navigate('UserProfile', { userId: otherUserId })}
-            disabled={isBot}
-            activeOpacity={isBot ? 1 : 0.7}
-          >
-            <View style={[styles.headerAvatar, isBot && styles.headerAvatarBot]}>
-              {otherUserAvatarUrl ? (
-                <Image source={{ uri: otherUserAvatarUrl }} style={styles.headerAvatarImage} />
-              ) : (
-                <Ionicons name={isBot ? 'flag' : 'person'} size={20} color={isBot ? '#4A90D9' : '#999'} />
-              )}
-            </View>
+          <View style={styles.headerProfile}>
+            <PremiumAvatar
+              uri={otherUserAvatarUrl}
+              name={otherUserName}
+              size="small"
+              isBot={isBot}
+            />
             <Text style={styles.headerTitle}>{otherUserName}</Text>
-          </TouchableOpacity>
+          </View>
         </View>
+
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={colors.primary} />
+          <ActivityIndicator size="large" color={colors.primary.cyan} />
         </View>
       </View>
     );
   }
 
   return (
-    <KeyboardAvoidingView
-      style={[styles.container, { paddingTop: insets.top }]}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top : 0}
-    >
+    <View style={[styles.container, { paddingTop: insets.top }]}>
+      {/* Header Gradient Background */}
+      <View style={styles.headerGradient} />
+
+      {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={24} color={colors.textPrimary} />
+          <Ionicons name="arrow-back" size={24} color={colors.text.primary} />
         </TouchableOpacity>
         <TouchableOpacity
           style={styles.headerProfile}
@@ -544,484 +529,431 @@ export default function ConversationScreen({ navigation, route }: Props) {
           disabled={isBot}
           activeOpacity={isBot ? 1 : 0.7}
         >
-          <View style={[styles.headerAvatar, isBot && styles.headerAvatarBot]}>
-            {otherUserAvatarUrl ? (
-              <Image source={{ uri: otherUserAvatarUrl }} style={styles.headerAvatarImage} />
-            ) : (
-              <Ionicons name={isBot ? 'flag' : 'person'} size={20} color={isBot ? '#4A90D9' : '#999'} />
-            )}
-          </View>
+          <PremiumAvatar
+            uri={otherUserAvatarUrl}
+            name={otherUserName}
+            size="small"
+            isBot={isBot}
+            withGlow={isBot}
+            glowColor="cyan"
+          />
           <Text style={styles.headerTitle}>{otherUserName}</Text>
         </TouchableOpacity>
       </View>
 
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top + 60 : 0}
+      >
+
+      {/* Messages List */}
       <FlatList
         ref={flatListRef}
         data={reversedMessages}
         keyExtractor={(item) => item.id}
         renderItem={renderMessage}
-        contentContainerStyle={styles.messagesList}
         inverted
-        ListEmptyComponent={
-          <View style={styles.emptyContainer}>
-            <Text style={styles.emptyText}>Aucun message</Text>
-            <Text style={styles.emptySubtext}>Envoyez le premier message !</Text>
-          </View>
-        }
+        contentContainerStyle={styles.messagesContent}
+        maintainVisibleContentPosition={{
+          minIndexForVisible: 0,
+        }}
+        removeClippedSubviews={false}
       />
 
-      {fullImageMessage && (
-        <Modal
-          visible
-          transparent
-          animationType="fade"
-          onRequestClose={() => setFullImageMessage(null)}
-        >
-          <View style={styles.fullscreenOverlay}>
-            <TouchableOpacity
-              style={styles.fullscreenCloseButton}
-              onPress={() => setFullImageMessage(null)}
-              activeOpacity={0.8}
-            >
-              <Ionicons name="close" size={28} color="#fff" />
-            </TouchableOpacity>
-            <View style={styles.fullscreenImageContainer}>
-              <Image
-                source={{ uri: fullImageMessage.media_url! }}
-                style={styles.fullscreenImage}
-                resizeMode="contain"
-              />
-            </View>
-            {fullImageMessage.location && (
-              <TouchableOpacity
-                style={styles.fullscreenLocationButton}
-                onPress={() => {
-                  const loc = fullImageMessage.location;
-                  setFullImageMessage(null);
-                  navigation.navigate('Main', {
-                    screen: 'Map',
-                    params: { focusLocation: loc },
-                  });
-                }}
-              >
-                <Ionicons name="location" size={20} color="#fff" />
-                <Text style={styles.fullscreenLocationText}>Voir sur la carte</Text>
-              </TouchableOpacity>
-            )}
-          </View>
-        </Modal>
-      )}
-
-      {!canSendMessages ? (
-        <View style={[styles.inputContainer, { paddingBottom: insets.bottom + 6 }]}>
-          <View style={styles.notFollowingContainer}>
-            <Ionicons name="lock-closed-outline" size={18} color={colors.textMuted} />
-            <Text style={styles.notFollowingText}>
-              Abonnez-vous pour envoyer des messages
-            </Text>
-          </View>
-        </View>
-      ) : (
-      <View style={[styles.inputContainer, { paddingBottom: insets.bottom + 6 }]}>
-        {mediaUri && contentType === 'photo' && (
-          <View style={styles.inputMediaPreview}>
-            <Image source={{ uri: mediaUri }} style={styles.inputMediaImage} />
-            <TouchableOpacity onPress={clearMedia} style={styles.inputMediaClear}>
-              <Ionicons name="close-circle" size={22} color="#fff" />
-            </TouchableOpacity>
+      {/* Input Area */}
+      <View style={[styles.inputContainer, { paddingBottom: spacing.lg + insets.bottom }]}>
+        {/* Media Preview */}
+        {mediaUri && (
+          <View style={styles.mediaPreview}>
+            {contentType === 'photo' ? (
+              <View style={styles.photoPreview}>
+                <Image source={{ uri: mediaUri }} style={styles.previewImage} />
+                <TouchableOpacity
+                  style={styles.removeMediaButton}
+                  onPress={() => {
+                    setMediaUri(null);
+                    setContentType('text');
+                  }}
+                >
+                  <Ionicons name="close-circle" size={24} color={colors.text.primary} />
+                </TouchableOpacity>
+              </View>
+            ) : contentType === 'audio' ? (
+              <GlassCard style={styles.audioPreview}>
+                <TouchableOpacity
+                  style={styles.audioPlayButton}
+                  onPress={playInputAudio}
+                >
+                  <Ionicons
+                    name={isPlayingInputAudio ? 'pause' : 'play'}
+                    size={20}
+                    color={colors.primary.cyan}
+                  />
+                </TouchableOpacity>
+                <Text style={styles.audioPreviewText}>Audio enregistré</Text>
+                <TouchableOpacity
+                  onPress={() => {
+                    setMediaUri(null);
+                    setContentType('text');
+                    if (inputSoundRef.current) {
+                      inputSoundRef.current.unloadAsync();
+                      inputSoundRef.current = null;
+                    }
+                  }}
+                >
+                  <Ionicons name="close" size={20} color={colors.text.secondary} />
+                </TouchableOpacity>
+              </GlassCard>
+            ) : null}
           </View>
         )}
 
-        {mediaUri && contentType === 'audio' && (
-          <View style={styles.inputAudioPreview}>
-            <TouchableOpacity onPress={playInputAudio} style={styles.inputAudioPlayButton}>
-              <Ionicons
-                name={isPlayingInputAudio ? 'pause' : 'play'}
-                size={18}
-                color="#fff"
-              />
-            </TouchableOpacity>
-            <Text style={styles.inputAudioText}>
-              {isPlayingInputAudio ? 'Lecture en cours...' : 'Audio enregistré'}
-            </Text>
-            <TouchableOpacity onPress={clearMedia}>
-              <Ionicons name="close-circle" size={20} color={colors.textSecondary} />
-            </TouchableOpacity>
-          </View>
-        )}
-
+        {/* Input Row */}
         <View style={styles.inputRow}>
-          <View style={styles.inputBox}>
-            <TextInput
-              style={styles.input}
-              placeholder="Votre message..."
-              placeholderTextColor={colors.textMuted}
-              value={inputText}
-              onChangeText={setInputText}
-              multiline
-              maxLength={1000}
-            />
-            <View style={styles.inputActions}>
-              <TouchableOpacity onPress={pickImage} style={styles.inputIconButton}>
-                <Ionicons name="image" size={22} color={colors.primary} />
+          {!canSendMessages ? (
+            <Text style={styles.cannotSendText}>
+              Suivez-vous mutuellement pour échanger des messages
+            </Text>
+          ) : (
+            <>
+              {/* Attachment Buttons */}
+              <TouchableOpacity onPress={pickImage} style={styles.iconButton}>
+                <Ionicons name="image-outline" size={24} color={colors.primary.cyan} />
               </TouchableOpacity>
-              <TouchableOpacity onPress={takePhoto} style={styles.inputIconButton}>
-                <Ionicons name="camera" size={22} color={colors.primary} />
+
+              <TouchableOpacity onPress={takePhoto} style={styles.iconButton}>
+                <Ionicons name="camera-outline" size={24} color={colors.primary.cyan} />
               </TouchableOpacity>
-            </View>
-          </View>
 
-          <TouchableOpacity
-            style={[styles.sendButton, sending && styles.sendButtonDisabled]}
-            onPress={async () => {
-              const hasText = !!inputText.trim();
-
-              if (hasText || mediaUri) {
-                await handleSend();
-                return;
-              }
-
-              if (isRecording) {
-                await stopRecording();
-              } else {
-                await startRecording();
-              }
-            }}
-            disabled={sending}
-          >
-            {sending ? (
-              <ActivityIndicator size="small" color="#fff" />
-            ) : (
-              <Ionicons
-                name={inputText.trim() || mediaUri ? 'send' : isRecording ? 'stop' : 'mic'}
-                size={20}
-                color="#fff"
+              {/* Text Input */}
+              <TextInput
+                style={styles.textInput}
+                placeholder="Message..."
+                placeholderTextColor={colors.text.tertiary}
+                value={inputText}
+                onChangeText={setInputText}
+                multiline
+                maxLength={500}
               />
-            )}
-          </TouchableOpacity>
+
+              {/* Audio Record Button OU Send Button (jamais les deux) */}
+              {!inputText.trim() && !mediaUri && !sending ? (
+                <TouchableOpacity
+                  onPress={isRecording ? stopRecording : startRecording}
+                  style={[styles.iconButton, isRecording && styles.recordingButton]}
+                >
+                  <Ionicons
+                    name={isRecording ? 'stop' : 'mic-outline'}
+                    size={24}
+                    color={isRecording ? colors.text.primary : colors.primary.cyan}
+                  />
+                </TouchableOpacity>
+              ) : !sending ? (
+                <TouchableOpacity onPress={handleSend} activeOpacity={0.9}>
+                  <LinearGradient
+                    colors={colors.gradients.primary}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 0 }}
+                    style={[styles.sendButton, shadows.glow]}
+                  >
+                    <Ionicons name="send" size={18} color={colors.text.primary} />
+                  </LinearGradient>
+                </TouchableOpacity>
+              ) : (
+                <ActivityIndicator size="small" color={colors.primary.cyan} />
+              )}
+            </>
+          )}
         </View>
       </View>
-      )}
-    </KeyboardAvoidingView>
+
+      {/* Full Image Modal */}
+      <Modal
+        visible={!!fullImageMessage}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setFullImageMessage(null)}
+      >
+        <View style={styles.fullImageModal}>
+          {fullImageMessage?.media_url && (
+            <Image
+              source={{ uri: fullImageMessage.media_url }}
+              style={styles.fullImage}
+              resizeMode="contain"
+            />
+          )}
+          <TouchableOpacity
+            style={[styles.closeFullImage, { top: 60 + insets.top }]}
+            onPress={() => setFullImageMessage(null)}
+          >
+            <View style={styles.closeButtonInner}>
+              <Ionicons name="close" size={28} color={colors.text.primary} />
+            </View>
+          </TouchableOpacity>
+        </View>
+      </Modal>
+      </KeyboardAvoidingView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: colors.background.primary,
+  },
+  headerGradient: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 200,
+    backgroundColor: 'rgba(124, 92, 252, 0.04)',
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    backgroundColor: colors.surface,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.md,
+    gap: spacing.md,
+    backgroundColor: colors.surface.glass,
   },
   backButton: {
-    padding: 4,
-    marginRight: 8,
+    padding: spacing.sm,
   },
   headerProfile: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    flex: 1,
-  },
-  headerAvatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: colors.surfaceLight,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 10,
-  },
-  headerAvatarBot: {
-    backgroundColor: colors.surfaceLight,
-  },
-  headerAvatarImage: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    gap: spacing.sm,
   },
   headerTitle: {
-    fontSize: 17,
+    fontSize: typography.sizes.lg,
     fontWeight: '600',
-    color: colors.textPrimary,
+    color: colors.text.primary,
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  messagesList: {
-    padding: 16,
-    flexGrow: 1,
+  messagesContent: {
+    padding: spacing.lg,
+    gap: spacing.sm,
+  },
+  messageContainer: {
+    marginBottom: spacing.sm,
   },
   dateSeparator: {
     alignItems: 'center',
-    marginVertical: 16,
+    marginVertical: spacing.md,
   },
   dateSeparatorText: {
-    fontSize: 12,
-    color: colors.textSecondary,
-    backgroundColor: colors.surfaceLight,
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: 10,
+    fontSize: typography.sizes.xs,
+    color: colors.text.tertiary,
+    backgroundColor: colors.surface.glass,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+    borderRadius: radius.full,
   },
-  messageContainer: {
-    marginBottom: 8,
-    maxWidth: '80%',
+  messageRow: {
+    flexDirection: 'row',
+    justifyContent: 'flex-start',
   },
-  messageContainerLeft: {
-    alignSelf: 'flex-start',
-  },
-  messageContainerRight: {
-    alignSelf: 'flex-end',
+  messageRowRight: {
+    justifyContent: 'flex-end',
   },
   messageBubble: {
-    padding: 12,
-    borderRadius: 18,
+    maxWidth: '75%',
+    padding: spacing.md,
+    borderRadius: radius.lg,
+    ...shadows.small,
   },
   messageBubbleLeft: {
-    backgroundColor: colors.surface,
-    borderBottomLeftRadius: 4,
+    backgroundColor: colors.surface.glassDark,
+    borderBottomLeftRadius: radius.xs,
+    borderWidth: 1,
+    borderColor: 'rgba(124, 92, 252, 0.2)',
   },
   messageBubbleRight: {
-    backgroundColor: colors.sent,
-    borderBottomRightRadius: 4,
+    backgroundColor: colors.message.sent,
+    borderBottomRightRadius: radius.xs,
+    ...shadows.medium,
   },
-  messageBubbleUndiscovered: {
-    overflow: 'hidden',
-    position: 'relative',
+  undiscoveredBubble: {
+    padding: spacing.md,
+    maxWidth: '75%',
+    backgroundColor: colors.message.undiscovered,
   },
-  messageText: {
-    fontSize: 16,
-    color: colors.textPrimary,
-    lineHeight: 22,
+  blurredContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginBottom: spacing.xs,
   },
-  messageTextRight: {
-    color: '#fff',
-  },
-  messageTextBlurred: {
-    color: colors.textMuted,
-  },
-  blurOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    borderRadius: 18,
-    backgroundColor: 'rgba(30, 30, 45, 0.85)',
+  undiscoveredText: {
+    fontSize: typography.sizes.sm,
+    color: colors.text.secondary,
   },
   undiscoveredHint: {
-    fontSize: 11,
-    color: colors.textMuted,
-    marginTop: 4,
+    fontSize: typography.sizes.xs,
+    color: colors.text.tertiary,
     fontStyle: 'italic',
+    marginTop: spacing.xs,
+    textAlign: 'center',
   },
   messageImage: {
     width: 200,
     height: 200,
-    borderRadius: 12,
-    marginBottom: 4,
+    borderRadius: radius.md,
+    marginBottom: spacing.xs,
   },
   audioMessage: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: spacing.sm,
+    paddingVertical: spacing.xs,
+  },
+  audioIconContainer: {
+    width: 32,
+    height: 32,
+    borderRadius: radius.full,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   audioText: {
-    marginLeft: 8,
-    fontSize: 14,
-    color: colors.primary,
+    fontSize: typography.sizes.sm,
+    color: colors.text.secondary,
   },
   audioTextRight: {
-    color: '#fff',
+    color: colors.text.primary,
+  },
+  messageText: {
+    fontSize: typography.sizes.md,
+    color: colors.text.primary,
+    lineHeight: 20,
+  },
+  messageTextRight: {
+    color: colors.text.primary,
   },
   messageFooter: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    marginTop: 4,
-  },
-  messageFooterNoFlag: {
-    justifyContent: 'flex-end',
+    gap: spacing.xs,
+    marginTop: spacing.xs,
   },
   flagButton: {
     padding: 2,
   },
   messageTime: {
-    fontSize: 11,
-    color: colors.textMuted,
+    fontSize: typography.sizes.xs,
+    color: colors.text.tertiary,
   },
   messageTimeRight: {
-    color: 'rgba(255, 255, 255, 0.7)',
-  },
-  emptyContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingTop: 100,
-  },
-  emptyText: {
-    fontSize: 16,
-    color: colors.textSecondary,
-  },
-  emptySubtext: {
-    fontSize: 14,
-    color: colors.textMuted,
-    marginTop: 4,
+    color: colors.text.secondary,
   },
   inputContainer: {
-    flexDirection: 'column',
-    alignItems: 'stretch',
-    paddingHorizontal: 12,
-    paddingTop: 8,
-    paddingBottom: 16,
-    backgroundColor: colors.surface,
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.lg,
+    paddingTop: spacing.sm,
+  },
+  mediaPreview: {
+    marginBottom: spacing.sm,
+  },
+  photoPreview: {
+    position: 'relative',
+  },
+  previewImage: {
+    width: 100,
+    height: 100,
+    borderRadius: radius.md,
+  },
+  removeMediaButton: {
+    position: 'absolute',
+    top: -8,
+    right: -8,
+  },
+  audioPreview: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    padding: spacing.md,
+  },
+  audioPlayButton: {
+    width: 36,
+    height: 36,
+    borderRadius: radius.full,
+    backgroundColor: colors.surface.glassDark,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  audioPreviewText: {
+    flex: 1,
+    fontSize: typography.sizes.sm,
+    color: colors.text.primary,
   },
   inputRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: spacing.sm,
+    padding: spacing.sm,
+    backgroundColor: colors.surface.glass,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.border.accent,
   },
-  inputBox: {
+  cannotSendText: {
     flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.surfaceLight,
-    borderRadius: 25,
-    paddingHorizontal: 14,
-    paddingVertical: 4,
-    marginRight: 8,
+    fontSize: typography.sizes.sm,
+    color: colors.text.secondary,
+    textAlign: 'center',
+    paddingVertical: spacing.sm,
   },
-  inputActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  inputIconButton: {
-    paddingHorizontal: 5,
-    paddingVertical: 0,
-  },
-  input: {
-    flex: 1,
-    backgroundColor: 'transparent',
-    paddingHorizontal: 0,
-    paddingVertical: 10,
-    fontSize: 16,
-    maxHeight: 100,
-    color: colors.textPrimary,
-  },
-  sendButton: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: colors.primary,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  sendButtonDisabled: {
-    backgroundColor: colors.textMuted,
-  },
-  fullscreenOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.95)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  fullscreenImageContainer: {
-    width: '100%',
-    height: '100%',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  fullscreenImage: {
-    width: '100%',
-    height: '100%',
-  },
-  fullscreenCloseButton: {
-    position: 'absolute',
-    top: 40,
-    right: 20,
-    zIndex: 2,
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  fullscreenLocationButton: {
-    position: 'absolute',
-    bottom: 60,
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(124,92,252,0.85)',
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderRadius: 24,
-    gap: 8,
-  },
-  fullscreenLocationText: {
-    color: '#fff',
-    fontSize: 15,
-    fontWeight: '600',
-  },
-  inputMediaPreview: {
-    marginBottom: 8,
-    borderRadius: 12,
-    overflow: 'hidden',
-  },
-  inputMediaImage: {
-    width: 140,
-    height: 140,
-    borderRadius: 12,
-  },
-  inputMediaClear: {
-    position: 'absolute',
-    top: 4,
-    right: 4,
-  },
-  inputAudioPreview: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.surfaceLight,
-    borderRadius: 8,
-    padding: 8,
-    marginBottom: 8,
-  },
-  inputAudioPlayButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: colors.primary,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  inputAudioText: {
-    flex: 1,
-    marginLeft: 8,
-    fontSize: 13,
-    color: colors.textPrimary,
+  iconButton: {
+    padding: spacing.xs,
   },
   recordingButton: {
-    backgroundColor: '#3a1a1a',
-    borderRadius: 16,
+    backgroundColor: colors.error,
+    borderRadius: radius.full,
   },
-  notFollowingContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  textInput: {
+    flex: 1,
+    fontSize: typography.sizes.md,
+    color: colors.text.primary,
+    maxHeight: 100,
+    paddingVertical: spacing.xs,
+  },
+  sendButton: {
+    width: 40,
+    height: 40,
+    borderRadius: radius.full,
     justifyContent: 'center',
-    paddingVertical: 12,
-    gap: 8,
+    alignItems: 'center',
   },
-  notFollowingText: {
-    fontSize: 14,
-    color: colors.textMuted,
+  fullImageModal: {
+    flex: 1,
+    backgroundColor: colors.overlay.dark,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  fullImage: {
+    width: '100%',
+    height: '100%',
+  },
+  closeFullImage: {
+    position: 'absolute',
+    top: 60,
+    right: 20,
+  },
+  closeButtonInner: {
+    width: 48,
+    height: 48,
+    borderRadius: radius.full,
+    backgroundColor: colors.surface.glass,
+    justifyContent: 'center',
+    alignItems: 'center',
+    ...shadows.medium,
   },
 });

@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { Animated, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { colors } from '@/theme';
+import { colors, shadows, radius } from '@/theme-redesign';
 
 interface ToastAction {
   label: string;
@@ -63,7 +63,7 @@ export default function Toast({ visible, message, type = 'success', duration = 2
   if (!visible) return null;
 
   const iconName = type === 'success' ? 'checkmark-circle' : type === 'error' ? 'close-circle' : 'warning';
-  const accentColor = type === 'success' ? colors.primary : type === 'error' ? colors.error : '#F59E0B';
+  const accentColor = type === 'success' ? colors.primary.cyan : type === 'error' ? colors.error : colors.warning;
 
   return (
     <Animated.View
@@ -97,34 +97,30 @@ const styles = StyleSheet.create({
     right: 16,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.surface,
-    borderRadius: 12,
+    backgroundColor: colors.surface.elevated,
+    borderRadius: radius.lg,
     borderLeftWidth: 4,
     paddingVertical: 14,
     paddingHorizontal: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 6,
+    ...shadows.medium,
     zIndex: 9999,
   },
   message: {
     marginLeft: 10,
     fontSize: 14,
     fontWeight: '500',
-    color: colors.textPrimary,
+    color: colors.text.primary,
     flex: 1,
   },
   actionButton: {
     marginLeft: 12,
     paddingVertical: 6,
     paddingHorizontal: 14,
-    borderRadius: 8,
+    borderRadius: radius.md,
   },
   actionLabel: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#FFFFFF',
+    color: colors.text.primary,
   },
 });

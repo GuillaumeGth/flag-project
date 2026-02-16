@@ -12,6 +12,7 @@ import {
 import Toast from '@/components/Toast';
 import { Switch } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import * as ImagePicker from 'expo-image-picker';
 import { Audio } from 'expo-av';
 import { useLocation } from '@/contexts/LocationContext';
@@ -415,18 +416,32 @@ export default function CreateMessageScreen({ navigation, route }: Props) {
 
       {/* Send button */}
       <TouchableOpacity
-        style={[styles.sendButton, loading && styles.sendButtonDisabled]}
+        style={[styles.sendButtonContainer, loading && styles.sendButtonDisabled]}
         onPress={handleSend}
         disabled={loading}
+        activeOpacity={0.8}
       >
-        {loading ? (
-          <ActivityIndicator color={colors.text.primary} />
-        ) : (
-          <>
-            <Ionicons name="send" size={20} color={colors.text.primary} />
-            <Text style={styles.sendButtonText}>Envoyer</Text>
-          </>
-        )}
+        <LinearGradient
+          colors={[
+            '#A78BFA',
+            '#8B5CF6',
+            '#7C3AED',
+            '#6D28D9',
+            '#5B21B6',
+          ]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 0 }}
+          style={styles.sendButton}
+        >
+          {loading ? (
+            <ActivityIndicator color="#FFFFFF" />
+          ) : (
+            <>
+              <Ionicons name="send" size={20} color="#FFFFFF" />
+              <Text style={styles.sendButtonText}>Envoyer</Text>
+            </>
+          )}
+        </LinearGradient>
       </TouchableOpacity>
     </ScrollView>
     </View>
@@ -569,14 +584,17 @@ const styles = StyleSheet.create({
   recordingText: {
     color: colors.error,
   },
+  sendButtonContainer: {
+    borderRadius: radius.lg,
+    overflow: 'hidden',
+    ...shadows.medium,
+  },
   sendButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.primary.cyan,
     borderRadius: radius.lg,
     padding: spacing.lg,
-    ...shadows.medium,
   },
   sendButtonDisabled: {
     opacity: 0.7,
@@ -585,6 +603,6 @@ const styles = StyleSheet.create({
     marginLeft: spacing.sm,
     fontSize: typography.sizes.md,
     fontWeight: '600',
-    color: colors.text.primary,
+    color: '#FFFFFF',
   },
 });

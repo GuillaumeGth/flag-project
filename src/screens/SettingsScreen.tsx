@@ -8,7 +8,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '@/contexts/AuthContext';
-import { colors } from '@/theme';
+import { colors } from '@/theme-redesign';
 
 export default function SettingsScreen({ navigation }: any) {
   const { signOut } = useAuth();
@@ -28,7 +28,7 @@ export default function SettingsScreen({ navigation }: any) {
     <View style={styles.container}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={24} color={colors.textPrimary} />
+          <Ionicons name="arrow-back" size={24} color={colors.text.primary} />
         </TouchableOpacity>
         <Text style={styles.title}>Paramètres</Text>
         <View style={styles.backButton} />
@@ -36,27 +36,27 @@ export default function SettingsScreen({ navigation }: any) {
 
       <View style={styles.menuSection}>
         <TouchableOpacity style={styles.menuItem}>
-          <Ionicons name="person-outline" size={24} color={colors.textPrimary} />
+          <Ionicons name="person-outline" size={24} color={colors.text.primary} />
           <Text style={styles.menuText}>Modifier le profil</Text>
-          <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
+          <Ionicons name="chevron-forward" size={20} color={colors.text.tertiary} />
         </TouchableOpacity>
 
         <TouchableOpacity style={styles.menuItem}>
-          <Ionicons name="notifications-outline" size={24} color={colors.textPrimary} />
+          <Ionicons name="notifications-outline" size={24} color={colors.text.primary} />
           <Text style={styles.menuText}>Notifications</Text>
-          <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
+          <Ionicons name="chevron-forward" size={20} color={colors.text.tertiary} />
         </TouchableOpacity>
 
         <TouchableOpacity style={styles.menuItem}>
-          <Ionicons name="shield-outline" size={24} color={colors.textPrimary} />
+          <Ionicons name="shield-outline" size={24} color={colors.text.primary} />
           <Text style={styles.menuText}>Confidentialité</Text>
-          <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
+          <Ionicons name="chevron-forward" size={20} color={colors.text.tertiary} />
         </TouchableOpacity>
 
         <TouchableOpacity style={styles.menuItem}>
-          <Ionicons name="help-circle-outline" size={24} color={colors.textPrimary} />
+          <Ionicons name="help-circle-outline" size={24} color={colors.text.primary} />
           <Text style={styles.menuText}>Aide</Text>
-          <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
+          <Ionicons name="chevron-forward" size={20} color={colors.text.tertiary} />
         </TouchableOpacity>
       </View>
 
@@ -73,7 +73,7 @@ export default function SettingsScreen({ navigation }: any) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: colors.background.primary,
   },
   header: {
     flexDirection: 'row',
@@ -92,7 +92,7 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 20,
     fontWeight: 'bold',
-    color: colors.textPrimary,
+    color: colors.text.primary,
     textAlign: 'center',
   },
   menuSection: {
@@ -108,7 +108,7 @@ const styles = StyleSheet.create({
     flex: 1,
     marginLeft: 16,
     fontSize: 16,
-    color: colors.textPrimary,
+    color: colors.text.primary,
   },
   signOutButton: {
     flexDirection: 'row',
@@ -124,7 +124,7 @@ const styles = StyleSheet.create({
   },
   version: {
     textAlign: 'center',
-    color: colors.textMuted,
+    color: colors.text.tertiary,
     fontSize: 12,
     marginTop: 'auto',
     paddingBottom: 32,

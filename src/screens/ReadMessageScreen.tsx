@@ -12,7 +12,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Audio } from 'expo-av';
 import { markMessageAsRead, fetchMessageById, markPublicMessageDiscovered } from '@/services/messages';
 import { MessageWithSender } from '@/types';
-import { colors } from '@/theme';
+import { colors } from '@/theme-redesign';
 
 interface Props {
   navigation: any;
@@ -113,7 +113,7 @@ export default function ReadMessageScreen({ navigation, route }: Props) {
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={colors.primary} />
+        <ActivityIndicator size="large" color={colors.primary.cyan} />
       </View>
     );
   }
@@ -121,7 +121,7 @@ export default function ReadMessageScreen({ navigation, route }: Props) {
   if (!message) {
     return (
       <View style={styles.loadingContainer}>
-        <Ionicons name="alert-circle" size={64} color={colors.textMuted} />
+        <Ionicons name="alert-circle" size={64} color={colors.text.tertiary} />
         <Text style={styles.errorText}>Message introuvable</Text>
         <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
           <Text style={styles.backButtonText}>Retour</Text>
@@ -134,7 +134,7 @@ export default function ReadMessageScreen({ navigation, route }: Props) {
     <View style={styles.container}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()}>
-          <Ionicons name="arrow-back" size={24} color={colors.textPrimary} />
+          <Ionicons name="arrow-back" size={24} color={colors.text.primary} />
         </TouchableOpacity>
         <View style={styles.headerInfo}>
           <Text style={styles.senderName}>
@@ -157,7 +157,7 @@ export default function ReadMessageScreen({ navigation, route }: Props) {
             <Ionicons
               name={isPlaying ? 'pause-circle' : 'play-circle'}
               size={64}
-              color={colors.primary}
+              color={colors.primary.cyan}
             />
             <Text style={styles.audioText}>
               {isPlaying ? 'En lecture...' : 'Appuyez pour écouter'}
@@ -171,7 +171,7 @@ export default function ReadMessageScreen({ navigation, route }: Props) {
         )}
 
         <View style={styles.locationBadge}>
-          <Ionicons name="location" size={16} color={colors.primary} />
+          <Ionicons name="location" size={16} color={colors.primary.cyan} />
           <Text style={styles.locationText}>
             Message découvert à cet endroit
           </Text>
@@ -199,13 +199,13 @@ export default function ReadMessageScreen({ navigation, route }: Props) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: colors.background.primary,
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: colors.background,
+    backgroundColor: colors.background.primary,
   },
   header: {
     flexDirection: 'row',
@@ -214,7 +214,7 @@ const styles = StyleSheet.create({
     paddingTop: 56,
     paddingBottom: 16,
     borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    borderBottomColor: colors.border.default,
   },
   headerInfo: {
     flex: 1,
@@ -223,11 +223,11 @@ const styles = StyleSheet.create({
   senderName: {
     fontSize: 18,
     fontWeight: '600',
-    color: colors.textPrimary,
+    color: colors.text.primary,
   },
   date: {
     fontSize: 12,
-    color: colors.textMuted,
+    color: colors.text.tertiary,
     marginTop: 2,
   },
   content: {
@@ -245,43 +245,43 @@ const styles = StyleSheet.create({
   audioPlayer: {
     alignItems: 'center',
     padding: 32,
-    backgroundColor: colors.surfaceLight,
+    backgroundColor: colors.background.tertiary,
     borderRadius: 12,
     marginBottom: 16,
   },
   audioText: {
     marginTop: 8,
     fontSize: 14,
-    color: colors.textSecondary,
+    color: colors.text.secondary,
   },
   textContent: {
     fontSize: 18,
     lineHeight: 28,
-    color: colors.textPrimary,
+    color: colors.text.primary,
     marginBottom: 24,
   },
   locationBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.surfaceLight,
+    backgroundColor: colors.background.tertiary,
     borderRadius: 8,
     padding: 12,
   },
   locationText: {
     marginLeft: 8,
     fontSize: 14,
-    color: colors.primary,
+    color: colors.primary.cyan,
   },
   footer: {
     padding: 16,
     borderTopWidth: 1,
-    borderTopColor: colors.border,
+    borderTopColor: colors.border.default,
   },
   replyButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.primary,
+    backgroundColor: colors.primary.cyan,
     borderRadius: 12,
     padding: 16,
   },
@@ -295,11 +295,11 @@ const styles = StyleSheet.create({
     marginTop: 16,
     fontSize: 18,
     fontWeight: '600',
-    color: colors.textSecondary,
+    color: colors.text.secondary,
   },
   backButton: {
     marginTop: 24,
-    backgroundColor: colors.primary,
+    backgroundColor: colors.primary.cyan,
     paddingHorizontal: 24,
     paddingVertical: 12,
     borderRadius: 8,

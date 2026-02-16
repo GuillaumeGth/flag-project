@@ -7,8 +7,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import * as SecureStore from 'expo-secure-store';
 
-import { colors } from '@/theme';
-import { colors as colorsRedesign, spacing } from '@/theme-redesign';
+import { colors, spacing } from '@/theme-redesign';
 import { AuthProvider, useAuth } from '@/contexts/AuthContext';
 import { LocationProvider } from '@/contexts/LocationContext';
 import { addNotificationResponseListener } from '@/services/notifications';
@@ -56,12 +55,12 @@ function MainTabs() {
 
           return <Ionicons name={iconName} size={24} color={color} />;
         },
-        tabBarActiveTintColor: colorsRedesign.primary.cyan,
-        tabBarInactiveTintColor: colorsRedesign.text.tertiary,
+        tabBarActiveTintColor: colors.primary.cyan,
+        tabBarInactiveTintColor: colors.text.tertiary,
         tabBarStyle: {
-          backgroundColor: colorsRedesign.surface.elevated,
+          backgroundColor: colors.surface.elevated,
           borderTopWidth: 1,
-          borderTopColor: colorsRedesign.border.default,
+          borderTopColor: colors.border.default,
           height: tabBarHeight,
           paddingBottom: insets.bottom,
           paddingTop: spacing.xs,

@@ -12,7 +12,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { fetchFollowedUsers, FLAG_BOT_ID } from '@/services/messages';
 import { User } from '@/types';
-import { colors } from '@/theme';
+import { colors } from '@/theme-redesign';
 
 interface Props {
   navigation: any;
@@ -95,7 +95,7 @@ export default function SelectRecipientScreen({ navigation }: Props) {
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()}>
-          <Ionicons name="arrow-back" size={24} color={colors.textPrimary} />
+          <Ionicons name="arrow-back" size={24} color={colors.text.primary} />
         </TouchableOpacity>
         <Text style={styles.title}>Choisir les destinataires</Text>
         <TouchableOpacity
@@ -115,11 +115,11 @@ export default function SelectRecipientScreen({ navigation }: Props) {
 
       {loading ? (
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={colors.primary} />
+          <ActivityIndicator size="large" color={colors.primary.cyan} />
         </View>
       ) : users.length === 0 ? (
         <View style={styles.emptyContainer}>
-          <Ionicons name="people-outline" size={64} color={colors.textMuted} />
+          <Ionicons name="people-outline" size={64} color={colors.text.tertiary} />
           <Text style={styles.emptyTitle}>Aucun abonnement</Text>
           <Text style={styles.emptyText}>
             Vous ne suivez personne pour le moment.{'\n'}
@@ -141,7 +141,7 @@ export default function SelectRecipientScreen({ navigation }: Props) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: colors.background.primary,
   },
   header: {
     flexDirection: 'row',
@@ -149,20 +149,20 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     padding: 16,
     borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    borderBottomColor: colors.border.default,
   },
   title: {
     fontSize: 18,
     fontWeight: '600',
-    color: colors.textPrimary,
+    color: colors.text.primary,
   },
   confirmButton: {
     fontSize: 16,
     fontWeight: '600',
-    color: colors.primary,
+    color: colors.primary.cyan,
   },
   confirmButtonDisabled: {
-    color: colors.textMuted,
+    color: colors.text.tertiary,
   },
   loadingContainer: {
     flex: 1,
@@ -178,13 +178,13 @@ const styles = StyleSheet.create({
   emptyTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: colors.textPrimary,
+    color: colors.text.primary,
     marginTop: 16,
     marginBottom: 8,
   },
   emptyText: {
     fontSize: 14,
-    color: colors.textSecondary,
+    color: colors.text.secondary,
     textAlign: 'center',
     lineHeight: 20,
   },
@@ -195,34 +195,34 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     padding: 12,
-    backgroundColor: colors.surfaceLight,
+    backgroundColor: colors.background.tertiary,
     borderRadius: 12,
     marginBottom: 8,
   },
   userItemSelected: {
-    backgroundColor: colors.surface,
+    backgroundColor: colors.surface.elevated,
     borderWidth: 1,
-    borderColor: colors.primary,
+    borderColor: colors.primary.cyan,
   },
   checkbox: {
     width: 24,
     height: 24,
     borderRadius: 12,
     borderWidth: 2,
-    borderColor: colors.textMuted,
+    borderColor: colors.text.tertiary,
     marginRight: 12,
     justifyContent: 'center',
     alignItems: 'center',
   },
   checkboxSelected: {
-    backgroundColor: colors.primary,
-    borderColor: colors.primary,
+    backgroundColor: colors.primary.cyan,
+    borderColor: colors.primary.cyan,
   },
   avatar: {
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: colors.surface,
+    backgroundColor: colors.surface.elevated,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -232,7 +232,7 @@ const styles = StyleSheet.create({
     borderRadius: 24,
   },
   botAvatar: {
-    backgroundColor: colors.surfaceLight,
+    backgroundColor: colors.background.tertiary,
   },
   userInfo: {
     flex: 1,
@@ -241,11 +241,11 @@ const styles = StyleSheet.create({
   userName: {
     fontSize: 16,
     fontWeight: '500',
-    color: colors.textPrimary,
+    color: colors.text.primary,
   },
   botLabel: {
     fontSize: 12,
-    color: colors.primary,
+    color: colors.primary.cyan,
     marginTop: 2,
   },
 });

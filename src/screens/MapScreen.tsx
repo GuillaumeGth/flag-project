@@ -77,6 +77,7 @@ export default function MapScreenRedesign({ navigation, route }: Props) {
     }
   }, []);
 
+
   // Load messages whenever the map screen is focused
   useFocusEffect(
     useCallback(() => {
@@ -587,20 +588,36 @@ export default function MapScreenRedesign({ navigation, route }: Props) {
       </View>
 
       {/* Create Message FAB - Gradient Style */}
-      <TouchableOpacity
-        style={[styles.createFABContainer, { bottom: 24 + insets.bottom }]}
-        onPress={() => navigation.navigate('CreateMessage')}
-        activeOpacity={0.9}
+      <View
+        style={[
+          styles.createFABGlowContainer,
+          { bottom: 24 + insets.bottom },
+        ]}
       >
-        <LinearGradient
-          colors={colors.gradients.primary}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={[styles.createFAB, shadows.glow]}
+        <TouchableOpacity
+          style={styles.createFABContainer}
+          onPress={() => navigation.navigate('CreateMessage')}
+          activeOpacity={0.8}
         >
-          <FontAwesome name="paper-plane" size={26} color={colors.text.primary} />
-        </LinearGradient>
-      </TouchableOpacity>
+          {/* Main button with intense gradient */}
+          <LinearGradient
+            colors={[
+              '#A78BFA',
+              '#8B5CF6',
+              '#7C3AED',
+              '#6D28D9',
+              '#5B21B6',
+            ]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.createFAB}
+          >
+            <View style={styles.createFABInner}>
+              <FontAwesome name="paper-plane" size={32} color="#FFFFFF" style={{ textShadowColor: 'rgba(0,0,0,0.3)', textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 4 }} />
+            </View>
+          </LinearGradient>
+        </TouchableOpacity>
+      </View>
 
       {/* Selected Message Card - Premium Glass */}
       {selectedMessage && (
@@ -749,17 +766,33 @@ const styles = StyleSheet.create({
     borderRadius: radius.lg,
     ...shadows.small,
   },
-  createFABContainer: {
+  createFABGlowContainer: {
     position: 'absolute',
     right: spacing.lg,
+    shadowColor: '#C4B5FD',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.9,
+    shadowRadius: 30,
+    elevation: 20,
+  },
+  createFABContainer: {
     borderRadius: radius.full,
   },
   createFAB: {
-    width: 64,
-    height: 64,
+    width: 80,
+    height: 80,
     borderRadius: radius.full,
     justifyContent: 'center',
     alignItems: 'center',
+    borderWidth: 3,
+    borderColor: 'rgba(255, 255, 255, 0.6)',
+  },
+  createFABInner: {
+    width: '100%',
+    height: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: radius.full,
   },
   messageCardContainer: {
     position: 'absolute',

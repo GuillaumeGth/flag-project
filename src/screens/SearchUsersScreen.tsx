@@ -12,7 +12,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { supabase, getCachedUserId } from '@/services/supabase';
-import { colors } from '@/theme';
+import { colors } from '@/theme-redesign';
 import { User } from '@/types';
 
 interface Props {
@@ -62,7 +62,7 @@ export default function SearchUsersScreen({ navigation }: Props) {
         {item.avatar_url ? (
           <Image source={{ uri: item.avatar_url }} style={styles.userAvatarImage} />
         ) : (
-          <Ionicons name="person" size={20} color={colors.textSecondary} />
+          <Ionicons name="person" size={20} color={colors.text.secondary} />
         )}
       </View>
       <View style={styles.userInfo}>
@@ -71,7 +71,7 @@ export default function SearchUsersScreen({ navigation }: Props) {
           <Text style={styles.userIdentifier}>{item.phone || item.email}</Text>
         )}
       </View>
-      <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
+      <Ionicons name="chevron-forward" size={20} color={colors.text.tertiary} />
     </TouchableOpacity>
   );
 
@@ -79,14 +79,14 @@ export default function SearchUsersScreen({ navigation }: Props) {
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={24} color={colors.textPrimary} />
+          <Ionicons name="arrow-back" size={24} color={colors.text.primary} />
         </TouchableOpacity>
         <View style={styles.searchBox}>
-          <Ionicons name="search" size={18} color={colors.textMuted} />
+          <Ionicons name="search" size={18} color={colors.text.tertiary} />
           <TextInput
             style={styles.searchInput}
             placeholder="Rechercher un utilisateur..."
-            placeholderTextColor={colors.textMuted}
+            placeholderTextColor={colors.text.tertiary}
             value={query}
             onChangeText={setQuery}
             autoFocus
@@ -95,7 +95,7 @@ export default function SearchUsersScreen({ navigation }: Props) {
           />
           {query.length > 0 && (
             <TouchableOpacity onPress={() => setQuery('')}>
-              <Ionicons name="close-circle" size={18} color={colors.textMuted} />
+              <Ionicons name="close-circle" size={18} color={colors.text.tertiary} />
             </TouchableOpacity>
           )}
         </View>
@@ -112,12 +112,12 @@ export default function SearchUsersScreen({ navigation }: Props) {
         ListEmptyComponent={
           query.trim().length > 0 && !loading ? (
             <View style={styles.emptyContainer}>
-              <Ionicons name="search-outline" size={48} color={colors.textMuted} />
+              <Ionicons name="search-outline" size={48} color={colors.text.tertiary} />
               <Text style={styles.emptyText}>Aucun utilisateur trouvé</Text>
             </View>
           ) : !query.trim() ? (
             <View style={styles.emptyContainer}>
-              <Ionicons name="people-outline" size={48} color={colors.textMuted} />
+              <Ionicons name="people-outline" size={48} color={colors.text.tertiary} />
               <Text style={styles.emptyText}>Recherchez par nom</Text>
             </View>
           ) : null
@@ -131,16 +131,16 @@ export default function SearchUsersScreen({ navigation }: Props) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: colors.background.primary,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 12,
     paddingVertical: 8,
-    backgroundColor: colors.surface,
+    backgroundColor: colors.surface.elevated,
     borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    borderBottomColor: colors.border.default,
   },
   backButton: {
     padding: 4,
@@ -150,7 +150,7 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.surfaceLight,
+    backgroundColor: colors.surface.elevatedLight,
     borderRadius: 12,
     paddingHorizontal: 12,
     paddingVertical: 8,
@@ -158,7 +158,7 @@ const styles = StyleSheet.create({
   searchInput: {
     flex: 1,
     fontSize: 16,
-    color: colors.textPrimary,
+    color: colors.text.primary,
     marginLeft: 8,
     paddingVertical: 0,
   },
@@ -171,13 +171,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    borderBottomColor: colors.border.default,
   },
   userAvatar: {
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: colors.surfaceLight,
+    backgroundColor: colors.surface.elevatedLight,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -193,11 +193,11 @@ const styles = StyleSheet.create({
   userName: {
     fontSize: 16,
     fontWeight: '600',
-    color: colors.textPrimary,
+    color: colors.text.primary,
   },
   userIdentifier: {
     fontSize: 13,
-    color: colors.textSecondary,
+    color: colors.text.secondary,
     marginTop: 2,
   },
   emptyContainer: {
@@ -206,7 +206,7 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   emptyText: {
-    color: colors.textMuted,
+    color: colors.text.tertiary,
     fontSize: 14,
   },
 });

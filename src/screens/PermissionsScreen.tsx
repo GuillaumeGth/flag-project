@@ -11,7 +11,7 @@ import * as Notifications from 'expo-notifications';
 import { Camera } from 'expo-camera';
 import { Audio } from 'expo-av';
 import { Ionicons } from '@expo/vector-icons';
-import { colors } from '@/theme';
+import { colors } from '@/theme-redesign';
 
 interface PermissionItem {
   key: string;
@@ -202,7 +202,7 @@ export default function PermissionsScreen({ onComplete }: PermissionsScreenProps
 
       <View style={styles.content}>
         <View style={styles.iconContainer}>
-          <Ionicons name={current.icon} size={64} color={colors.primary} />
+          <Ionicons name={current.icon} size={64} color={colors.primary.cyan} />
         </View>
 
         <Text style={styles.title}>{current.label}</Text>
@@ -235,7 +235,7 @@ export default function PermissionsScreen({ onComplete }: PermissionsScreenProps
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: colors.background.primary,
     paddingHorizontal: 32,
     paddingTop: 80,
     paddingBottom: 40,
@@ -250,14 +250,14 @@ const styles = StyleSheet.create({
     width: 10,
     height: 10,
     borderRadius: 5,
-    backgroundColor: colors.surfaceLight,
+    backgroundColor: colors.background.tertiary,
   },
   progressDotActive: {
-    backgroundColor: colors.primary,
+    backgroundColor: colors.primary.cyan,
     width: 24,
   },
   progressDotDone: {
-    backgroundColor: colors.primary,
+    backgroundColor: colors.primary.cyan,
   },
   content: {
     flex: 1,
@@ -268,7 +268,7 @@ const styles = StyleSheet.create({
     width: 120,
     height: 120,
     borderRadius: 60,
-    backgroundColor: colors.surfaceLight,
+    backgroundColor: colors.background.tertiary,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 32,
@@ -276,19 +276,19 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 28,
     fontWeight: 'bold',
-    color: colors.textPrimary,
+    color: colors.text.primary,
     textAlign: 'center',
     marginBottom: 12,
   },
   description: {
     fontSize: 16,
-    color: colors.textSecondary,
+    color: colors.text.secondary,
     textAlign: 'center',
     marginBottom: 48,
     lineHeight: 22,
   },
   button: {
-    backgroundColor: colors.primary,
+    backgroundColor: colors.primary.cyan,
     borderRadius: 12,
     paddingVertical: 16,
     paddingHorizontal: 48,
@@ -305,12 +305,12 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   skipButtonText: {
-    color: colors.textMuted,
+    color: colors.text.tertiary,
     fontSize: 14,
   },
   footer: {
     textAlign: 'center',
-    color: colors.textMuted,
+    color: colors.text.tertiary,
     fontSize: 14,
   },
 });

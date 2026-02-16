@@ -17,47 +17,49 @@ export const colors = {
     elevated: '#1E1E2D',                    // Solid elevated surface
   },
 
-  // === Primary Palette (Violet + Cyan exploration theme) ===
+  // === Primary Palette (Purple theme) ===
   primary: {
-    violet: '#7C5CFC',       // Your signature violet
-    violetLight: '#9B7FFF',
-    violetDark: '#6344E8',
-    cyan: '#00E5FF',         // Discovery/active state
-    cyanLight: '#5FF3FF',
-    cyanDark: '#00B8D4',
-    magenta: '#FF00E5',      // Accent for special moments
+    violet: '#A78BFA',       // Medium purple
+    violetLight: '#C4B5FD',
+    violetDark: '#7C3AED',
+    cyan: '#A78BFA',         // Medium purple (main action color)
+    cyanLight: '#C4B5FD',
+    cyanDark: '#7C3AED',
+    magenta: '#D8B4FE',      // Light lavender accent
   },
 
   // === Gradients (for backgrounds, buttons, highlights) ===
   gradients: {
-    primary: ['#7C5CFC', '#00E5FF'] as const,           // Violet to cyan
-    discovery: ['#FF00E5', '#7C5CFC', '#00E5FF'] as const, // Magenta > violet > cyan
+    primary: ['#A78BFA', '#7C3AED'] as const,           // Purple gradient
+    discovery: ['#D8B4FE', '#A78BFA', '#7C3AED'] as const, // Lavender > purple > deep purple
+    heroButton: ['#F3E8FF', '#E9D5FF', '#D8B4FE', '#C4B5FD', '#A78BFA', '#8B5CF6', '#7C3AED'] as const, // Ultra-vibrant purple cascade
     subtle: ['#1A1A28', '#12121D'] as const,            // Subtle depth
-    glow: ['rgba(124, 92, 252, 0.3)', 'rgba(0, 229, 255, 0.3)'] as const, // Soft glow
+    glow: ['rgba(167, 139, 250, 0.3)', 'rgba(124, 58, 237, 0.3)'] as const, // Purple glow
+    glowIntense: ['rgba(216, 180, 254, 0.6)', 'rgba(167, 139, 250, 0.6)', 'rgba(124, 58, 237, 0.8)'] as const, // Intense purple glow
     topographic: ['#0A0A12', '#1A1A28', '#0A0A12'] as const, // Contour lines effect
   },
 
   // === Semantic Colors ===
-  success: '#00E676',       // Bright green for discoveries
-  warning: '#FFB300',       // Amber for proximity alerts
-  error: '#FF3D71',         // Vibrant red
-  info: '#00E5FF',          // Cyan for information
+  success: '#5FD68A',       // Vibrant green for discoveries
+  warning: '#FFA94D',       // Amber for proximity alerts
+  error: '#FF5C7C',         // Rose-red
+  info: '#A78BFA',          // Purple for information
 
   // === Text Hierarchy ===
   text: {
     primary: '#FFFFFF',
     secondary: '#B8B8D0',    // Slightly purple-tinted gray
-    tertiary: '#7A7A95',     // Muted
+    tertiary: '#7A7A95',     // Muted purple-gray
     disabled: '#4A4A5C',
-    accent: '#00E5FF',       // Cyan for highlighted text
+    accent: '#A78BFA',       // Purple for highlighted text
   },
 
   // === Borders & Dividers ===
   border: {
-    default: 'rgba(124, 92, 252, 0.15)',  // Subtle violet tint
+    default: 'rgba(167, 139, 250, 0.2)',   // Purple tint
     light: 'rgba(255, 255, 255, 0.08)',
-    accent: 'rgba(0, 229, 255, 0.3)',     // Cyan glow
-    glow: 'rgba(124, 92, 252, 0.4)',      // Glowing borders
+    accent: 'rgba(167, 139, 250, 0.4)',    // Purple glow
+    glow: 'rgba(167, 139, 250, 0.45)',     // Strong purple borders
   },
 
   // === Overlays & Shadows ===
@@ -69,18 +71,18 @@ export const colors = {
 
   // === Special Effects ===
   glow: {
-    violet: '#7C5CFC',
-    cyan: '#00E5FF',
-    magenta: '#FF00E5',
+    violet: '#A78BFA',
+    cyan: '#A78BFA',
+    magenta: '#D8B4FE',
     white: '#FFFFFF',
   },
 
   // === Message States ===
   message: {
-    sent: '#7C5CFC',
+    sent: '#3c2f63',
     received: 'rgba(30, 30, 45, 0.7)',
-    undiscovered: 'rgba(255, 0, 229, 0.2)',  // Magenta tint
-    discovered: 'rgba(0, 229, 255, 0.2)',     // Cyan tint
+    undiscovered: 'rgba(216, 180, 254, 0.25)',  // Lavender tint
+    discovered: 'rgba(167, 139, 250, 0.25)',    // Purple tint
   },
 };
 
@@ -108,16 +110,16 @@ export const shadows = {
     elevation: 8,
   },
   glow: {
-    shadowColor: colors.primary.cyan,
+    shadowColor: '#A78BFA',
     shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.6,
+    shadowOpacity: 0.5,
     shadowRadius: 12,
     elevation: 6,
   },
   glowViolet: {
-    shadowColor: colors.primary.violet,
+    shadowColor: '#A78BFA',
     shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.5,
+    shadowOpacity: 0.45,
     shadowRadius: 10,
     elevation: 5,
   },

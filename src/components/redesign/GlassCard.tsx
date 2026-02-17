@@ -1,6 +1,5 @@
 import React from 'react';
 import { View, StyleSheet, ViewStyle } from 'react-native';
-import { BlurView } from 'expo-blur';
 import { colors, shadows, radius } from '@/theme-redesign';
 
 interface GlassCardProps {
@@ -12,10 +11,6 @@ interface GlassCardProps {
   glowColor?: 'violet' | 'cyan' | 'magenta';
 }
 
-/**
- * Premium Glass Card with Glassmorphism Effect
- * Usage: Wrap content in this for elevated, glass-like surfaces
- */
 export default function GlassCard({
   children,
   style,
@@ -42,9 +37,7 @@ export default function GlassCard({
         style,
       ]}
     >
-      <BlurView intensity={intensity} tint="default" style={styles.blur}>
-        <View style={styles.content}>{children}</View>
-      </BlurView>
+      <View style={styles.content}>{children}</View>
     </View>
   );
 }
@@ -52,14 +45,9 @@ export default function GlassCard({
 const styles = StyleSheet.create({
   container: {
     borderRadius: radius.lg,
-    overflow: 'hidden',
     backgroundColor: colors.surface.glass,
   },
-  blur: {
-    flex: 1,
-  },
   content: {
-    flex: 1,
     padding: 16,
   },
   border: {

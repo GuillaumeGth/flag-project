@@ -223,7 +223,6 @@ export default function UserProfileScreen({ navigation, route }: Props) {
       </View>
 
       <View style={styles.divider} />
-      <Text style={styles.gridTitle}>Messages Publics</Text>
     </>
   );
 

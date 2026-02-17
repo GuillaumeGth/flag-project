@@ -280,7 +280,6 @@ export default function ProfileScreenRedesign({ navigation }: any) {
 
       {/* Divider */}
       <View style={styles.divider} />
-      <Text style={styles.gridTitle}>Messages Publics</Text>
     </Animated.View>
   );
 

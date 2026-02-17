@@ -18,6 +18,8 @@ import {
   ActivityIndicator,
   Image,
   Animated,
+  Linking,
+  Platform,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
@@ -259,7 +261,11 @@ export default function MapScreenRedesign({ navigation, route }: Props) {
 
   const handleMarkerPress = useCallback((message: UndiscoveredMessageMapMeta) => {
     setSelectedMessage(message);
-  }, []);
+    const location = getMessageLocation(message);
+    if (location && !canReadMessage(location)) {
+      fetchRoute(location, message.id);
+    }
+  }, [canReadMessage, fetchRoute]);
 
   const getInitials = useCallback((name?: string): string => {
     if (!name) return '?';
@@ -306,6 +312,18 @@ export default function MapScreenRedesign({ navigation, route }: Props) {
       setIsLoadingRoute(false);
     }
   }, [userLocation, routeCoordinates]);
+
+  const openInMaps = useCallback(() => {
+    if (!routeCoordinates || routeCoordinates.length === 0) return;
+    const dest = routeCoordinates[routeCoordinates.length - 1];
+    const { latitude, longitude } = dest;
+    const url = Platform.OS === 'ios'
+      ? `maps://?daddr=${latitude},${longitude}&dirflg=w`
+      : `google.navigation:q=${latitude},${longitude}&mode=w`;
+    Linking.openURL(url).catch(() => {
+      Linking.openURL(`https://maps.google.com/maps?daddr=${latitude},${longitude}`);
+    });
+  }, [routeCoordinates]);
 
   // Fit map to route AFTER re-render (so minZoomLevel is already removed)
   useEffect(() => {
@@ -532,17 +550,6 @@ export default function MapScreenRedesign({ navigation, route }: Props) {
         </TouchableOpacity>
 
         <TouchableOpacity
-          onPress={() => {
-            refreshLocation();
-            loadMessages();
-          }}
-          activeOpacity={0.9}
-          style={styles.floatingButton}
-        >
-          <Ionicons name="refresh" size={22} color={colors.primary.cyan} />
-        </TouchableOpacity>
-
-        <TouchableOpacity
           onPress={() => navigation.navigate('SearchUsers')}
           activeOpacity={0.9}
           style={styles.floatingButton}
@@ -551,13 +558,22 @@ export default function MapScreenRedesign({ navigation, route }: Props) {
         </TouchableOpacity>
 
         {routeCoordinates && (
-          <TouchableOpacity
-            onPress={() => { setRouteCoordinates(null); setRouteTargetId(null); }}
-            activeOpacity={0.9}
-            style={[styles.floatingButton, styles.floatingButtonDanger]}
-          >
-            <Ionicons name="close" size={22} color="#FF6B6B" />
-          </TouchableOpacity>
+          <>
+            <TouchableOpacity
+              onPress={openInMaps}
+              activeOpacity={0.9}
+              style={[styles.floatingButton, styles.floatingButtonMaps]}
+            >
+              <Ionicons name="walk-outline" size={22} color={colors.primary.cyan} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => { setRouteCoordinates(null); setRouteTargetId(null); }}
+              activeOpacity={0.9}
+              style={[styles.floatingButton, styles.floatingButtonDanger]}
+            >
+              <Ionicons name="close" size={22} color="#FF6B6B" />
+            </TouchableOpacity>
+          </>
         )}
       </View>
 
@@ -652,32 +668,24 @@ export default function MapScreenRedesign({ navigation, route }: Props) {
                   style={styles.actionButton}
                 />
               ) : (
-                <TouchableOpacity
-                  activeOpacity={0.8}
-                  onPress={() => {
-                    if (msgLocation) fetchRoute(msgLocation, selectedMessage.id);
-                  }}
-                  disabled={isLoadingRoute}
+                <LinearGradient
+                  colors={['rgba(0, 229, 255, 0.18)', 'rgba(124, 92, 252, 0.35)']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={styles.navButton}
                 >
-                  <LinearGradient
-                    colors={['rgba(0, 229, 255, 0.32)', 'rgba(124, 92, 252, 0.55)']}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 0 }}
-                    style={styles.navButton}
-                  >
-                    {isLoadingRoute ? (
-                      <ActivityIndicator size="small" color={colors.primary.cyan} />
-                    ) : (
-                      <>
-                        <Ionicons name="navigate" size={16} color="#ffffff" />
-                        <Text style={styles.navButtonText}>
-                          Voir l'itinéraire
-                          {distance ? ` · ${distance}` : ''}
-                        </Text>
-                      </>
-                    )}
-                  </LinearGradient>
-                </TouchableOpacity>
+                  {isLoadingRoute ? (
+                    <ActivityIndicator size="small" color={colors.primary.cyan} />
+                  ) : (
+                    <>
+                      <Ionicons name="navigate" size={16} color={colors.primary.cyan} />
+                      <Text style={styles.navButtonText}>
+                        Itinéraire calculé
+                        {distance ? ` · ${distance}` : ''}
+                      </Text>
+                    </>
+                  )}
+                </LinearGradient>
               )}
             </GlassCard>
           </Animated.View>
@@ -767,6 +775,10 @@ const styles = StyleSheet.create({
   floatingButtonDanger: {
     borderWidth: 1,
     borderColor: 'rgba(255, 107, 107, 0.4)',
+  },
+  floatingButtonMaps: {
+    borderWidth: 1,
+    borderColor: 'rgba(0, 229, 255, 0.35)',
   },
   createFABGlowContainer: {
     position: 'absolute',

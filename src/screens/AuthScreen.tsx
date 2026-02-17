@@ -75,7 +75,7 @@ export default function AuthScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <View style={styles.content}>
-        <Text style={styles.title}>Flag</Text>
+        <Text style={styles.title}>Fläag</Text>
         <Text style={styles.subtitle}>
           Messages ancrés dans le monde réel
         </Text>

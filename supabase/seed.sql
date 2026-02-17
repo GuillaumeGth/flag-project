@@ -113,7 +113,7 @@ BEGIN
     LIMIT 1;
 
     IF test_user_id IS NOT NULL THEN
-        -- Message 1: Very close (within 30m - discoverable)
+        -- Message 1: Very close (discoverable)
         INSERT INTO public.messages (sender_id, recipient_id, content_type, text_content, location, radius, is_read, created_at)
         VALUES (
             bot_user_id,

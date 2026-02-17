@@ -1,4 +1,4 @@
-// 🎨 Flag App - Neo-Cartographic Theme
+// 🎨 Fläag App - Neo-Cartographic Theme
 // Direction: Premium exploration & discovery with holographic elements
 
 export const colors = {

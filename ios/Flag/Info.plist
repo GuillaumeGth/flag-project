@@ -7,7 +7,7 @@
     <key>CFBundleDevelopmentRegion</key>
     <string>$(DEVELOPMENT_LANGUAGE)</string>
     <key>CFBundleDisplayName</key>
-    <string>Flag</string>
+    <string>Fläag</string>
     <key>CFBundleExecutable</key>
     <string>$(EXECUTABLE_NAME)</string>
     <key>CFBundleIdentifier</key>
@@ -27,14 +27,14 @@
       <dict>
         <key>CFBundleURLSchemes</key>
         <array>
-          <string>flag</string>
-          <string>com.flagapp.app</string>
+          <string>flaag</string>
+          <string>com.flaagapp.app</string>
         </array>
       </dict>
       <dict>
         <key>CFBundleURLSchemes</key>
         <array>
-          <string>exp+flag-app</string>
+          <string>exp+flaag-app</string>
         </array>
       </dict>
     </array>
@@ -52,15 +52,15 @@
       <true/>
     </dict>
     <key>NSCameraUsageDescription</key>
-    <string>Flag utilise la caméra pour les photos.</string>
+    <string>Fläag utilise la caméra pour les photos.</string>
     <key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
-    <string>Flag utilise votre position pour vous notifier des messages proches.</string>
+    <string>Fläag utilise votre position pour vous notifier des messages proches.</string>
     <key>NSLocationAlwaysUsageDescription</key>
     <string>Allow $(PRODUCT_NAME) to access your location</string>
     <key>NSLocationWhenInUseUsageDescription</key>
-    <string>Flag utilise votre position pour afficher les messages autour de vous.</string>
+    <string>Fläag utilise votre position pour afficher les messages autour de vous.</string>
     <key>NSMicrophoneUsageDescription</key>
-    <string>Flag utilise le micro pour enregistrer des messages audio.</string>
+    <string>Fläag utilise le micro pour enregistrer des messages audio.</string>
     <key>NSPhotoLibraryUsageDescription</key>
     <string>Allow $(PRODUCT_NAME) to access your photos</string>
     <key>RCTNewArchEnabled</key>

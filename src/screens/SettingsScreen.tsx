@@ -65,7 +65,7 @@ export default function SettingsScreen({ navigation }: any) {
         <Text style={styles.signOutText}>Se déconnecter</Text>
       </TouchableOpacity>
 
-      <Text style={styles.version}>Flag v1.0.0</Text>
+      <Text style={styles.version}>Fläag v1.0.0</Text>
     </View>
   );
 }

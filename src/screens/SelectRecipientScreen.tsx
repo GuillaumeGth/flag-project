@@ -84,7 +84,7 @@ export default function SelectRecipientScreen({ navigation }: Props) {
         <View style={styles.userInfo}>
           <Text style={styles.userName}>{displayName}</Text>
           {isBot && (
-            <Text style={styles.botLabel}>Bot officiel Flag</Text>
+            <Text style={styles.botLabel}>Bot officiel Fläag</Text>
           )}
         </View>
       </TouchableOpacity>

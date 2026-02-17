@@ -38,12 +38,12 @@
         <action android:name="android.intent.action.VIEW"/>
         <category android:name="android.intent.category.DEFAULT"/>
         <category android:name="android.intent.category.BROWSABLE"/>
-        <data android:scheme="flag"/>
-        <data android:scheme="exp+flag-app"/>
+        <data android:scheme="flaag"/>
+        <data android:scheme="exp+flaag-app"/>
       </intent-filter>
       <intent-filter data-generated="true">
         <action android:name="android.intent.action.VIEW"/>
-        <data android:scheme="flag"/>
+        <data android:scheme="flaag"/>
         <category android:name="android.intent.category.BROWSABLE"/>
         <category android:name="android.intent.category.DEFAULT"/>
       </intent-filter>

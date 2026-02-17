@@ -36,7 +36,6 @@ import { UndiscoveredMessageMapMeta, Coordinates } from '@/types';
 import { colors, shadows, radius, spacing, typography } from '@/theme-redesign';
 import Toast from '@/components/Toast';
 import GlassCard from '@/components/redesign/GlassCard';
-import PremiumButton from '@/components/redesign/PremiumButton';
 import PremiumAvatar from '@/components/redesign/PremiumAvatar';
 
 interface Props {
@@ -293,9 +292,11 @@ export default function MapScreenRedesign({ navigation, route }: Props) {
   const fetchRoute = useCallback(async (destination: Coordinates, messageId: string) => {
     if (!userLocation) return;
     setIsLoadingRoute(true);
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 10000);
     try {
       const url = `https://router.project-osrm.org/route/v1/walking/${userLocation.longitude},${userLocation.latitude};${destination.longitude},${destination.latitude}?overview=full&geometries=geojson`;
-      const response = await fetch(url);
+      const response = await fetch(url, { signal: controller.signal });
       const data = await response.json();
       if (data.routes && data.routes.length > 0) {
         const coords = data.routes[0].geometry.coordinates.map(([lng, lat]: [number, number]) => ({
@@ -305,13 +306,19 @@ export default function MapScreenRedesign({ navigation, route }: Props) {
         setRouteCoordinates(coords);
         setRouteTargetId(messageId);
         setSelectedMessage(null);
+      } else {
+        setToastData({ visible: true, message: 'Impossible de calculer l\'itinéraire', type: 'error' });
       }
-    } catch (e) {
-      console.error('Route fetch error:', e);
+    } catch (e: any) {
+      const msg = e?.name === 'AbortError'
+        ? 'Délai dépassé, réessaie plus tard'
+        : 'Erreur de connexion pour l\'itinéraire';
+      setToastData({ visible: true, message: msg, type: 'error' });
     } finally {
+      clearTimeout(timeout);
       setIsLoadingRoute(false);
     }
-  }, [userLocation, routeCoordinates]);
+  }, [userLocation]);
 
   const openInMaps = useCallback(() => {
     if (!routeCoordinates || routeCoordinates.length === 0) return;
@@ -658,34 +665,51 @@ export default function MapScreenRedesign({ navigation, route }: Props) {
 
               {/* Action Button */}
               {canRead ? (
-                <PremiumButton
-                  title="Découvrir le message"
-                  variant="gradient"
-                  icon="eye"
-                  fullWidth
-                  withGlow
+                <TouchableOpacity
                   onPress={() => navigation.navigate('ReadMessage', { messageId: selectedMessage.id })}
+                  activeOpacity={0.8}
                   style={styles.actionButton}
-                />
-              ) : (
-                <LinearGradient
-                  colors={['rgba(0, 229, 255, 0.18)', 'rgba(124, 92, 252, 0.35)']}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 0 }}
-                  style={styles.navButton}
                 >
-                  {isLoadingRoute ? (
-                    <ActivityIndicator size="small" color={colors.primary.cyan} />
-                  ) : (
-                    <>
-                      <Ionicons name="navigate" size={16} color={colors.primary.cyan} />
-                      <Text style={styles.navButtonText}>
-                        Itinéraire calculé
-                        {distance ? ` · ${distance}` : ''}
-                      </Text>
-                    </>
-                  )}
-                </LinearGradient>
+                  <LinearGradient
+                    colors={['rgba(124, 92, 252, 0.4)', 'rgba(167, 139, 250, 0.35)']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 0 }}
+                    style={[styles.navButton, { borderColor: 'rgba(167, 139, 250, 0.5)' }]}
+                  >
+                    <Ionicons name="eye" size={16} color={colors.primary.violet} />
+                    <Text style={styles.navButtonText}>Découvrir le message</Text>
+                  </LinearGradient>
+                </TouchableOpacity>
+              ) : (
+                <TouchableOpacity
+                  onPress={() => {
+                    if (!isLoadingRoute && msgLocation) {
+                      fetchRoute(msgLocation, selectedMessage.id);
+                    }
+                  }}
+                  activeOpacity={0.8}
+                  style={styles.actionButton}
+                  disabled={isLoadingRoute}
+                >
+                  <LinearGradient
+                    colors={['rgba(0, 229, 255, 0.18)', 'rgba(124, 92, 252, 0.35)']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 0 }}
+                    style={styles.navButton}
+                  >
+                    {isLoadingRoute ? (
+                      <ActivityIndicator size="small" color={colors.primary.cyan} />
+                    ) : (
+                      <>
+                        <Ionicons name="navigate" size={16} color={colors.primary.cyan} />
+                        <Text style={styles.navButtonText}>
+                          Itinéraire
+                          {distance ? ` · ${distance}` : ''}
+                        </Text>
+                      </>
+                    )}
+                  </LinearGradient>
+                </TouchableOpacity>
               )}
             </GlassCard>
           </Animated.View>

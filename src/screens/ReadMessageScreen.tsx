@@ -56,7 +56,7 @@ export default function ReadMessageScreen({ navigation, route }: Props) {
       if (currentMessage.is_public) {
         await markPublicMessageDiscovered(currentMessage.id);
       }
-      await markMessageAsRead(currentMessage.id);
+      await markMessageAsRead(currentMessage.id, currentMessage.sender_id);
     }
     setLoading(false);
   };

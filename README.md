@@ -1,4 +1,4 @@
-# Flag
+# Fläag
 
 Application de messagerie géolocalisée - Laissez des messages ancrés dans le monde réel.
 
@@ -6,7 +6,7 @@ Application de messagerie géolocalisée - Laissez des messages ancrés dans le 
 
 - **Messages géolocalisés** : Les messages sont ancrés à une position GPS
 - **Découverte** : Carte interactive affichant les messages à découvrir
-- **Proximité** : Lecture possible uniquement dans un rayon de 30m
+- **Proximité** : Lecture possible uniquement dans un rayon défini autour du point de dépôt
 - **Multimédia** : Texte, photos et audio
 - **Notifications** : Alertes quand vous approchez d'un message
 
@@ -61,7 +61,7 @@ npx expo start
 3. Créer deux clients OAuth :
    - **Web** : pour Supabase (noter le Client ID et Client Secret)
    - **Android** :
-     - Nom du package : `com.flagapp.app`
+     - Nom du package : `com.flaagapp.app`
      - Empreinte SHA-1 : obtenir avec `keytool -keystore android/app/debug.keystore -list -v` (mot de passe : `android`)
 
 ### Supabase
@@ -77,7 +77,7 @@ npx expo start
 Ajouter dans `app.json` :
 ```json
 "expo": {
-  "scheme": "com.flagapp.app",
+  "scheme": "com.flaagapp.app",
   "plugins": [
     [
       "@react-native-google-signin/google-signin",

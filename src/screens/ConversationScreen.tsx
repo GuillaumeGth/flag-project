@@ -25,6 +25,7 @@ import {
   Modal,
   Animated,
 } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Audio } from 'expo-av';
@@ -93,6 +94,13 @@ export default function ConversationScreenRedesign({ navigation, route }: Props)
       }
     };
   }, []);
+
+  // Reload messages when coming back from ReadMessageScreen so discovered messages are shown
+  useFocusEffect(
+    useCallback(() => {
+      loadMessages();
+    }, [])
+  );
 
   // Scroll to bottom when messages load (only once, when loading completes)
   useEffect(() => {

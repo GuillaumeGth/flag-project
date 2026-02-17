@@ -198,7 +198,14 @@ DECLARE
     sender_name TEXT;
     expo_url TEXT := 'https://exp.host/--/api/v2/push/send';
     payload JSONB;
+    notif_title TEXT;
+    notif_body TEXT;
 BEGIN
+    -- Only notify for private messages (recipient exists)
+    IF NEW.recipient_id IS NULL THEN
+        RETURN NEW;
+    END IF;
+
     -- Collect all push tokens for the recipient
     SELECT array_agg(expo_push_token)
     INTO target_tokens
@@ -215,23 +222,36 @@ BEGIN
     FROM public.users
     WHERE id = NEW.sender_id;
 
+    -- Differentiate notification text based on whether message is geolocated
+    IF NEW.location IS NOT NULL THEN
+        notif_title := 'Nouveau flag à découvrir !';
+        notif_body := sender_name || ' t''a laissé un message à découvrir sur la carte';
+    ELSE
+        notif_title := 'Nouveau message';
+        notif_body := sender_name || ' t''a envoyé un message';
+    END IF;
+
     FOREACH token IN ARRAY target_tokens LOOP
         payload := jsonb_build_object(
             'to', token,
             'sound', 'default',
-            'title', 'Nouveau message reçu',
-            'body', sender_name || ' t''a laissé un nouveau message à découvrir',
+            'title', notif_title,
+            'body', notif_body,
             'data', jsonb_build_object('messageId', NEW.id)
         );
 
-        PERFORM
-            http_post(
-                expo_url,
-                payload::text,
-                'application/json'
-            );
+        PERFORM http((
+            'POST',
+            expo_url,
+            ARRAY[http_header('Content-Type', 'application/json')],
+            'application/json',
+            payload::text
+        )::http_request);
     END LOOP;
 
+    RETURN NEW;
+EXCEPTION WHEN OTHERS THEN
+    RAISE LOG 'send_push_on_new_message error: % %', SQLERRM, SQLSTATE;
     RETURN NEW;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
@@ -240,6 +260,67 @@ DROP TRIGGER IF EXISTS on_message_created_send_push ON public.messages;
 CREATE TRIGGER on_message_created_send_push
     AFTER INSERT ON public.messages
     FOR EACH ROW EXECUTE FUNCTION public.send_push_on_new_message();
+
+-- Function to send push notification to the author when their message is discovered
+CREATE OR REPLACE FUNCTION public.send_push_on_message_discovered()
+RETURNS TRIGGER AS $$
+DECLARE
+    target_tokens TEXT[];
+    token TEXT;
+    discoverer_name TEXT;
+    expo_url TEXT := 'https://exp.host/--/api/v2/push/send';
+    payload JSONB;
+BEGIN
+    -- Only fire when is_read transitions from false to true
+    IF OLD.is_read = TRUE OR NEW.is_read = FALSE THEN
+        RETURN NEW;
+    END IF;
+
+    -- Collect all push tokens for the sender (author)
+    SELECT array_agg(expo_push_token)
+    INTO target_tokens
+    FROM public.user_push_tokens
+    WHERE user_id = NEW.sender_id;
+
+    IF target_tokens IS NULL OR array_length(target_tokens, 1) = 0 THEN
+        RETURN NEW;
+    END IF;
+
+    -- Get discoverer display name
+    SELECT COALESCE(display_name, 'Quelqu''un')
+    INTO discoverer_name
+    FROM public.users
+    WHERE id = NEW.recipient_id;
+
+    FOREACH token IN ARRAY target_tokens LOOP
+        payload := jsonb_build_object(
+            'to', token,
+            'sound', 'default',
+            'title', 'Ton message a été découvert ! 🎉',
+            'body', discoverer_name || ' a découvert ton message',
+            'data', jsonb_build_object('messageId', NEW.id)
+        );
+
+        PERFORM http((
+            'POST',
+            expo_url,
+            ARRAY[http_header('Content-Type', 'application/json')],
+            'application/json',
+            payload::text
+        )::http_request);
+    END LOOP;
+
+    RETURN NEW;
+EXCEPTION WHEN OTHERS THEN
+    RAISE LOG 'send_push_on_message_discovered error: % %', SQLERRM, SQLSTATE;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+DROP TRIGGER IF EXISTS on_message_discovered_send_push ON public.messages;
+CREATE TRIGGER on_message_discovered_send_push
+    AFTER UPDATE OF is_read ON public.messages
+    FOR EACH ROW EXECUTE FUNCTION public.send_push_on_message_discovered();
 
 -- Discovered public messages (tracks which public messages a user has discovered on the map)
 CREATE TABLE IF NOT EXISTS public.discovered_public_messages (
@@ -328,14 +409,18 @@ BEGIN
             'data', jsonb_build_object('followerId', NEW.follower_id)
         );
 
-        PERFORM
-            http_post(
-                expo_url,
-                payload::text,
-                'application/json'
-            );
+        PERFORM http((
+            'POST',
+            expo_url,
+            ARRAY[http_header('Content-Type', 'application/json')],
+            'application/json',
+            payload::text
+        )::http_request);
     END LOOP;
 
+    RETURN NEW;
+EXCEPTION WHEN OTHERS THEN
+    RAISE LOG 'send_push_on_new_follow error: % %', SQLERRM, SQLSTATE;
     RETURN NEW;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;

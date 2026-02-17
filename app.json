@@ -1,11 +1,11 @@
 {
   "expo": {
-    "name": "Flag",
-    "slug": "flag-app",
+    "name": "Fläag",
+    "slug": "flaag-app",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./src/assets/icon.png",
-    "scheme": "flag",
+    "scheme": "flaag",
     "userInterfaceStyle": "automatic",
     "splash": {
       "image": "./src/assets/splash.png",
@@ -17,12 +17,12 @@
     ],
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.flagapp.app",
+      "bundleIdentifier": "com.flaagapp.app",
       "infoPlist": {
-        "NSLocationWhenInUseUsageDescription": "Flag utilise votre position pour afficher les messages autour de vous.",
-        "NSLocationAlwaysAndWhenInUseUsageDescription": "Flag utilise votre position en arrière-plan pour vous notifier quand vous êtes proche d'un message.",
-        "NSCameraUsageDescription": "Flag utilise la caméra pour prendre des photos à joindre aux messages.",
-        "NSMicrophoneUsageDescription": "Flag utilise le micro pour enregistrer des messages audio."
+        "NSLocationWhenInUseUsageDescription": "Fläag utilise votre position pour afficher les messages autour de vous.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "Fläag utilise votre position en arrière-plan pour vous notifier quand vous êtes proche d'un message.",
+        "NSCameraUsageDescription": "Fläag utilise la caméra pour prendre des photos à joindre aux messages.",
+        "NSMicrophoneUsageDescription": "Fläag utilise le micro pour enregistrer des messages audio."
       }
     },
     "android": {
@@ -30,14 +30,14 @@
         "foregroundImage": "./src/assets/adaptive-icon.png",
         "backgroundColor": "#1E2028"
       },
-      "package": "com.flagapp.app",
+      "package": "com.flaagapp.app",
       "googleServicesFile": "./android/app/google-services.json",
       "intentFilters": [
         {
           "action": "VIEW",
           "data": [
             {
-              "scheme": "flag"
+              "scheme": "flaag"
             }
           ],
           "category": ["BROWSABLE", "DEFAULT"]
@@ -69,7 +69,7 @@
       [
         "expo-location",
         {
-          "locationAlwaysAndWhenInUsePermission": "Flag utilise votre position pour vous notifier des messages proches.",
+          "locationAlwaysAndWhenInUsePermission": "Fläag utilise votre position pour vous notifier des messages proches.",
           "isAndroidBackgroundLocationEnabled": true,
           "isIosBackgroundLocationEnabled": true
         }
@@ -84,7 +84,7 @@
       [
         "expo-camera",
         {
-          "cameraPermission": "Flag utilise la caméra pour les photos."
+          "cameraPermission": "Fläag utilise la caméra pour les photos."
         }
       ],
       "expo-web-browser"

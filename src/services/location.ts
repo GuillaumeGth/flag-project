@@ -78,7 +78,7 @@ export async function startBackgroundLocationTracking(): Promise<boolean> {
       deferredUpdatesInterval: 1000, // Minimum time between updates
       showsBackgroundLocationIndicator: true,
       foregroundService: {
-        notificationTitle: 'Flag',
+        notificationTitle: 'Fläag',
         notificationBody: 'Recherche de messages autour de vous...',
         notificationColor: '#4A90D9',
       },

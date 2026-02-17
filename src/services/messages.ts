@@ -10,7 +10,7 @@ import {
 } from './cache';
 import { reportError } from './errorReporting';
 
-// Default Flag Bot user ID (created via seed.sql)
+// Default Fläag Bot user ID (created via seed.sql)
 export const FLAG_BOT_ID = '00000000-0000-0000-0000-000000000001';
 
 // Helper to get current user ID from cached value (avoids getSession() deadlock)
@@ -603,7 +603,7 @@ is_read: location ? false : true, // Messages without location are immediately r
 }
 
 // Mark message as read and update local caches
-export async function markMessageAsRead(messageId: string): Promise<boolean> {
+export async function markMessageAsRead(messageId: string, senderId?: string): Promise<boolean> {
   const readAt = new Date().toISOString();
 
   const { error } = await supabase
@@ -627,13 +627,24 @@ export async function markMessageAsRead(messageId: string): Promise<boolean> {
     await setCachedData(CACHE_KEYS.MAP_MESSAGES, updated);
   }
 
-  // Update read status in conversations cache
+  // Update read status in global conversations cache
   const convCached = await getCachedData<any[]>(CACHE_KEYS.CONVERSATIONS_MESSAGES);
   if (convCached) {
     const updated = convCached.map(m =>
       m.id === messageId ? { ...m, is_read: true, read_at: readAt } : m
     );
     await setCachedData(CACHE_KEYS.CONVERSATIONS_MESSAGES, updated);
+  }
+
+  // Update read status in per-conversation cache (used by ConversationScreen)
+  if (senderId) {
+    const perConvCached = await getCachedData<MessageWithUsers[]>(CACHE_KEYS.CONVERSATION(senderId));
+    if (perConvCached) {
+      const updated = perConvCached.map(m =>
+        m.id === messageId ? { ...m, is_read: true, read_at: readAt } : m
+      );
+      await setCachedData(CACHE_KEYS.CONVERSATION(senderId), updated);
+    }
   }
 
   return true;

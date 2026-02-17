@@ -7,7 +7,7 @@ import { reportError } from '@/services/errorReporting';
 import { Coordinates } from '@/types';
 
 const LOCATION_TASK_NAME = 'background-location-task';
-const PROXIMITY_RADIUS = 120; // Check at 120m to give time for notification
+const PROXIMITY_RADIUS = 300; // Notify at 300m to give time before reaching message
 
 // Store notified message IDs to avoid duplicate notifications
 const notifiedMessages = new Set<string>();

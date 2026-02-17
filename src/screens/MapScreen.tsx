@@ -17,13 +17,11 @@ import {
   Text,
   ActivityIndicator,
   Image,
-  Platform,
   Animated,
-  Linking,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
-import MapView, { Marker } from 'react-native-maps';
+import MapView, { Marker, Polyline } from 'react-native-maps';
 import { Ionicons } from '@expo/vector-icons';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -64,6 +62,9 @@ export default function MapScreenRedesign({ navigation, route }: Props) {
   const [markersReady, setMarkersReady] = useState(false);
   const [avatarImages, setAvatarImages] = useState<Record<string, string>>({});
   const [toastData, setToastData] = useState<{ visible: boolean; message: string; type: 'success' | 'warning' | 'error' }>({ visible: false, message: '', type: 'success' });
+  const [routeCoordinates, setRouteCoordinates] = useState<Array<{ latitude: number; longitude: number }> | null>(null);
+  const [routeTargetId, setRouteTargetId] = useState<string | null>(null);
+  const [isLoadingRoute, setIsLoadingRoute] = useState(false);
   const avatarRefs = useRef<Record<string, View | null>>({});
 
   // Animation for message card
@@ -110,10 +111,6 @@ export default function MapScreenRedesign({ navigation, route }: Props) {
         // Clean up the param after using it
         navigation.setParams({ focusLocation: undefined });
       } else {
-        if (focusTimeoutRef.current) {
-          clearTimeout(focusTimeoutRef.current);
-          focusTimeoutRef.current = null;
-        }
         setCenterLocation(null);
         setCenteredMessageId(null);
         setFocusLocation(null);
@@ -138,15 +135,6 @@ export default function MapScreenRedesign({ navigation, route }: Props) {
     }
   }, [route?.params]);
 
-  // Clear any pending timeout on unmount
-  useEffect(() => {
-    return () => {
-      if (focusTimeoutRef.current) {
-        clearTimeout(focusTimeoutRef.current);
-        focusTimeoutRef.current = null;
-      }
-    };
-  }, []);
 
   // Center on user when location changes
   useEffect(() => {
@@ -295,6 +283,41 @@ export default function MapScreenRedesign({ navigation, route }: Props) {
     }
     return `${(distance / 1000).toFixed(1)}km`;
   }, [userLocation]);
+
+  const fetchRoute = useCallback(async (destination: Coordinates, messageId: string) => {
+    if (!userLocation) return;
+    setIsLoadingRoute(true);
+    try {
+      const url = `https://router.project-osrm.org/route/v1/walking/${userLocation.longitude},${userLocation.latitude};${destination.longitude},${destination.latitude}?overview=full&geometries=geojson`;
+      const response = await fetch(url);
+      const data = await response.json();
+      if (data.routes && data.routes.length > 0) {
+        const coords = data.routes[0].geometry.coordinates.map(([lng, lat]: [number, number]) => ({
+          latitude: lat,
+          longitude: lng,
+        }));
+        setRouteCoordinates(coords);
+        setRouteTargetId(messageId);
+        setSelectedMessage(null);
+      }
+    } catch (e) {
+      console.error('Route fetch error:', e);
+    } finally {
+      setIsLoadingRoute(false);
+    }
+  }, [userLocation, routeCoordinates]);
+
+  // Fit map to route AFTER re-render (so minZoomLevel is already removed)
+  useEffect(() => {
+    if (!routeCoordinates || !mapRef.current) return;
+    const timeout = setTimeout(() => {
+      mapRef.current?.fitToCoordinates(routeCoordinates, {
+        edgePadding: { top: 120, right: 60, bottom: 280, left: 60 },
+        animated: true,
+      });
+    }, 100);
+    return () => clearTimeout(timeout);
+  }, [routeCoordinates]);
 
   const captureAvatar = useCallback(async (messageId: string) => {
     const ref = avatarRefs.current[messageId];
@@ -446,10 +469,8 @@ export default function MapScreenRedesign({ navigation, route }: Props) {
         }
         showsUserLocation
         showsMyLocationButton={false}
-        minZoomLevel={16}
-        maxZoomLevel={18}
-        scrollEnabled={false}
-        zoomEnabled={false}
+        scrollEnabled={!!routeCoordinates}
+        zoomEnabled={!!routeCoordinates}
         rotateEnabled={false}
         pitchEnabled={false}
         moveOnMarkerPress={false}
@@ -459,7 +480,8 @@ export default function MapScreenRedesign({ navigation, route }: Props) {
           if (!location) return null;
           const sender = message.sender;
           const capturedImage = avatarImages[message.id];
-          const isPublic = message.is_public === true;
+          const isTarget = message.id === routeTargetId;
+          const markerOpacity = routeCoordinates && !isTarget ? 0.35 : 1;
 
           if (sender?.avatar_url) {
             if (!capturedImage) return null;
@@ -469,6 +491,7 @@ export default function MapScreenRedesign({ navigation, route }: Props) {
                 coordinate={location}
                 image={{ uri: capturedImage }}
                 onPress={() => handleMarkerPress(message)}
+                opacity={markerOpacity}
               />
             );
           }
@@ -479,9 +502,24 @@ export default function MapScreenRedesign({ navigation, route }: Props) {
               coordinate={location}
               onPress={() => handleMarkerPress(message)}
               image={require('../assets/red-circle.png')}
+              opacity={markerOpacity}
             />
           );
         })}
+        {routeCoordinates && (
+          <>
+            <Polyline
+              coordinates={routeCoordinates}
+              strokeColor="rgba(255,255,255,0.9)"
+              strokeWidth={10}
+            />
+            <Polyline
+              coordinates={routeCoordinates}
+              strokeColor={colors.primary.cyan}
+              strokeWidth={5}
+            />
+          </>
+        )}
         {focusMarkerCoords && (
           <Marker
             coordinate={focusMarkerCoords}
@@ -519,6 +557,16 @@ export default function MapScreenRedesign({ navigation, route }: Props) {
         >
           <Ionicons name="search" size={22} color={colors.primary.cyan} />
         </TouchableOpacity>
+
+        {routeCoordinates && (
+          <TouchableOpacity
+            onPress={() => { setRouteCoordinates(null); setRouteTargetId(null); }}
+            activeOpacity={0.9}
+            style={[styles.floatingButton, styles.floatingButtonDanger]}
+          >
+            <Ionicons name="close" size={22} color="#FF6B6B" />
+          </TouchableOpacity>
+        )}
       </View>
 
       {/* Create Message FAB - Gradient Style */}
@@ -580,7 +628,7 @@ export default function MapScreenRedesign({ navigation, route }: Props) {
                   {selectedMessage.sender?.display_name || 'Inconnu'}
                 </Text>
               </View>
-              <TouchableOpacity onPress={() => setSelectedMessage(null)}>
+              <TouchableOpacity onPress={() => { setSelectedMessage(null); setRouteCoordinates(null); }}>
                 <Ionicons name="close" size={24} color={colors.text.secondary} />
               </TouchableOpacity>
             </View>
@@ -612,9 +660,35 @@ export default function MapScreenRedesign({ navigation, route }: Props) {
                 style={styles.actionButton}
               />
             ) : (
-              <Text style={styles.distanceText}>
-                Rapprochez-vous pour découvrir ce message
-              </Text>
+              <View>
+                <Text style={styles.distanceText}>
+                  Rapprochez-vous pour découvrir ce message
+                </Text>
+                <TouchableOpacity
+                  activeOpacity={0.8}
+                  onPress={() => {
+                    const loc = getMessageLocation(selectedMessage);
+                    if (loc) fetchRoute(loc, selectedMessage.id);
+                  }}
+                  disabled={isLoadingRoute}
+                >
+                  <LinearGradient
+                    colors={['rgba(0, 229, 255, 0.2)', 'rgba(124, 92, 252, 0.2)']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 0 }}
+                    style={styles.navButton}
+                  >
+                    {isLoadingRoute ? (
+                      <ActivityIndicator size="small" color={colors.primary.cyan} />
+                    ) : (
+                      <>
+                        <Ionicons name="navigate" size={15} color={colors.primary.cyan} />
+                        <Text style={styles.navButtonText}>Voir l'itinéraire</Text>
+                      </>
+                    )}
+                  </LinearGradient>
+                </TouchableOpacity>
+              </View>
             )}
           </GlassCard>
         </Animated.View>
@@ -700,6 +774,10 @@ const styles = StyleSheet.create({
     borderRadius: radius.lg,
     ...shadows.small,
   },
+  floatingButtonDanger: {
+    borderWidth: 1,
+    borderColor: 'rgba(255, 107, 107, 0.4)',
+  },
   createFABGlowContainer: {
     position: 'absolute',
     right: spacing.lg,
@@ -775,6 +853,24 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.sm,
     textAlign: 'center',
     marginTop: spacing.xs,
+    marginBottom: spacing.sm,
+  },
+  navButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.xs,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: 'rgba(0, 229, 255, 0.3)',
+    overflow: 'hidden',
+  },
+  navButtonText: {
+    color: colors.primary.cyan,
+    fontSize: typography.sizes.sm,
+    fontWeight: '600',
   },
   focusMarker: {
     width: 40,

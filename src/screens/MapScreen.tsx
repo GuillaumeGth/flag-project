@@ -494,8 +494,8 @@ export default function MapScreenRedesign({ navigation, route }: Props) {
         }
         showsUserLocation
         showsMyLocationButton={false}
-        scrollEnabled={!!routeCoordinates}
-        zoomEnabled={!!routeCoordinates}
+        scrollEnabled
+        zoomEnabled
         rotateEnabled={false}
         pitchEnabled={false}
         moveOnMarkerPress={false}

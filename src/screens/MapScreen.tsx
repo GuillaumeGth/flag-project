@@ -496,15 +496,7 @@ export default function MapScreenRedesign({ navigation, route }: Props) {
             );
           }
 
-          return (
-            <Marker
-              key={message.id}
-              coordinate={location}
-              onPress={() => handleMarkerPress(message)}
-              image={require('../assets/red-circle.png')}
-              opacity={markerOpacity}
-            />
-          );
+          return null;
         })}
         {routeCoordinates && (
           <>
@@ -602,78 +594,73 @@ export default function MapScreenRedesign({ navigation, route }: Props) {
       </View>
 
       {/* Selected Message Card - Premium Glass */}
-      {selectedMessage && (
-        <Animated.View
-          style={[
-            styles.messageCardContainer,
-            { bottom: 24 + insets.bottom },
-            {
-              opacity: cardOpacityAnim,
-              transform: [{ translateY: cardSlideAnim }],
-            },
-          ]}
-        >
-          <GlassCard withBorder withGlow glowColor="cyan" style={styles.messageCard}>
-            {/* Header */}
-            <View style={styles.messageCardHeader}>
-              <View style={styles.messageCardHeaderLeft}>
-                <PremiumAvatar
-                  uri={selectedMessage.sender?.avatar_url}
-                  name={selectedMessage.sender?.display_name}
-                  size="small"
-                  withRing
-                  ringColor="gradient"
-                />
-                <Text style={styles.senderName}>
-                  {selectedMessage.sender?.display_name || 'Inconnu'}
-                </Text>
-              </View>
-              <TouchableOpacity onPress={() => { setSelectedMessage(null); setRouteCoordinates(null); }}>
-                <Ionicons name="close" size={24} color={colors.text.secondary} />
-              </TouchableOpacity>
-            </View>
-
-            {/* Distance Badge */}
-            {formatDistance(getMessageLocation(selectedMessage)) && (
-              <LinearGradient
-                colors={['rgba(0, 229, 255, 0.15)', 'rgba(124, 92, 252, 0.15)']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={styles.distanceBadge}
+      {selectedMessage && (() => {
+        const msgLocation = getMessageLocation(selectedMessage);
+        const distance = formatDistance(msgLocation);
+        const canRead = canReadMessage(msgLocation);
+        return (
+          <Animated.View
+            style={[
+              styles.messageCardContainer,
+              { bottom: 24 + insets.bottom },
+              {
+                opacity: cardOpacityAnim,
+                transform: [{ translateY: cardSlideAnim }],
+              },
+            ]}
+          >
+            <GlassCard withBorder withGlow glowColor="cyan" style={styles.messageCard}>
+              {/* Close button */}
+              <TouchableOpacity
+                style={styles.cardCloseButton}
+                onPress={() => { setSelectedMessage(null); setRouteCoordinates(null); }}
               >
-                <Ionicons name="navigate-outline" size={16} color={colors.primary.cyan} />
-                <Text style={styles.distanceLabel}>
-                  {formatDistance(getMessageLocation(selectedMessage))}
-                </Text>
-              </LinearGradient>
-            )}
+                <Ionicons name="close" size={18} color="#ffffff" />
+              </TouchableOpacity>
 
-            {/* Action Button */}
-            {canReadMessage(getMessageLocation(selectedMessage)) ? (
-              <PremiumButton
-                title="Découvrir le message"
-                variant="gradient"
-                icon="eye"
-                fullWidth
-                withGlow
-                onPress={() => navigation.navigate('ReadMessage', { messageId: selectedMessage.id })}
-                style={styles.actionButton}
-              />
-            ) : (
-              <View>
-                <Text style={styles.distanceText}>
-                  Rapprochez-vous pour découvrir ce message
-                </Text>
+
+              {/* Sender row */}
+              <View style={styles.messageCardHeader}>
+                <View style={styles.messageCardHeaderLeft}>
+                  <PremiumAvatar
+                    uri={selectedMessage.sender?.avatar_url}
+                    name={selectedMessage.sender?.display_name}
+                    size="small"
+                    withRing
+                    ringColor="gradient"
+                  />
+                  <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: spacing.xs }}>
+                    <Text style={styles.senderName}>
+                      {selectedMessage.sender?.display_name || 'Inconnu'}
+                    </Text>
+                    <Text style={styles.senderLabel}>
+                      · {new Date(selectedMessage.created_at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' })}
+                    </Text>
+                  </View>
+                </View>
+              </View>
+
+              {/* Action Button */}
+              {canRead ? (
+                <PremiumButton
+                  title="Découvrir le message"
+                  variant="gradient"
+                  icon="eye"
+                  fullWidth
+                  withGlow
+                  onPress={() => navigation.navigate('ReadMessage', { messageId: selectedMessage.id })}
+                  style={styles.actionButton}
+                />
+              ) : (
                 <TouchableOpacity
                   activeOpacity={0.8}
                   onPress={() => {
-                    const loc = getMessageLocation(selectedMessage);
-                    if (loc) fetchRoute(loc, selectedMessage.id);
+                    if (msgLocation) fetchRoute(msgLocation, selectedMessage.id);
                   }}
                   disabled={isLoadingRoute}
                 >
                   <LinearGradient
-                    colors={['rgba(0, 229, 255, 0.2)', 'rgba(124, 92, 252, 0.2)']}
+                    colors={['rgba(0, 229, 255, 0.32)', 'rgba(124, 92, 252, 0.55)']}
                     start={{ x: 0, y: 0 }}
                     end={{ x: 1, y: 0 }}
                     style={styles.navButton}
@@ -682,17 +669,20 @@ export default function MapScreenRedesign({ navigation, route }: Props) {
                       <ActivityIndicator size="small" color={colors.primary.cyan} />
                     ) : (
                       <>
-                        <Ionicons name="navigate" size={15} color={colors.primary.cyan} />
-                        <Text style={styles.navButtonText}>Voir l'itinéraire</Text>
+                        <Ionicons name="navigate" size={16} color="#ffffff" />
+                        <Text style={styles.navButtonText}>
+                          Voir l'itinéraire
+                          {distance ? ` · ${distance}` : ''}
+                        </Text>
                       </>
                     )}
                   </LinearGradient>
                 </TouchableOpacity>
-              </View>
-            )}
-          </GlassCard>
-        </Animated.View>
-      )}
+              )}
+            </GlassCard>
+          </Animated.View>
+        );
+      })()}
 
       {/* Hidden container for capturing circular avatars */}
       <View style={styles.captureContainer} pointerEvents="none">
@@ -812,7 +802,51 @@ const styles = StyleSheet.create({
     right: 96,
   },
   messageCard: {
-    padding: spacing.lg,
+  },
+  cardCloseButton: {
+    position: 'absolute',
+    top: spacing.md,
+    right: spacing.md,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1,
+  },
+  cardIconRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    marginBottom: spacing.md,
+    marginRight: 32,
+  },
+  cardIconBadge: {
+    width: 48,
+    height: 48,
+    borderRadius: 14,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  cardIconMeta: {
+    flex: 1,
+  },
+  cardIconTitle: {
+    fontSize: typography.sizes.md,
+    fontWeight: '700',
+    color: colors.text.primary,
+    marginBottom: 2,
+  },
+  cardIconSub: {
+    fontSize: typography.sizes.xs,
+    color: colors.primary.cyan,
+    fontWeight: '600',
+  },
+  cardSeparator: {
+    height: 1,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    marginBottom: spacing.md,
   },
   messageCardHeader: {
     flexDirection: 'row',
@@ -825,52 +859,36 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: spacing.sm,
   },
+  senderLabel: {
+    fontSize: typography.sizes.xs,
+    color: colors.text.secondary,
+    marginBottom: 1,
+  },
   senderName: {
-    fontSize: typography.sizes.md,
+    fontSize: typography.sizes.sm,
     fontWeight: '700',
     color: colors.text.primary,
   },
-  distanceBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.xs,
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.md,
-    borderRadius: radius.lg,
-    marginBottom: spacing.md,
-  },
-  distanceLabel: {
-    color: colors.primary.cyan,
-    fontSize: typography.sizes.sm,
-    fontWeight: '700',
-  },
   actionButton: {
     marginTop: spacing.xs,
-  },
-  distanceText: {
-    color: colors.text.secondary,
-    fontSize: typography.sizes.sm,
-    textAlign: 'center',
-    marginTop: spacing.xs,
-    marginBottom: spacing.sm,
   },
   navButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: spacing.xs,
-    paddingVertical: spacing.sm,
+    gap: spacing.sm,
+    paddingVertical: 14,
     paddingHorizontal: spacing.md,
     borderRadius: radius.lg,
     borderWidth: 1,
-    borderColor: 'rgba(0, 229, 255, 0.3)',
+    borderColor: 'rgba(0, 229, 255, 0.35)',
     overflow: 'hidden',
   },
   navButtonText: {
-    color: colors.primary.cyan,
+    color: '#ffffff',
     fontSize: typography.sizes.sm,
-    fontWeight: '600',
+    fontWeight: '700',
+    letterSpacing: 0.3,
   },
   focusMarker: {
     width: 40,

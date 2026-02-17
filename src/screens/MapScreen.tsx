@@ -19,6 +19,7 @@ import {
   Image,
   Platform,
   Animated,
+  Linking,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
@@ -64,7 +65,6 @@ export default function MapScreenRedesign({ navigation, route }: Props) {
   const [avatarImages, setAvatarImages] = useState<Record<string, string>>({});
   const [toastData, setToastData] = useState<{ visible: boolean; message: string; type: 'success' | 'warning' | 'error' }>({ visible: false, message: '', type: 'success' });
   const avatarRefs = useRef<Record<string, View | null>>({});
-  const focusTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Animation for message card
   const [cardSlideAnim] = useState(new Animated.Value(200));
@@ -195,11 +195,6 @@ export default function MapScreenRedesign({ navigation, route }: Props) {
     setCenterLocation(location);
     setSelectedMessage(targetMessage);
 
-    if (focusTimeoutRef.current) {
-      clearTimeout(focusTimeoutRef.current);
-      focusTimeoutRef.current = null;
-    }
-
     mapRef.current.animateToRegion(
       {
         latitude: location.latitude,
@@ -209,34 +204,6 @@ export default function MapScreenRedesign({ navigation, route }: Props) {
       },
       500
     );
-
-    if (userLocation) {
-      focusTimeoutRef.current = setTimeout(() => {
-        if (!mapRef.current || !userLocation) return;
-
-        setCenteredMessageId(null);
-        setCenterLocation(null);
-        setSelectedMessage(null);
-        navigation.setParams({ messageId: undefined });
-
-        mapRef.current.animateToRegion(
-          {
-            latitude: userLocation.latitude,
-            longitude: userLocation.longitude,
-            latitudeDelta: LAT_DELTA,
-            longitudeDelta: LNG_DELTA,
-          },
-          500
-        );
-      }, 5000);
-    }
-
-    return () => {
-      if (focusTimeoutRef.current) {
-        clearTimeout(focusTimeoutRef.current);
-        focusTimeoutRef.current = null;
-      }
-    };
   }, [centeredMessageId, messages, userLocation]);
 
   // Handle focusLocation from conversation screen
@@ -245,11 +212,6 @@ export default function MapScreenRedesign({ navigation, route }: Props) {
 
     const coords = getMessageLocation({ location: focusLocation } as any);
     if (!coords) return;
-
-    if (focusTimeoutRef.current) {
-      clearTimeout(focusTimeoutRef.current);
-      focusTimeoutRef.current = null;
-    }
 
     setFocusMarkerCoords(coords);
 
@@ -262,34 +224,6 @@ export default function MapScreenRedesign({ navigation, route }: Props) {
       },
       500
     );
-
-    if (userLocation) {
-      focusTimeoutRef.current = setTimeout(() => {
-        if (!mapRef.current || !userLocation) return;
-
-        setFocusLocation(null);
-        setFocusMarkerCoords(null);
-        setSelectedMessage(null);
-        navigation.setParams({ focusLocation: undefined });
-
-        mapRef.current.animateToRegion(
-          {
-            latitude: userLocation.latitude,
-            longitude: userLocation.longitude,
-            latitudeDelta: LAT_DELTA,
-            longitudeDelta: LNG_DELTA,
-          },
-          500
-        );
-      }, 5000);
-    }
-
-    return () => {
-      if (focusTimeoutRef.current) {
-        clearTimeout(focusTimeoutRef.current);
-        focusTimeoutRef.current = null;
-      }
-    };
   }, [focusLocation, userLocation]);
 
   const loadMessages = async () => {

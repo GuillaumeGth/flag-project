@@ -587,8 +587,7 @@ export async function sendMessage(
       text_content: textContent,
       media_url: mediaUrl,
       location: location ? `POINT(${location.longitude} ${location.latitude})` : null,
-      radius: location ? 60 : null,
-      is_read: location ? false : true, // Messages without location are immediately readable
+is_read: location ? false : true, // Messages without location are immediately readable
       is_public: isPublic || false,
     })
     .select()

@@ -26,8 +26,7 @@ export interface Message {
   text_content?: string;
   media_url?: string;
   location: Coordinates;
-  radius: number; // meters (default 30)
-  created_at: string;
+created_at: string;
   read_at?: string;
   is_read: boolean;
   is_public?: boolean;
@@ -58,7 +57,7 @@ export interface UndiscoveredMessageMapMeta {
 export interface MapMarker {
   id: string;
   coordinate: Coordinates;
-  is_readable: boolean; // within 30m radius
+  is_readable: boolean; // within 100m radius
   sender_name?: string;
 }
 

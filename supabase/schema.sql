@@ -71,7 +71,6 @@ CREATE TABLE IF NOT EXISTS public.messages (
     text_content TEXT,
     media_url TEXT,
     location GEOGRAPHY(POINT, 4326),
-    radius INTEGER DEFAULT 30,
     is_read BOOLEAN DEFAULT FALSE,
     is_public BOOLEAN DEFAULT FALSE,
     read_at TIMESTAMPTZ,
@@ -167,7 +166,6 @@ BEGIN
             content_type,
             text_content,
             location,
-            radius,
             is_read
         ) VALUES (
             bot_user_id,
@@ -175,7 +173,6 @@ BEGIN
             'text',
             'Bienvenue sur Flag ! Je suis Flag Bot, ton assistant. Tu peux m''envoyer des messages pour tester l''application. Bonne découverte !',
             ST_SetSRID(ST_MakePoint(2.3522, 48.8566), 4326)::geography,
-            30,
             false
         );
     END IF;

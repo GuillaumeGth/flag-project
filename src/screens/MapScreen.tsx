@@ -556,14 +556,6 @@ export default function MapScreenRedesign({ navigation, route }: Props) {
           <Ionicons name="locate" size={22} color={colors.primary.cyan} />
         </TouchableOpacity>
 
-        <TouchableOpacity
-          onPress={() => navigation.navigate('Search')}
-          activeOpacity={0.9}
-          style={styles.floatingButton}
-        >
-          <Ionicons name="search" size={22} color={colors.primary.cyan} />
-        </TouchableOpacity>
-
         {routeCoordinates && (
           <>
             <TouchableOpacity

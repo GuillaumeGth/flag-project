@@ -557,7 +557,7 @@ export default function MapScreenRedesign({ navigation, route }: Props) {
         </TouchableOpacity>
 
         <TouchableOpacity
-          onPress={() => navigation.navigate('SearchUsers')}
+          onPress={() => navigation.navigate('Search')}
           activeOpacity={0.9}
           style={styles.floatingButton}
         >

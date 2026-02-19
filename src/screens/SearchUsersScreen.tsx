@@ -78,9 +78,6 @@ export default function SearchUsersScreen({ navigation }: Props) {
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={24} color={colors.text.primary} />
-        </TouchableOpacity>
         <View style={styles.searchBox}>
           <Ionicons name="search" size={18} color={colors.text.tertiary} />
           <TextInput
@@ -89,7 +86,6 @@ export default function SearchUsersScreen({ navigation }: Props) {
             placeholderTextColor={colors.text.tertiary}
             value={query}
             onChangeText={setQuery}
-            autoFocus
             autoCapitalize="none"
             autoCorrect={false}
           />
@@ -141,10 +137,6 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface.elevated,
     borderBottomWidth: 1,
     borderBottomColor: colors.border.default,
-  },
-  backButton: {
-    padding: 4,
-    marginRight: 8,
   },
   searchBox: {
     flex: 1,

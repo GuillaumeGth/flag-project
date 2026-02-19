@@ -47,6 +47,8 @@ function MainTabs() {
             iconName = focused ? 'map' : 'map-outline';
           } else if (route.name === 'Inbox') {
             iconName = focused ? 'mail' : 'mail-outline';
+          } else if (route.name === 'Search') {
+            iconName = focused ? 'search' : 'search-outline';
           } else if (route.name === 'Profile') {
             iconName = focused ? 'person' : 'person-outline';
           } else {
@@ -69,6 +71,7 @@ function MainTabs() {
     >
       <Tab.Screen name="Map" component={MapScreen} />
       <Tab.Screen name="Inbox" component={InboxScreen} />
+      <Tab.Screen name="Search" component={SearchUsersScreen} />
       <Tab.Screen name="Profile" component={ProfileScreen} />
     </Tab.Navigator>
   );
@@ -137,11 +140,6 @@ function AppNavigator() {
           <Stack.Screen
             name="UserProfile"
             component={UserProfileScreen}
-            options={{ presentation: 'card' }}
-          />
-          <Stack.Screen
-            name="SearchUsers"
-            component={SearchUsersScreen}
             options={{ presentation: 'card' }}
           />
         </>

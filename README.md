@@ -61,7 +61,7 @@ npx expo start
 3. Créer deux clients OAuth :
    - **Web** : pour Supabase (noter le Client ID et Client Secret)
    - **Android** :
-     - Nom du package : `com.flaagapp.app`
+     - Nom du package : `com.flagapp.app`
      - Empreinte SHA-1 : obtenir avec `keytool -keystore android/app/debug.keystore -list -v` (mot de passe : `android`)
 
 ### Supabase
@@ -77,7 +77,7 @@ npx expo start
 Ajouter dans `app.json` :
 ```json
 "expo": {
-  "scheme": "com.flaagapp.app",
+  "scheme": "com.flagapp.app",
   "plugins": [
     [
       "@react-native-google-signin/google-signin",

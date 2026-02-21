@@ -5,6 +5,47 @@ function getCurrentUserId(): string | null {
   return getCachedUserId();
 }
 
+export interface NotificationPrefs {
+  notifyPrivateFlags: boolean;
+  notifyPublicFlags: boolean;
+}
+
+export async function fetchNotificationPrefs(followingId: string): Promise<NotificationPrefs> {
+  const currentUserId = getCurrentUserId();
+  if (!currentUserId) return { notifyPrivateFlags: true, notifyPublicFlags: false };
+  const { data } = await supabase
+    .from('subscriptions')
+    .select('notify_private_flags, notify_public_flags')
+    .eq('follower_id', currentUserId)
+    .eq('following_id', followingId)
+    .maybeSingle();
+  return {
+    notifyPrivateFlags: data?.notify_private_flags ?? true,
+    notifyPublicFlags: data?.notify_public_flags ?? false,
+  };
+}
+
+export async function updateNotificationPrefs(
+  followingId: string,
+  prefs: Partial<NotificationPrefs>
+): Promise<boolean> {
+  const currentUserId = getCurrentUserId();
+  if (!currentUserId) return false;
+  const update: Record<string, boolean> = {};
+  if (prefs.notifyPrivateFlags !== undefined) update.notify_private_flags = prefs.notifyPrivateFlags;
+  if (prefs.notifyPublicFlags !== undefined) update.notify_public_flags = prefs.notifyPublicFlags;
+  const { error } = await supabase
+    .from('subscriptions')
+    .update(update)
+    .eq('follower_id', currentUserId)
+    .eq('following_id', followingId);
+  if (error) {
+    reportError(error, 'subscriptions.updateNotificationPrefs');
+    return false;
+  }
+  return true;
+}
+
 export async function follow(userId: string): Promise<boolean> {
   const currentUserId = getCurrentUserId();
   if (!currentUserId) return false;

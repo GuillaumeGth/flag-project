@@ -89,9 +89,9 @@ android {
     buildToolsVersion rootProject.ext.buildToolsVersion
     compileSdk rootProject.ext.compileSdkVersion
 
-    namespace 'com.flaagapp.app'
+    namespace 'com.flagapp.app'
     defaultConfig {
-        applicationId 'com.flaagapp.app'
+        applicationId 'com.flagapp.app'
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1

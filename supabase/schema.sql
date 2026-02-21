@@ -200,9 +200,20 @@ DECLARE
     payload JSONB;
     notif_title TEXT;
     notif_body TEXT;
+    notif_pref BOOLEAN;
 BEGIN
     -- Only notify for private messages (recipient exists)
     IF NEW.recipient_id IS NULL THEN
+        RETURN NEW;
+    END IF;
+
+    -- Check notify_private_flags preference (recipient's prefs for messages from sender)
+    SELECT notify_private_flags INTO notif_pref
+    FROM public.subscriptions
+    WHERE follower_id = NEW.recipient_id AND following_id = NEW.sender_id;
+
+    -- If preference is explicitly disabled, skip notification
+    IF notif_pref = FALSE THEN
         RETURN NEW;
     END IF;
 
@@ -352,6 +363,8 @@ CREATE TABLE IF NOT EXISTS public.subscriptions (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     follower_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
     following_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+    notify_private_flags BOOLEAN NOT NULL DEFAULT TRUE,
+    notify_public_flags  BOOLEAN NOT NULL DEFAULT FALSE,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     CONSTRAINT subscriptions_unique UNIQUE (follower_id, following_id),
     CONSTRAINT subscriptions_no_self CHECK (follower_id != following_id)
@@ -370,6 +383,10 @@ CREATE POLICY "Users can follow" ON public.subscriptions
 DROP POLICY IF EXISTS "Users can unfollow" ON public.subscriptions;
 CREATE POLICY "Users can unfollow" ON public.subscriptions
     FOR DELETE USING (auth.uid() = follower_id);
+
+DROP POLICY IF EXISTS "Users can update own subscriptions" ON public.subscriptions;
+CREATE POLICY "Users can update own subscriptions" ON public.subscriptions
+    FOR UPDATE USING (auth.uid() = follower_id);
 
 CREATE INDEX IF NOT EXISTS subscriptions_follower_idx ON public.subscriptions(follower_id);
 CREATE INDEX IF NOT EXISTS subscriptions_following_idx ON public.subscriptions(following_id);
@@ -429,6 +446,60 @@ DROP TRIGGER IF EXISTS on_subscription_created_send_push ON public.subscriptions
 CREATE TRIGGER on_subscription_created_send_push
     AFTER INSERT ON public.subscriptions
     FOR EACH ROW EXECUTE FUNCTION public.send_push_on_new_follow();
+
+-- Function to send push notification to followers when a new public message is created
+CREATE OR REPLACE FUNCTION public.send_push_on_new_public_message()
+RETURNS TRIGGER AS $$
+DECLARE
+  sub RECORD;
+  target_tokens TEXT[];
+  token TEXT;
+  sender_name TEXT;
+  expo_url TEXT := 'https://exp.host/--/api/v2/push/send';
+  payload JSONB;
+BEGIN
+  -- Only handle public messages (no recipient)
+  IF NEW.recipient_id IS NOT NULL THEN RETURN NEW; END IF;
+
+  SELECT COALESCE(display_name, 'Quelqu''un') INTO sender_name
+  FROM public.users WHERE id = NEW.sender_id;
+
+  FOR sub IN
+    SELECT s.follower_id
+    FROM public.subscriptions s
+    WHERE s.following_id = NEW.sender_id
+      AND s.notify_public_flags = TRUE
+  LOOP
+    SELECT array_agg(expo_push_token) INTO target_tokens
+    FROM public.user_push_tokens
+    WHERE user_id = sub.follower_id;
+
+    IF target_tokens IS NOT NULL AND array_length(target_tokens, 1) > 0 THEN
+      FOREACH token IN ARRAY target_tokens LOOP
+        payload := jsonb_build_object(
+          'to', token,
+          'sound', 'default',
+          'title', 'Nouveau flag public !',
+          'body', sender_name || ' a déposé un nouveau flag',
+          'data', jsonb_build_object('messageId', NEW.id)
+        );
+        PERFORM http(('POST', expo_url,
+          ARRAY[http_header('Content-Type','application/json')],
+          'application/json', payload::text)::http_request);
+      END LOOP;
+    END IF;
+  END LOOP;
+  RETURN NEW;
+EXCEPTION WHEN OTHERS THEN
+  RAISE LOG 'send_push_on_new_public_message error: % %', SQLERRM, SQLSTATE;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+DROP TRIGGER IF EXISTS on_public_message_created_send_push ON public.messages;
+CREATE TRIGGER on_public_message_created_send_push
+  AFTER INSERT ON public.messages
+  FOR EACH ROW EXECUTE FUNCTION public.send_push_on_new_public_message();
 
 -- Storage bucket for media (photos, audio)
 INSERT INTO storage.buckets (id, name, public)

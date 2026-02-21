@@ -11,6 +11,7 @@ import { colors, spacing } from '@/theme-redesign';
 import { AuthProvider, useAuth } from '@/contexts/AuthContext';
 import { LocationProvider } from '@/contexts/LocationContext';
 import { addNotificationResponseListener } from '@/services/notifications';
+import { checkForAppUpdate } from '@/services/appUpdater';
 
 import PermissionsScreen from '@/screens/PermissionsScreen';
 import AuthScreen from '@/screens/AuthScreen';
@@ -152,6 +153,10 @@ function AppNavigator() {
 
 export default function App() {
   const navigationRef = useRef<NavigationContainerRef<any>>(null);
+
+  useEffect(() => {
+    checkForAppUpdate();
+  }, []);
 
   useEffect(() => {
     const subscription = addNotificationResponseListener(() => {

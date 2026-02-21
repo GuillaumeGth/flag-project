@@ -85,11 +85,11 @@ const GridCell = ({ item, index, onPress }: { item: Message; index: number; onPr
   // text
   return (
     <Animated.View style={{ opacity: itemFade }}>
-      <View style={[styles.cell, styles.cellPlaceholder]}>
+      <TouchableOpacity style={[styles.cell, styles.cellPlaceholder]} onPress={() => onPress(item)}>
         <Text style={styles.cellText} numberOfLines={4}>
           {item.text_content}
         </Text>
-      </View>
+      </TouchableOpacity>
     </Animated.View>
   );
 };
@@ -359,7 +359,7 @@ export default function ProfileScreenRedesign({ navigation }: any) {
         </KeyboardAvoidingView>
       </Modal>
 
-      {/* Photo Viewer Modal */}
+      {/* Message Viewer Modal */}
       <Modal
         visible={!!viewingMessage}
         transparent
@@ -367,12 +367,17 @@ export default function ProfileScreenRedesign({ navigation }: any) {
         onRequestClose={() => setViewingMessage(null)}
       >
         <View style={styles.photoViewerOverlay}>
-          {viewingMessage?.media_url && (
+          {viewingMessage?.content_type === 'photo' && viewingMessage?.media_url && (
             <Image
               source={{ uri: viewingMessage.media_url }}
               style={styles.photoViewerImage}
               resizeMode="contain"
             />
+          )}
+          {viewingMessage?.content_type === 'text' && (
+            <View style={styles.textViewerContainer}>
+              <Text style={styles.textViewerContent}>{viewingMessage.text_content}</Text>
+            </View>
           )}
 
           {/* Close Button */}
@@ -658,5 +663,17 @@ const styles = StyleSheet.create({
     position: 'absolute',
     bottom: 60,
     paddingHorizontal: spacing.xl,
+  },
+  textViewerContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: spacing.xxl,
+  },
+  textViewerContent: {
+    fontSize: typography.sizes.xl,
+    color: colors.text.primary,
+    textAlign: 'center',
+    lineHeight: 32,
   },
 });

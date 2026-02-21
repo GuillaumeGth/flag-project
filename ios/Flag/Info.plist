@@ -27,14 +27,14 @@
       <dict>
         <key>CFBundleURLSchemes</key>
         <array>
-          <string>flaag</string>
-          <string>com.flaagapp.app</string>
+          <string>flag</string>
+          <string>com.flagapp.app</string>
         </array>
       </dict>
       <dict>
         <key>CFBundleURLSchemes</key>
         <array>
-          <string>exp+flaag-app</string>
+          <string>exp+flag-app</string>
         </array>
       </dict>
     </array>

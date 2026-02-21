@@ -1,5 +1,5 @@
 {
-  "name": "flaag-app",
+  "name": "flag-app",
   "version": "1.0.0",
   "main": "node_modules/expo/AppEntry.js",
   "scripts": {
@@ -9,11 +9,16 @@
     "web": "expo start --web",
     "lint": "eslint .",
     "build-android": "eas build --platform android --local",
-    "build-apple": "eas build --platform ios --local"
+    "build-apple": "eas build --platform ios --local",
+    "deploy": "bash scripts/deploy-firebase.sh",
+    "deploy:existing": "bash scripts/deploy-firebase.sh --skip-build",
+    "distribute": "bash scripts/deploy-firebase.sh --skip-build"
   },
   "dependencies": {
     "@expo/vector-icons": "^15.0.3",
     "@react-native-async-storage/async-storage": "2.2.0",
+    "@react-native-firebase/app": "^23.8.6",
+    "@react-native-firebase/app-distribution": "^23.8.6",
     "@react-navigation/bottom-tabs": "^6.5.11",
     "@react-navigation/native": "^6.1.9",
     "@react-navigation/native-stack": "^6.9.17",

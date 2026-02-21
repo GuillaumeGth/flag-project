@@ -111,6 +111,6 @@ npm run lint       # ESLint
 
 ## Identifiants
 
-- iOS bundle ID : `com.flaagapp.app`
-- Android package : `com.flaagapp.app`
+- iOS bundle ID : `com.flagapp.app`
+- Android package : `com.flagapp.app`
 - EAS project : configuré dans `app.json`

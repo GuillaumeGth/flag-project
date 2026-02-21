@@ -1,11 +1,11 @@
 {
   "expo": {
     "name": "Fläag",
-    "slug": "flaag-app",
+    "slug": "flag-app",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./src/assets/icon.png",
-    "scheme": "flaag",
+    "scheme": "flag",
     "userInterfaceStyle": "automatic",
     "splash": {
       "image": "./src/assets/splash.png",
@@ -17,7 +17,7 @@
     ],
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.flaagapp.app",
+      "bundleIdentifier": "com.flagapp.app",
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "Fläag utilise votre position pour afficher les messages autour de vous.",
         "NSLocationAlwaysAndWhenInUseUsageDescription": "Fläag utilise votre position en arrière-plan pour vous notifier quand vous êtes proche d'un message.",
@@ -30,14 +30,14 @@
         "foregroundImage": "./src/assets/adaptive-icon.png",
         "backgroundColor": "#1E2028"
       },
-      "package": "com.flaagapp.app",
+      "package": "com.flagapp.app",
       "googleServicesFile": "./android/app/google-services.json",
       "intentFilters": [
         {
           "action": "VIEW",
           "data": [
             {
-              "scheme": "flaag"
+              "scheme": "flag"
             }
           ],
           "category": ["BROWSABLE", "DEFAULT"]

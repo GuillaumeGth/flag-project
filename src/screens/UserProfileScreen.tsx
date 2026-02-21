@@ -10,12 +10,21 @@ import {
   Dimensions,
   RefreshControl,
   Modal,
+  Switch,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing, radius, typography, shadows } from '@/theme-redesign';
 import { supabase } from '@/services/supabase';
 import { fetchUserPublicMessages, fetchDiscoveredPublicMessageIds } from '@/services/messages';
-import { follow, unfollow, isFollowing, fetchFollowerCount } from '@/services/subscriptions';
+import {
+  follow,
+  unfollow,
+  isFollowing,
+  fetchFollowerCount,
+  fetchNotificationPrefs,
+  updateNotificationPrefs,
+  NotificationPrefs,
+} from '@/services/subscriptions';
 import { Message, User } from '@/types';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
@@ -38,6 +47,8 @@ export default function UserProfileScreen({ navigation, route }: Props) {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [viewingMessage, setViewingMessage] = useState<Message | null>(null);
+  const [notifPrefs, setNotifPrefs] = useState<NotificationPrefs>({ notifyPrivateFlags: true, notifyPublicFlags: false });
+  const [showNotifModal, setShowNotifModal] = useState(false);
 
   const loadProfile = useCallback(async () => {
     const { data } = await supabase
@@ -61,6 +72,10 @@ export default function UserProfileScreen({ navigation, route }: Props) {
   const checkFollowing = useCallback(async () => {
     const result = await isFollowing(userId);
     setFollowing(result);
+    if (result) {
+      const prefs = await fetchNotificationPrefs(userId);
+      setNotifPrefs(prefs);
+    }
   }, [userId]);
 
   const loadFollowerCount = useCallback(async () => {
@@ -86,12 +101,15 @@ export default function UserProfileScreen({ navigation, route }: Props) {
       if (ok) {
         setFollowing(false);
         setFollowerCount(c => Math.max(0, c - 1));
+        setNotifPrefs({ notifyPrivateFlags: true, notifyPublicFlags: false });
       }
     } else {
       const ok = await follow(userId);
       if (ok) {
         setFollowing(true);
         setFollowerCount(c => c + 1);
+        const prefs = await fetchNotificationPrefs(userId);
+        setNotifPrefs(prefs);
       }
     }
     setFollowLoading(false);
@@ -146,11 +164,11 @@ export default function UserProfileScreen({ navigation, route }: Props) {
       );
     }
     return (
-      <View style={[styles.cell, styles.cellPlaceholder]}>
+      <TouchableOpacity style={[styles.cell, styles.cellPlaceholder]} onPress={() => setViewingMessage(item)}>
         <Text style={styles.cellText} numberOfLines={4}>
           {item.text_content}
         </Text>
-      </View>
+      </TouchableOpacity>
     );
   };
 
@@ -189,6 +207,15 @@ export default function UserProfileScreen({ navigation, route }: Props) {
             {followerCount} abonné{followerCount !== 1 ? 's' : ''}
           </Text>
         </View>
+        {following && (
+          <TouchableOpacity onPress={() => setShowNotifModal(true)} style={styles.bellButton}>
+            <Ionicons
+              name={notifPrefs.notifyPrivateFlags || notifPrefs.notifyPublicFlags ? 'notifications' : 'notifications-off'}
+              size={22}
+              color={colors.primary.violet}
+            />
+          </TouchableOpacity>
+        )}
         <TouchableOpacity
           style={[styles.followButton, following && styles.followButtonActive]}
           onPress={handleToggleFollow}
@@ -250,18 +277,79 @@ export default function UserProfileScreen({ navigation, route }: Props) {
       )}
 
       <Modal
+        visible={showNotifModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowNotifModal(false)}
+      >
+        <TouchableOpacity
+          style={styles.notifModalOverlay}
+          activeOpacity={1}
+          onPress={() => setShowNotifModal(false)}
+        >
+          <TouchableOpacity activeOpacity={1} style={styles.notifModalCard}>
+            <View style={styles.notifModalHeader}>
+              <Text style={styles.notifModalTitle}>Notifications</Text>
+              <TouchableOpacity onPress={() => setShowNotifModal(false)}>
+                <Ionicons name="close" size={22} color={colors.text.secondary} />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.notifRow}>
+              <View style={styles.notifRowInfo}>
+                <Text style={styles.notifRowLabel}>Fläags privés</Text>
+              </View>
+              <Switch
+                value={notifPrefs.notifyPrivateFlags}
+                onValueChange={async (val) => {
+                  const newPrefs = { ...notifPrefs, notifyPrivateFlags: val };
+                  setNotifPrefs(newPrefs);
+                  await updateNotificationPrefs(userId, { notifyPrivateFlags: val });
+                }}
+                trackColor={{ false: colors.border.default, true: colors.primary.violet }}
+                thumbColor={colors.text.primary}
+              />
+            </View>
+
+            <View style={styles.notifDivider} />
+
+            <View style={styles.notifRow}>
+              <View style={styles.notifRowInfo}>
+                <Text style={styles.notifRowLabel}>Fläags publics</Text>
+              </View>
+              <Switch
+                value={notifPrefs.notifyPublicFlags}
+                onValueChange={async (val) => {
+                  const newPrefs = { ...notifPrefs, notifyPublicFlags: val };
+                  setNotifPrefs(newPrefs);
+                  await updateNotificationPrefs(userId, { notifyPublicFlags: val });
+                }}
+                trackColor={{ false: colors.border.default, true: colors.primary.violet }}
+                thumbColor={colors.text.primary}
+              />
+            </View>
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
+
+      <Modal
         visible={!!viewingMessage}
         transparent
         animationType="fade"
         onRequestClose={() => setViewingMessage(null)}
       >
         <View style={styles.photoViewerOverlay}>
-          {viewingMessage?.media_url && (
+          {viewingMessage?.content_type === 'photo' && viewingMessage?.media_url && (
             <Image
               source={{ uri: viewingMessage.media_url }}
               style={styles.photoViewerImage}
               resizeMode="contain"
             />
+          )}
+          {viewingMessage?.content_type === 'text' && (
+            <View style={styles.textViewerContainer}>
+              <Text style={styles.textViewerContent}>{viewingMessage.text_content}</Text>
+            </View>
           )}
           <TouchableOpacity style={styles.photoViewerClose} onPress={() => setViewingMessage(null)}>
             <Ionicons name="close" size={28} color={colors.text.primary} />
@@ -481,5 +569,70 @@ const styles = StyleSheet.create({
     color: colors.text.primary,
     fontSize: 15,
     fontWeight: '600',
+  },
+  bellButton: {
+    padding: 6,
+    marginRight: 8,
+  },
+  notifModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 24,
+  },
+  notifModalCard: {
+    width: '100%',
+    backgroundColor: colors.surface.elevated,
+    borderRadius: radius.xl,
+    padding: spacing.lg,
+  },
+  notifModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: spacing.lg,
+  },
+  notifModalTitle: {
+    fontSize: typography.sizes.lg,
+    fontWeight: '700',
+    color: colors.text.primary,
+  },
+  notifRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: spacing.sm,
+  },
+  notifRowInfo: {
+    flex: 1,
+    marginRight: spacing.md,
+  },
+  notifRowLabel: {
+    fontSize: typography.sizes.md,
+    fontWeight: '600',
+    color: colors.text.primary,
+  },
+  notifRowDesc: {
+    fontSize: typography.sizes.sm,
+    color: colors.text.secondary,
+    marginTop: 2,
+  },
+  notifDivider: {
+    height: 1,
+    backgroundColor: colors.border.default,
+    marginVertical: spacing.sm,
+  },
+  textViewerContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: spacing.xxl,
+  },
+  textViewerContent: {
+    fontSize: typography.sizes.xl,
+    color: colors.text.primary,
+    textAlign: 'center',
+    lineHeight: 32,
   },
 });

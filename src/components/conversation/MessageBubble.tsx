@@ -3,15 +3,22 @@ import {
   View,
   Text,
   TouchableOpacity,
+  Pressable,
   Image,
   StyleSheet,
   Animated,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { MessageWithUsers } from '@/types';
+import { ReactionSummary } from '@/types/reactions';
 import { colors, spacing, radius, shadows, typography } from '@/theme-redesign';
 import { formatTime, formatDateSeparator } from '@/utils/date';
 import GlassCard from '@/components/redesign/GlassCard';
+import ReactionBadge from './ReactionBadge';
+
+// Module-level interpolation config — never declared inside render
+const ANIM_INPUT_RANGE = [0, 1] as const;
+const ANIM_OUTPUT_RANGE = [20, 0] as const;
 
 interface MessageBubbleProps {
   message: MessageWithUsers;
@@ -20,9 +27,12 @@ interface MessageBubbleProps {
   showDateSeparator: boolean;
   isPlaying: boolean;
   playingMessageId: string | null;
+  reactions: ReactionSummary[];
   onPlayAudio: (message: MessageWithUsers) => void;
   onViewImage: (message: MessageWithUsers) => void;
   onNavigateToMap: (location: MessageWithUsers['location']) => void;
+  onLongPress: () => void;
+  onReactionPress: (emoji: string) => void;
 }
 
 export default function MessageBubble({
@@ -32,16 +42,30 @@ export default function MessageBubble({
   showDateSeparator,
   isPlaying,
   playingMessageId,
+  reactions,
   onPlayAudio,
   onViewImage,
   onNavigateToMap,
+  onLongPress,
+  onReactionPress,
 }: MessageBubbleProps) {
   const isUndiscovered = !isFromMe && !message.is_read && message.location;
+  const hasReactions = reactions.length > 0;
 
-  const animatedStyle = useMemo(() => ({
-    opacity: animValue,
-    transform: [{ translateY: animValue.interpolate({ inputRange: [0, 1], outputRange: [20, 0] }) }],
-  }), [animValue]);
+  const animatedStyle = useMemo(
+    () => ({
+      opacity: animValue,
+      transform: [
+        {
+          translateY: animValue.interpolate({
+            inputRange: ANIM_INPUT_RANGE,
+            outputRange: ANIM_OUTPUT_RANGE,
+          }),
+        },
+      ],
+    }),
+    [animValue]
+  );
 
   return (
     <Animated.View style={[styles.messageContainer, animatedStyle]}>
@@ -55,9 +79,10 @@ export default function MessageBubble({
 
       <View style={[styles.messageRow, isFromMe && styles.messageRowRight]}>
         {isUndiscovered ? (
-          <TouchableOpacity
+          <Pressable
             onPress={() => onNavigateToMap(message.location)}
-            activeOpacity={0.9}
+            onLongPress={onLongPress}
+            delayLongPress={400}
           >
             <GlassCard style={styles.undiscoveredBubble}>
               <View style={styles.blurredContent}>
@@ -66,64 +91,92 @@ export default function MessageBubble({
               </View>
               <Text style={styles.messageTime}>{formatTime(message.created_at)}</Text>
             </GlassCard>
-          </TouchableOpacity>
+          </Pressable>
         ) : (
-          <View
-            style={[
-              styles.messageBubble,
-              isFromMe ? styles.messageBubbleRight : styles.messageBubbleLeft,
-            ]}
-          >
-            {message.content_type === 'photo' && message.media_url && (
-              <TouchableOpacity activeOpacity={0.9} onPress={() => onViewImage(message)}>
-                <Image source={{ uri: message.media_url }} style={styles.messageImage} />
-              </TouchableOpacity>
-            )}
-
-            {message.content_type === 'audio' && message.media_url && (
-              <TouchableOpacity
-                style={styles.audioMessage}
-                activeOpacity={0.7}
-                onPress={() => onPlayAudio(message)}
-              >
-                <View style={styles.audioIconContainer}>
-                  <Ionicons
-                    name={playingMessageId === message.id && isPlaying ? 'pause' : 'play'}
-                    size={18}
-                    color={isFromMe ? colors.text.primary : colors.primary.cyan}
-                  />
-                </View>
-                <Text style={[styles.audioText, isFromMe && styles.audioTextRight]}>
-                  {playingMessageId === message.id && isPlaying ? 'En lecture...' : 'Message audio'}
-                </Text>
-              </TouchableOpacity>
-            )}
-
-            {message.text_content && (
-              <Text style={[styles.messageText, isFromMe && styles.messageTextRight]}>
-                {message.text_content}
-              </Text>
-            )}
-
-            <View style={styles.messageFooter}>
-              {message.location && (
-                <TouchableOpacity
-                  activeOpacity={0.7}
-                  onPress={() => onNavigateToMap(message.location)}
-                  style={styles.flagButton}
-                >
-                  <Ionicons
-                    name="flag"
-                    size={12}
-                    color={isFromMe ? colors.text.secondary : colors.primary.cyan}
-                  />
+          // Wrapper gives position:relative context for the floating reactions
+          <View style={styles.bubbleWrapper}>
+            <Pressable
+              onLongPress={onLongPress}
+              delayLongPress={400}
+              style={[
+                styles.messageBubble,
+                isFromMe ? styles.messageBubbleRight : styles.messageBubbleLeft,
+                hasReactions && styles.messageBubbleWithReactions,
+              ]}
+            >
+              {message.content_type === 'photo' && message.media_url && (
+                <TouchableOpacity activeOpacity={0.9} onPress={() => onViewImage(message)}>
+                  <Image source={{ uri: message.media_url }} style={styles.messageImage} />
                 </TouchableOpacity>
               )}
-              <Text style={[styles.messageTime, isFromMe && styles.messageTimeRight]}>
-                {formatTime(message.created_at)}
-                {isFromMe ? (message.is_read ? ' ✓✓' : ' ✓') : ''}
-              </Text>
-            </View>
+
+              {message.content_type === 'audio' && message.media_url && (
+                <TouchableOpacity
+                  style={styles.audioMessage}
+                  activeOpacity={0.7}
+                  onPress={() => onPlayAudio(message)}
+                >
+                  <View style={styles.audioIconContainer}>
+                    <Ionicons
+                      name={
+                        playingMessageId === message.id && isPlaying ? 'pause' : 'play'
+                      }
+                      size={18}
+                      color={isFromMe ? colors.text.primary : colors.primary.cyan}
+                    />
+                  </View>
+                  <Text style={[styles.audioText, isFromMe && styles.audioTextRight]}>
+                    {playingMessageId === message.id && isPlaying
+                      ? 'En lecture...'
+                      : 'Message audio'}
+                  </Text>
+                </TouchableOpacity>
+              )}
+
+              {message.text_content && (
+                <Text style={[styles.messageText, isFromMe && styles.messageTextRight]}>
+                  {message.text_content}
+                </Text>
+              )}
+
+              <View style={styles.messageFooter}>
+                {message.location && (
+                  <TouchableOpacity
+                    activeOpacity={0.7}
+                    onPress={() => onNavigateToMap(message.location)}
+                    style={styles.flagButton}
+                  >
+                    <Ionicons
+                      name="flag"
+                      size={12}
+                      color={isFromMe ? colors.text.secondary : colors.primary.cyan}
+                    />
+                  </TouchableOpacity>
+                )}
+                <Text style={[styles.messageTime, isFromMe && styles.messageTimeRight]}>
+                  {formatTime(message.created_at)}
+                  {isFromMe ? (message.is_read ? ' ✓✓' : ' ✓') : ''}
+                </Text>
+              </View>
+            </Pressable>
+
+            {/* Floating reactions — positioned at bottom-right of the bubble */}
+            {hasReactions && (
+              <View
+                style={[
+                  styles.reactionsFloat,
+                  isFromMe ? styles.reactionsFloatRight : styles.reactionsFloatLeft,
+                ]}
+              >
+                {reactions.map((reaction) => (
+                  <ReactionBadge
+                    key={reaction.emoji}
+                    reaction={reaction}
+                    onPress={() => onReactionPress(reaction.emoji)}
+                  />
+                ))}
+              </View>
+            )}
           </View>
         )}
       </View>
@@ -158,8 +211,11 @@ const styles = StyleSheet.create({
   messageRowRight: {
     justifyContent: 'flex-end',
   },
-  messageBubble: {
+  bubbleWrapper: {
+    position: 'relative',
     maxWidth: '75%',
+  },
+  messageBubble: {
     padding: spacing.md,
     borderRadius: radius.lg,
     ...shadows.small,
@@ -174,6 +230,24 @@ const styles = StyleSheet.create({
     backgroundColor: colors.message.sent,
     borderBottomRightRadius: radius.xs,
     ...shadows.medium,
+  },
+  // Extra bottom margin when reactions are floating below the bubble
+  messageBubbleWithReactions: {
+    marginBottom: 16,
+  },
+  // Reactions row floats outside the bubble at bottom-right
+  reactionsFloat: {
+    position: 'absolute',
+    bottom: -8,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 3,
+  },
+  reactionsFloatRight: {
+    right: 4,
+  },
+  reactionsFloatLeft: {
+    left: 4,
   },
   undiscoveredBubble: {
     padding: spacing.md,

@@ -656,3 +656,41 @@ DROP TRIGGER IF EXISTS on_error_log_send_email ON public.error_logs;
 CREATE TRIGGER on_error_log_send_email
     AFTER INSERT ON public.error_logs
     FOR EACH ROW EXECUTE FUNCTION public.send_error_email_alert();
+
+-- Message reactions table
+-- Stores emoji reactions (❤️ 😂 😮 😢 😡 👍) on messages.
+-- Unique per (message, user, emoji) — one reaction type per user per message.
+CREATE TABLE IF NOT EXISTS public.message_reactions (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    message_id UUID NOT NULL REFERENCES public.messages(id) ON DELETE CASCADE,
+    user_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+    emoji TEXT NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    CONSTRAINT message_reactions_unique UNIQUE (message_id, user_id, emoji)
+);
+
+ALTER TABLE public.message_reactions ENABLE ROW LEVEL SECURITY;
+
+-- Only users who can view the message can view its reactions
+DROP POLICY IF EXISTS "Users can view reactions on accessible messages" ON public.message_reactions;
+CREATE POLICY "Users can view reactions on accessible messages" ON public.message_reactions
+    FOR SELECT USING (
+        EXISTS (
+            SELECT 1 FROM public.messages m
+            WHERE m.id = message_id
+              AND (auth.uid() = m.sender_id OR auth.uid() = m.recipient_id OR m.is_public = true)
+        )
+    );
+
+-- Users can only insert their own reactions
+DROP POLICY IF EXISTS "Users can add own reactions" ON public.message_reactions;
+CREATE POLICY "Users can add own reactions" ON public.message_reactions
+    FOR INSERT WITH CHECK (auth.uid() = user_id);
+
+-- Users can only delete their own reactions
+DROP POLICY IF EXISTS "Users can delete own reactions" ON public.message_reactions;
+CREATE POLICY "Users can delete own reactions" ON public.message_reactions
+    FOR DELETE USING (auth.uid() = user_id);
+
+CREATE INDEX IF NOT EXISTS message_reactions_message_id_idx ON public.message_reactions(message_id);
+CREATE INDEX IF NOT EXISTS message_reactions_user_id_idx ON public.message_reactions(user_id);

@@ -12,29 +12,18 @@ import {
 import Toast from '@/components/Toast';
 import { Switch } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as ImagePicker from 'expo-image-picker';
 import { Audio } from 'expo-av';
 import { useLocation } from '@/contexts/LocationContext';
 import { sendMessage, uploadMedia } from '@/services/messages';
-import { MessageContentType } from '@/types';
+import { MessageContentType, RootStackParamList } from '@/types';
 import { colors, shadows, radius, spacing, typography } from '@/theme-redesign';
 
-interface Recipient {
-  id: string;
-  name: string;
-}
+type Props = NativeStackScreenProps<RootStackParamList, 'CreateMessage'>;
 
-interface Props {
-  navigation: any;
-  route: {
-    params?: {
-      recipientId?: string;
-      recipientName?: string;
-      recipients?: Recipient[];
-    };
-  };
-}
+type Recipient = { id: string; name: string };
 
 export default function CreateMessageScreen({ navigation, route }: Props) {
   const { current: userLocation } = useLocation();
@@ -122,8 +111,8 @@ export default function CreateMessageScreen({ navigation, route }: Props) {
       );
       setRecording(recording);
       setIsRecording(true);
-    } catch (error) {
-      console.error('Error starting recording:', error);
+    } catch {
+      // recording errors are non-critical
     }
   };
 
@@ -183,8 +172,8 @@ export default function CreateMessageScreen({ navigation, route }: Props) {
 
       await sound.playAsync();
       setIsPlaying(true);
-    } catch (error) {
-      console.error('Error playing audio:', error);
+    } catch {
+      // audio errors are non-critical
     }
   };
 
@@ -266,7 +255,7 @@ export default function CreateMessageScreen({ navigation, route }: Props) {
         );
 
         const results = await Promise.all(sendPromises);
-        console.log('handleSend results:', results.map((r, i) => ({ recipient: recipients[i]?.id, success: !!r })));
+        // results logged implicitly via successCount check below
         const successCount = results.filter(Boolean).length;
 
         if (successCount === recipients.length) {

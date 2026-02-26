@@ -4,6 +4,7 @@ import {
   Text,
   StyleSheet,
   ViewStyle,
+  StyleProp,
   ActivityIndicator,
   View,
 } from 'react-native';
@@ -21,9 +22,21 @@ interface PremiumButtonProps {
   loading?: boolean;
   disabled?: boolean;
   fullWidth?: boolean;
-  style?: ViewStyle;
+  style?: StyleProp<ViewStyle>;
   withGlow?: boolean;
 }
+
+const SIZE_STYLES = {
+  small: { paddingVertical: 8, paddingHorizontal: 16, fontSize: typography.sizes.sm },
+  medium: { paddingVertical: 12, paddingHorizontal: 20, fontSize: typography.sizes.md },
+  large: { paddingVertical: 16, paddingHorizontal: 28, fontSize: typography.sizes.lg },
+};
+
+const ICON_SIZES = {
+  small: 16,
+  medium: 20,
+  large: 24,
+};
 
 /**
  * Premium Button Component with multiple variants
@@ -41,17 +54,6 @@ export default function PremiumButton({
   style,
   withGlow = false,
 }: PremiumButtonProps) {
-  const sizeStyles = {
-    small: { paddingVertical: 8, paddingHorizontal: 16, fontSize: typography.sizes.sm },
-    medium: { paddingVertical: 12, paddingHorizontal: 20, fontSize: typography.sizes.md },
-    large: { paddingVertical: 16, paddingHorizontal: 28, fontSize: typography.sizes.lg },
-  };
-
-  const iconSizes = {
-    small: 16,
-    medium: 20,
-    large: 24,
-  };
 
   const renderContent = () => (
     <View style={styles.contentContainer}>
@@ -62,7 +64,7 @@ export default function PremiumButton({
           {icon && iconPosition === 'left' && (
             <Ionicons
               name={icon}
-              size={iconSizes[size]}
+              size={ICON_SIZES[size]}
               color="#fff"
               style={styles.iconLeft}
             />
@@ -71,7 +73,7 @@ export default function PremiumButton({
             <Text
               style={[
                 styles.text,
-                { fontSize: sizeStyles[size].fontSize },
+                { fontSize: SIZE_STYLES[size].fontSize },
                 variant === 'ghost' && styles.textGhost,
               ]}
             >
@@ -81,7 +83,7 @@ export default function PremiumButton({
           {icon && iconPosition === 'right' && (
             <Ionicons
               name={icon}
-              size={iconSizes[size]}
+              size={ICON_SIZES[size]}
               color="#fff"
               style={styles.iconRight}
             />
@@ -94,8 +96,8 @@ export default function PremiumButton({
   const buttonStyle = [
     styles.button,
     {
-      paddingVertical: sizeStyles[size].paddingVertical,
-      paddingHorizontal: sizeStyles[size].paddingHorizontal,
+      paddingVertical: SIZE_STYLES[size].paddingVertical,
+      paddingHorizontal: SIZE_STYLES[size].paddingHorizontal,
     },
     fullWidth && styles.fullWidth,
     withGlow && shadows.glow,

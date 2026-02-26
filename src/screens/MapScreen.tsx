@@ -1,115 +1,164 @@
-/**
- * MapScreen - Redesigned with Neo-Cartographic theme
- *
- * Major improvements:
- * - Glass floating action buttons
- * - Gradient FAB with glow
- * - Premium message card with glass effect
- * - Better marker visuals
- * - Smooth animations
- */
-
-import React, { useEffect, useState, useRef, useCallback } from 'react';
+import React, { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import {
   View,
   StyleSheet,
   TouchableOpacity,
   Text,
-  ActivityIndicator,
   Image,
   Animated,
   Linking,
   Platform,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect, CompositeNavigationProp } from '@react-navigation/native';
+import { BottomTabNavigationProp, BottomTabScreenProps } from '@react-navigation/bottom-tabs';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import MapView, { Marker, Polyline } from 'react-native-maps';
 import { Ionicons } from '@expo/vector-icons';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { LinearGradient } from 'expo-linear-gradient';
-import { captureRef } from 'react-native-view-shot';
 import { useLocation } from '@/contexts/LocationContext';
 import { useAuth } from '@/contexts/AuthContext';
-import { fetchUndiscoveredMessagesForMap, getCachedMapMessages, fetchFollowingPublicMessages } from '@/services/messages';
-import { isWithinRadius, calculateDistance } from '@/services/location';
-import { UndiscoveredMessageMapMeta, Coordinates } from '@/types';
-import { colors, shadows, radius, spacing, typography } from '@/theme-redesign';
+import { UndiscoveredMessageMapMeta, Coordinates, MainTabParamList, RootStackParamList } from '@/types';
+import { colors, shadows, radius, spacing } from '@/theme-redesign';
 import Toast from '@/components/Toast';
-import GlassCard from '@/components/redesign/GlassCard';
-import PremiumAvatar from '@/components/redesign/PremiumAvatar';
+import SelectedMessageCard from '@/components/map/SelectedMessageCard';
+import MessageMarker from '@/components/map/MessageMarker';
+import ScreenLoader from '@/components/ScreenLoader';
+import { useMapMessages } from '@/hooks/useMapMessages';
+import { useMapMarkers } from '@/hooks/useMapMarkers';
+import { log } from '@/utils/debug';
 
-interface Props {
-  navigation: any;
-  route: any;
-}
+type MapNavigationProp = CompositeNavigationProp<
+  BottomTabNavigationProp<MainTabParamList, 'Map'>,
+  NativeStackNavigationProp<RootStackParamList>
+>;
+type Props = Omit<BottomTabScreenProps<MainTabParamList, 'Map'>, 'navigation'> & {
+  navigation: MapNavigationProp;
+};
 
-// 500m radius = ~0.009 latitudeDelta (1km visible area)
-const VISIBLE_RADIUS_METERS = 500;
 const LAT_DELTA = 0.009;
 const LNG_DELTA = 0.009;
 
-export default function MapScreenRedesign({ navigation, route }: Props) {
+const FAB_GRADIENT_COLORS = ['#A78BFA', '#8B5CF6', '#7C3AED', '#6D28D9', '#5B21B6'] as const;
+const GRADIENT_START = { x: 0, y: 0 } as const;
+const FAB_GRADIENT_END = { x: 1, y: 1 } as const;
+const PERMISSION_GRADIENT_END = { x: 1, y: 0 } as const;
+const MARKER_ANCHOR = { x: 0.3, y: 1 } as const;
+
+const parseWKBHex = (wkbHex: string): Coordinates | null => {
+  try {
+    if (wkbHex.length < 42) return null;
+    const isLittleEndian = wkbHex.substring(0, 2) === '01';
+    const typeHex = wkbHex.substring(2, 10);
+    let coordStart = 10;
+    if (typeHex === '01000020' || typeHex === '20000001') coordStart = 18;
+    const lngHex = wkbHex.substring(coordStart, coordStart + 16);
+    const latHex = wkbHex.substring(coordStart + 16, coordStart + 32);
+    const hexToDouble = (hex: string, littleEndian: boolean): number => {
+      const bytes = [];
+      for (let i = 0; i < hex.length; i += 2) bytes.push(parseInt(hex.substring(i, i + 2), 16));
+      if (littleEndian) bytes.reverse();
+      const buffer = new ArrayBuffer(8);
+      const view = new DataView(buffer);
+      bytes.forEach((b, i) => view.setUint8(i, b));
+      return view.getFloat64(0, false);
+    };
+    const lng = hexToDouble(lngHex, isLittleEndian);
+    const lat = hexToDouble(latHex, isLittleEndian);
+    if (!isNaN(lng) && !isNaN(lat) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180) return { longitude: lng, latitude: lat };
+  } catch (e) {
+    log('MapScreen', 'WKB parse error:', e);
+  }
+  return null;
+};
+
+const getMessageLocation = (message: UndiscoveredMessageMapMeta): Coordinates | null => {
+  if (!message.location) return null;
+  if (typeof message.location === 'object') {
+    const loc = message.location as unknown as Record<string, unknown>;
+    if (loc.type === 'Point' && Array.isArray(loc.coordinates) && loc.coordinates.length >= 2) {
+      const [lng, lat] = loc.coordinates as number[];
+      if (typeof lng === 'number' && typeof lat === 'number' && !isNaN(lng) && !isNaN(lat)) return { longitude: lng, latitude: lat };
+    }
+    if (typeof loc.latitude === 'number' && typeof loc.longitude === 'number' && !isNaN(loc.latitude as number) && !isNaN(loc.longitude as number)) {
+      return { longitude: loc.longitude as number, latitude: loc.latitude as number };
+    }
+  }
+  if (typeof message.location === 'string') {
+    if (/^[0-9A-Fa-f]+$/.test(message.location) && message.location.length >= 42) {
+      const coords = parseWKBHex(message.location);
+      if (coords) return coords;
+    }
+    const match = message.location.match(/POINT\(([^ ]+) ([^)]+)\)/);
+    if (match) {
+      const lng = parseFloat(match[1]);
+      const lat = parseFloat(match[2]);
+      if (!isNaN(lng) && !isNaN(lat)) return { longitude: lng, latitude: lat };
+    }
+  }
+  return null;
+};
+
+export default function MapScreen({ navigation, route }: Props) {
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
   const { current: userLocation, loading: locationLoading, refreshLocation, requestPermission, permission } = useLocation();
   const mapRef = useRef<MapView>(null);
-  const [messages, setMessages] = useState<UndiscoveredMessageMapMeta[]>([]);
-  const [loading, setLoading] = useState(true);
+
+  const { messages, loading, loadMessages } = useMapMessages();
+  const { avatarImages, avatarRefs, captureAvatar, canReadMessage, formatDistance } = useMapMarkers(userLocation, messages);
+
   const [selectedMessage, setSelectedMessage] = useState<UndiscoveredMessageMapMeta | null>(null);
   const [centerLocation, setCenterLocation] = useState<Coordinates | null>(null);
   const [centeredMessageId, setCenteredMessageId] = useState<string | null>(null);
-  const [focusLocation, setFocusLocation] = useState<any>(null);
+  const [focusLocation, setFocusLocation] = useState<unknown>(null);
   const [focusMarkerCoords, setFocusMarkerCoords] = useState<Coordinates | null>(null);
-  const [markersReady, setMarkersReady] = useState(false);
-  const [avatarImages, setAvatarImages] = useState<Record<string, string>>({});
   const [toastData, setToastData] = useState<{ visible: boolean; message: string; type: 'success' | 'warning' | 'error' }>({ visible: false, message: '', type: 'success' });
   const [routeCoordinates, setRouteCoordinates] = useState<Array<{ latitude: number; longitude: number }> | null>(null);
   const [routeTargetId, setRouteTargetId] = useState<string | null>(null);
   const [isLoadingRoute, setIsLoadingRoute] = useState(false);
-  const avatarRefs = useRef<Record<string, View | null>>({});
 
-  // Animation for message card
   const [cardSlideAnim] = useState(new Animated.Value(200));
   const [cardOpacityAnim] = useState(new Animated.Value(0));
 
-  // Request location permission on mount
+  const selectedMsgLocation = useMemo(
+    () => (selectedMessage ? getMessageLocation(selectedMessage) : null),
+    [selectedMessage],
+  );
+
   useEffect(() => {
     if (permission !== 'granted') {
       requestPermission();
     }
   }, []);
 
-
-  // Load messages whenever the map screen is focused
   useFocusEffect(
     useCallback(() => {
-      console.log('[MapScreen] useFocusEffect fired, user =', user?.id);
+      log('MapScreen', 'useFocusEffect fired, user =', user?.id);
       if (user) {
         loadMessages();
       }
     }, [])
   );
 
-  // Remember which message we should center on when coming from another screen
   useEffect(() => {
     const unsubscribe = navigation.addListener('focus', () => {
-      const params = navigation.getState()?.routes?.find((r: any) => r.name === 'Map')?.params ?? route?.params;
-      console.log('DEBUG Map focus params:', JSON.stringify(params));
+      const params = navigation.getState()?.routes?.find((r: { name: string }) => r.name === 'Map')?.params ?? route?.params;
+      log('MapScreen', 'focus params:', JSON.stringify(params));
 
       if (params?.toast) {
         setToastData({ visible: true, message: params.toast.message, type: params.toast.type });
         navigation.setParams({ toast: undefined });
       }
 
-      if (params && params.messageId) {
+      if (params?.messageId) {
         setCenteredMessageId(params.messageId);
         setFocusLocation(null);
-        // Clean up the param after using it
         navigation.setParams({ messageId: undefined });
-      } else if (params && params.focusLocation) {
+      } else if (params?.focusLocation) {
         setFocusLocation(params.focusLocation);
         setCenteredMessageId(null);
-        // Clean up the param after using it
         navigation.setParams({ focusLocation: undefined });
       } else {
         setCenterLocation(null);
@@ -123,21 +172,17 @@ export default function MapScreenRedesign({ navigation, route }: Props) {
     return unsubscribe;
   }, [navigation, route]);
 
-  // Also handle route params changes directly
   useEffect(() => {
     const params = route?.params;
-    console.log('DEBUG Map route.params changed:', JSON.stringify(params));
-    if (params && params.focusLocation) {
+    if (params?.focusLocation) {
       setFocusLocation(params.focusLocation);
       setCenteredMessageId(null);
-    } else if (params && params.messageId) {
+    } else if (params?.messageId) {
       setCenteredMessageId(params.messageId);
       setFocusLocation(null);
     }
   }, [route?.params]);
 
-
-  // Center on user when location changes
   useEffect(() => {
     if (userLocation && mapRef.current && !centeredMessageId && !focusLocation) {
       mapRef.current.animateToRegion({
@@ -149,21 +194,11 @@ export default function MapScreenRedesign({ navigation, route }: Props) {
     }
   }, [userLocation, centeredMessageId, focusLocation]);
 
-  // Animate message card entrance
   useEffect(() => {
     if (selectedMessage) {
       Animated.parallel([
-        Animated.spring(cardSlideAnim, {
-          toValue: 0,
-          friction: 8,
-          tension: 40,
-          useNativeDriver: true,
-        }),
-        Animated.timing(cardOpacityAnim, {
-          toValue: 1,
-          duration: 250,
-          useNativeDriver: true,
-        }),
+        Animated.spring(cardSlideAnim, { toValue: 0, friction: 8, tension: 40, useNativeDriver: true }),
+        Animated.timing(cardOpacityAnim, { toValue: 1, duration: 250, useNativeDriver: true }),
       ]).start();
     } else {
       cardSlideAnim.setValue(200);
@@ -171,123 +206,59 @@ export default function MapScreenRedesign({ navigation, route }: Props) {
     }
   }, [selectedMessage]);
 
-  // When messages are loaded and we have a centeredMessageId
   useEffect(() => {
     if (!centeredMessageId || !mapRef.current || messages.length === 0) return;
-
     const targetMessage = messages.find((m) => m.id === centeredMessageId);
     if (!targetMessage) return;
-
     const location = getMessageLocation(targetMessage);
     if (!location) return;
-
     setCenterLocation(location);
     setSelectedMessage(targetMessage);
-
-    mapRef.current.animateToRegion(
-      {
-        latitude: location.latitude,
-        longitude: location.longitude,
-        latitudeDelta: 0.02,
-        longitudeDelta: 0.02,
-      },
-      500
-    );
+    mapRef.current.animateToRegion({ latitude: location.latitude, longitude: location.longitude, latitudeDelta: 0.02, longitudeDelta: 0.02 }, 500);
   }, [centeredMessageId, messages, userLocation]);
 
-  // Handle focusLocation from conversation screen
   useEffect(() => {
     if (!focusLocation || !mapRef.current) return;
-
-    const coords = getMessageLocation({ location: focusLocation } as any);
+    const coords = getMessageLocation({ location: focusLocation } as UndiscoveredMessageMapMeta);
     if (!coords) return;
-
     setFocusMarkerCoords(coords);
-
-    mapRef.current.animateToRegion(
-      {
-        latitude: coords.latitude,
-        longitude: coords.longitude,
-        latitudeDelta: 0.01,
-        longitudeDelta: 0.01,
-      },
-      500
-    );
+    mapRef.current.animateToRegion({ latitude: coords.latitude, longitude: coords.longitude, latitudeDelta: 0.01, longitudeDelta: 0.01 }, 500);
   }, [focusLocation, userLocation]);
 
-  const loadMessages = async () => {
-    console.log('[MapScreen] loadMessages: START');
+  useEffect(() => {
+    if (!routeCoordinates || !mapRef.current) return;
+    const timeout = setTimeout(() => {
+      mapRef.current?.fitToCoordinates(routeCoordinates, {
+        edgePadding: { top: 120, right: 60, bottom: 280, left: 60 },
+        animated: true,
+      });
+    }, 100);
+    return () => clearTimeout(timeout);
+  }, [routeCoordinates]);
 
-    if (messages.length === 0) {
-      const cached = await getCachedMapMessages();
-      if (cached && cached.length > 0) {
-        console.log('[MapScreen] showing', cached.length, 'cached messages');
-        setMessages(cached);
-        setLoading(false);
-        setTimeout(() => setMarkersReady(true), 500);
-      }
-    }
-
-    setMarkersReady(false);
-    const [data, followingData] = await Promise.all([
-      fetchUndiscoveredMessagesForMap(),
-      fetchFollowingPublicMessages(),
-    ]);
-
-    const mergedMap = new Map<string, UndiscoveredMessageMapMeta>();
-    for (const msg of data) mergedMap.set(msg.id, msg);
-    for (const msg of followingData) {
-      if (!mergedMap.has(msg.id)) mergedMap.set(msg.id, msg);
-    }
-    const allMessages = Array.from(mergedMap.values());
-
-    console.log('[MapScreen] loadMessages: got', data.length, 'undiscovered +', followingData.length, 'following =', allMessages.length, 'total');
-    setMessages(allMessages);
-    setLoading(false);
-    setTimeout(() => setMarkersReady(true), 500);
-  };
-
-  const centerOnUser = () => {
+  const centerOnUser = useCallback(() => {
     if (userLocation && mapRef.current) {
-      mapRef.current.animateToRegion({
-        latitude: userLocation.latitude,
-        longitude: userLocation.longitude,
-        latitudeDelta: LAT_DELTA,
-        longitudeDelta: LNG_DELTA,
-      }, 300);
+      mapRef.current.animateToRegion({ latitude: userLocation.latitude, longitude: userLocation.longitude, latitudeDelta: LAT_DELTA, longitudeDelta: LNG_DELTA }, 300);
     }
-  };
+  }, [userLocation]);
 
-  const handleMarkerPress = useCallback((message: UndiscoveredMessageMapMeta) => {
-    setSelectedMessage(message);
-    const location = getMessageLocation(message);
-    if (location && !canReadMessage(location)) {
-      fetchRoute(location, message.id);
-    }
-  }, [canReadMessage, fetchRoute]);
+  const hideToast = useCallback(() => setToastData((prev) => ({ ...prev, visible: false })), []);
 
-  const getInitials = useCallback((name?: string): string => {
-    if (!name) return '?';
-    const parts = name.trim().split(' ');
-    if (parts.length >= 2) {
-      return (parts[0][0] + parts[1][0]).toUpperCase();
-    }
-    return name.substring(0, 2).toUpperCase();
+  const clearRoute = useCallback(() => {
+    setRouteCoordinates(null);
+    setRouteTargetId(null);
   }, []);
 
-  const canReadMessage = useCallback((messageLocation: Coordinates | null): boolean => {
-    if (!userLocation || !messageLocation) return false;
-    return isWithinRadius(userLocation, messageLocation, 100);
-  }, [userLocation]);
+  const navigateToCreate = useCallback(() => navigation.navigate('CreateMessage'), [navigation]);
 
-  const formatDistance = useCallback((messageLocation: Coordinates | null): string | null => {
-    if (!userLocation || !messageLocation) return null;
-    const distance = calculateDistance(userLocation, messageLocation);
-    if (distance < 1000) {
-      return `${Math.round(distance)}m`;
-    }
-    return `${(distance / 1000).toFixed(1)}km`;
-  }, [userLocation]);
+  const handleRead = useCallback(() => {
+    if (selectedMessage) navigation.navigate('ReadMessage', { messageId: selectedMessage.id });
+  }, [selectedMessage, navigation]);
+
+  const handleCloseCard = useCallback(() => {
+    setSelectedMessage(null);
+    setRouteCoordinates(null);
+  }, []);
 
   const fetchRoute = useCallback(async (destination: Coordinates, messageId: string) => {
     if (!userLocation) return;
@@ -299,18 +270,15 @@ export default function MapScreenRedesign({ navigation, route }: Props) {
       const response = await fetch(url, { signal: controller.signal });
       const data = await response.json();
       if (data.routes && data.routes.length > 0) {
-        const coords = data.routes[0].geometry.coordinates.map(([lng, lat]: [number, number]) => ({
-          latitude: lat,
-          longitude: lng,
-        }));
+        const coords = data.routes[0].geometry.coordinates.map(([lng, lat]: [number, number]) => ({ latitude: lat, longitude: lng }));
         setRouteCoordinates(coords);
         setRouteTargetId(messageId);
         setSelectedMessage(null);
       } else {
         setToastData({ visible: true, message: 'Impossible de calculer l\'itinéraire', type: 'error' });
       }
-    } catch (e: any) {
-      const msg = e?.name === 'AbortError'
+    } catch (e: unknown) {
+      const msg = (e as { name?: string })?.name === 'AbortError'
         ? 'Délai dépassé, réessaie plus tard'
         : 'Erreur de connexion pour l\'itinéraire';
       setToastData({ visible: true, message: msg, type: 'error' });
@@ -332,131 +300,24 @@ export default function MapScreenRedesign({ navigation, route }: Props) {
     });
   }, [routeCoordinates]);
 
-  // Fit map to route AFTER re-render (so minZoomLevel is already removed)
-  useEffect(() => {
-    if (!routeCoordinates || !mapRef.current) return;
-    const timeout = setTimeout(() => {
-      mapRef.current?.fitToCoordinates(routeCoordinates, {
-        edgePadding: { top: 120, right: 60, bottom: 280, left: 60 },
-        animated: true,
-      });
-    }, 100);
-    return () => clearTimeout(timeout);
-  }, [routeCoordinates]);
-
-  const captureAvatar = useCallback(async (messageId: string) => {
-    const ref = avatarRefs.current[messageId];
-    if (!ref || avatarImages[messageId]) return;
-
-    try {
-      const uri = await captureRef(ref, {
-        format: 'png',
-        quality: 1,
-        result: 'tmpfile',
-      });
-      setAvatarImages(prev => ({ ...prev, [messageId]: uri }));
-    } catch (e) {
-      console.log('Failed to capture avatar:', e);
+  const handleMarkerPress = useCallback((message: UndiscoveredMessageMapMeta) => {
+    setSelectedMessage(message);
+    const location = getMessageLocation(message);
+    if (location && !canReadMessage(location)) {
+      fetchRoute(location, message.id);
     }
-  }, [avatarImages]);
-
-  const parseWKBHex = (wkbHex: string): Coordinates | null => {
-    try {
-      if (wkbHex.length < 42) return null;
-
-      const isLittleEndian = wkbHex.substring(0, 2) === '01';
-      const typeHex = wkbHex.substring(2, 10);
-
-      let coordStart = 10;
-      if (typeHex === '01000020' || typeHex === '20000001') {
-        coordStart = 18;
-      }
-
-      const lngHex = wkbHex.substring(coordStart, coordStart + 16);
-      const latHex = wkbHex.substring(coordStart + 16, coordStart + 32);
-
-      const hexToDouble = (hex: string, littleEndian: boolean): number => {
-        const bytes = [];
-        for (let i = 0; i < hex.length; i += 2) {
-          bytes.push(parseInt(hex.substring(i, i + 2), 16));
-        }
-        if (littleEndian) bytes.reverse();
-        const buffer = new ArrayBuffer(8);
-        const view = new DataView(buffer);
-        bytes.forEach((b, i) => view.setUint8(i, b));
-        return view.getFloat64(0, false);
-      };
-
-      const lng = hexToDouble(lngHex, isLittleEndian);
-      const lat = hexToDouble(latHex, isLittleEndian);
-
-      if (!isNaN(lng) && !isNaN(lat) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180) {
-        return { longitude: lng, latitude: lat };
-      }
-    } catch (e) {
-      console.error('WKB parse error:', e);
-    }
-    return null;
-  };
-
-  const getMessageLocation = (message: UndiscoveredMessageMapMeta): Coordinates | null => {
-    if (!message.location) return null;
-
-    if (typeof message.location === 'object') {
-      const loc = message.location as any;
-
-      if (loc.type === 'Point' && Array.isArray(loc.coordinates) && loc.coordinates.length >= 2) {
-        const lng = loc.coordinates[0];
-        const lat = loc.coordinates[1];
-        if (typeof lng === 'number' && typeof lat === 'number' && !isNaN(lng) && !isNaN(lat)) {
-          return { longitude: lng, latitude: lat };
-        }
-      }
-
-      if (typeof loc.latitude === 'number' && typeof loc.longitude === 'number' &&
-          !isNaN(loc.latitude) && !isNaN(loc.longitude)) {
-        return { longitude: loc.longitude, latitude: loc.latitude };
-      }
-    }
-
-    if (typeof message.location === 'string') {
-      if (/^[0-9A-Fa-f]+$/.test(message.location) && message.location.length >= 42) {
-        const coords = parseWKBHex(message.location);
-        if (coords) return coords;
-      }
-
-      const match = message.location.match(/POINT\(([^ ]+) ([^)]+)\)/);
-      if (match) {
-        const lng = parseFloat(match[1]);
-        const lat = parseFloat(match[2]);
-        if (!isNaN(lng) && !isNaN(lat)) {
-          return { longitude: lng, latitude: lat };
-        }
-      }
-    }
-
-    return null;
-  };
+  }, [canReadMessage, fetchRoute]);
 
   if (locationLoading || !userLocation) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={colors.primary.cyan} />
-        <Text style={styles.loadingText}>
-          {permission !== 'granted'
-            ? 'Autorisation de localisation requise...'
-            : 'Localisation en cours...'}
-        </Text>
+        <ScreenLoader message={permission !== 'granted' ? 'Autorisation de localisation requise...' : 'Localisation en cours...'} />
         {permission !== 'granted' && (
-          <TouchableOpacity
-            style={styles.permissionButtonContainer}
-            onPress={requestPermission}
-            activeOpacity={0.9}
-          >
+          <TouchableOpacity style={styles.permissionButtonContainer} onPress={requestPermission} activeOpacity={0.9}>
             <LinearGradient
               colors={colors.gradients.primary}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
+              start={GRADIENT_START}
+              end={PERMISSION_GRADIENT_END}
               style={styles.permissionButton}
             >
               <Text style={styles.permissionButtonText}>Autoriser la localisation</Text>
@@ -473,25 +334,15 @@ export default function MapScreenRedesign({ navigation, route }: Props) {
         visible={toastData.visible}
         message={toastData.message}
         type={toastData.type}
-        onHide={() => setToastData((prev) => ({ ...prev, visible: false }))}
+        onHide={hideToast}
       />
 
-      {/* Status bar spacer */}
-      <View style={{ height: insets.top, backgroundColor: 'transparent' }} />
+      <View style={[styles.insetSpacer, { height: insets.top }]} />
 
       <MapView
         ref={mapRef}
         style={styles.map}
-        initialRegion={
-          userLocation
-            ? {
-                latitude: userLocation.latitude,
-                longitude: userLocation.longitude,
-                latitudeDelta: LAT_DELTA,
-                longitudeDelta: LNG_DELTA,
-              }
-            : undefined
-        }
+        initialRegion={userLocation ? { latitude: userLocation.latitude, longitude: userLocation.longitude, latitudeDelta: LAT_DELTA, longitudeDelta: LNG_DELTA } : undefined}
         showsUserLocation
         showsMyLocationButton={false}
         scrollEnabled
@@ -503,46 +354,30 @@ export default function MapScreenRedesign({ navigation, route }: Props) {
         {messages.map((message) => {
           const location = getMessageLocation(message);
           if (!location) return null;
-          const sender = message.sender;
           const capturedImage = avatarImages[message.id];
-          const isTarget = message.id === routeTargetId;
-          const markerOpacity = routeCoordinates && !isTarget ? 0.35 : 1;
-
-          if (sender?.avatar_url) {
-            if (!capturedImage) return null;
-            return (
-              <Marker
-                key={message.id}
-                coordinate={location}
-                image={{ uri: capturedImage }}
-                onPress={() => handleMarkerPress(message)}
-                opacity={markerOpacity}
-              />
-            );
-          }
-
-          return null;
+          if (!message.sender?.avatar_url || !capturedImage) return null;
+          return (
+            <MessageMarker
+              key={message.id}
+              message={message}
+              location={location}
+              avatarUri={capturedImage}
+              isTarget={message.id === routeTargetId}
+              hasActiveRoute={!!routeCoordinates}
+              onPress={handleMarkerPress}
+            />
+          );
         })}
+
         {routeCoordinates && (
           <>
-            <Polyline
-              coordinates={routeCoordinates}
-              strokeColor="rgba(255,255,255,0.9)"
-              strokeWidth={10}
-            />
-            <Polyline
-              coordinates={routeCoordinates}
-              strokeColor={colors.primary.cyan}
-              strokeWidth={5}
-            />
+            <Polyline coordinates={routeCoordinates} strokeColor="rgba(255,255,255,0.9)" strokeWidth={10} />
+            <Polyline coordinates={routeCoordinates} strokeColor={colors.primary.cyan} strokeWidth={5} />
           </>
         )}
+
         {focusMarkerCoords && (
-          <Marker
-            coordinate={focusMarkerCoords}
-            anchor={{ x: 0.3, y: 1 }}
-            tracksViewChanges={true}
-          >
+          <Marker coordinate={focusMarkerCoords} anchor={MARKER_ANCHOR} tracksViewChanges>
             <View style={styles.focusMarker}>
               <Ionicons name="flag" size={36} color={colors.primary.cyan} />
             </View>
@@ -550,7 +385,6 @@ export default function MapScreenRedesign({ navigation, route }: Props) {
         )}
       </MapView>
 
-      {/* Floating Action Buttons - Glass Style */}
       <View style={[styles.floatingButtonsContainer, { top: insets.top + 16 }]}>
         <TouchableOpacity onPress={centerOnUser} activeOpacity={0.9} style={styles.floatingButton}>
           <Ionicons name="locate" size={22} color={colors.primary.cyan} />
@@ -558,15 +392,11 @@ export default function MapScreenRedesign({ navigation, route }: Props) {
 
         {routeCoordinates && (
           <>
-            <TouchableOpacity
-              onPress={openInMaps}
-              activeOpacity={0.9}
-              style={[styles.floatingButton, styles.floatingButtonMaps]}
-            >
+            <TouchableOpacity onPress={openInMaps} activeOpacity={0.9} style={[styles.floatingButton, styles.floatingButtonMaps]}>
               <Ionicons name="walk-outline" size={22} color={colors.primary.cyan} />
             </TouchableOpacity>
             <TouchableOpacity
-              onPress={() => { setRouteCoordinates(null); setRouteTargetId(null); }}
+              onPress={clearRoute}
               activeOpacity={0.9}
               style={[styles.floatingButton, styles.floatingButtonDanger]}
             >
@@ -576,161 +406,56 @@ export default function MapScreenRedesign({ navigation, route }: Props) {
         )}
       </View>
 
-      {/* Create Message FAB - Gradient Style */}
-      <View
-        style={[
-          styles.createFABGlowContainer,
-          { bottom: 24 + insets.bottom },
-        ]}
-      >
+      <View style={[styles.createFABGlowContainer, { bottom: 24 + insets.bottom }]}>
         <TouchableOpacity
           style={styles.createFABContainer}
-          onPress={() => navigation.navigate('CreateMessage')}
+          onPress={navigateToCreate}
           activeOpacity={0.8}
         >
-          {/* Main button with intense gradient */}
           <LinearGradient
-            colors={[
-              '#A78BFA',
-              '#8B5CF6',
-              '#7C3AED',
-              '#6D28D9',
-              '#5B21B6',
-            ]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
+            colors={FAB_GRADIENT_COLORS}
+            start={GRADIENT_START}
+            end={FAB_GRADIENT_END}
             style={styles.createFAB}
           >
             <View style={styles.createFABInner}>
-              <FontAwesome name="paper-plane" size={32} color="#FFFFFF" style={{ textShadowColor: 'rgba(0,0,0,0.3)', textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 4 }} />
+              <FontAwesome name="paper-plane" size={32} color="#FFFFFF" style={styles.fabIcon} />
             </View>
           </LinearGradient>
         </TouchableOpacity>
       </View>
 
-      {/* Selected Message Card - Premium Glass */}
-      {selectedMessage && (() => {
-        const msgLocation = getMessageLocation(selectedMessage);
-        const distance = formatDistance(msgLocation);
-        const canRead = canReadMessage(msgLocation);
-        return (
-          <Animated.View
-            style={[
-              styles.messageCardContainer,
-              { bottom: 24 + insets.bottom },
-              {
-                opacity: cardOpacityAnim,
-                transform: [{ translateY: cardSlideAnim }],
-              },
-            ]}
-          >
-            <GlassCard withBorder withGlow glowColor="cyan" style={styles.messageCard}>
-              {/* Close button */}
-              <TouchableOpacity
-                style={styles.cardCloseButton}
-                onPress={() => { setSelectedMessage(null); setRouteCoordinates(null); }}
-              >
-                <Ionicons name="close" size={18} color="#ffffff" />
-              </TouchableOpacity>
+      {selectedMessage && (
+        <SelectedMessageCard
+          message={selectedMessage}
+          isReadable={canReadMessage(selectedMsgLocation)}
+          isLoadingRoute={isLoadingRoute}
+          distance={formatDistance(selectedMsgLocation)}
+          cardSlideAnim={cardSlideAnim}
+          cardOpacityAnim={cardOpacityAnim}
+          bottomOffset={24 + insets.bottom}
+          onRead={handleRead}
+          onNavigate={handleNavigateToMessage}
+          onClose={handleCloseCard}
+        />
+      )}
 
-
-              {/* Sender row */}
-              <View style={styles.messageCardHeader}>
-                <View style={styles.messageCardHeaderLeft}>
-                  <PremiumAvatar
-                    uri={selectedMessage.sender?.avatar_url}
-                    name={selectedMessage.sender?.display_name}
-                    size="small"
-                    withRing
-                    ringColor="gradient"
-                  />
-                  <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: spacing.xs }}>
-                    <Text style={styles.senderName}>
-                      {selectedMessage.sender?.display_name || 'Inconnu'}
-                    </Text>
-                    <Text style={styles.senderLabel}>
-                      · {new Date(selectedMessage.created_at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' })}
-                    </Text>
-                  </View>
-                </View>
-              </View>
-
-              {/* Action Button */}
-              {canRead ? (
-                <TouchableOpacity
-                  onPress={() => navigation.navigate('ReadMessage', { messageId: selectedMessage.id })}
-                  activeOpacity={0.8}
-                  style={styles.actionButton}
-                >
-                  <LinearGradient
-                    colors={['rgba(124, 92, 252, 0.4)', 'rgba(167, 139, 250, 0.35)']}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 0 }}
-                    style={[styles.navButton, { borderColor: 'rgba(167, 139, 250, 0.5)' }]}
-                  >
-                    <Ionicons name="eye" size={16} color={colors.primary.violet} />
-                    <Text style={styles.navButtonText}>Découvrir le message</Text>
-                  </LinearGradient>
-                </TouchableOpacity>
-              ) : (
-                <TouchableOpacity
-                  onPress={() => {
-                    if (!isLoadingRoute && msgLocation) {
-                      fetchRoute(msgLocation, selectedMessage.id);
-                    }
-                  }}
-                  activeOpacity={0.8}
-                  style={styles.actionButton}
-                  disabled={isLoadingRoute}
-                >
-                  <LinearGradient
-                    colors={['rgba(0, 229, 255, 0.18)', 'rgba(124, 92, 252, 0.35)']}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 0 }}
-                    style={styles.navButton}
-                  >
-                    {isLoadingRoute ? (
-                      <ActivityIndicator size="small" color={colors.primary.cyan} />
-                    ) : (
-                      <>
-                        <Ionicons name="navigate" size={16} color={colors.primary.cyan} />
-                        <Text style={styles.navButtonText}>
-                          Itinéraire
-                          {distance ? ` · ${distance}` : ''}
-                        </Text>
-                      </>
-                    )}
-                  </LinearGradient>
-                </TouchableOpacity>
-              )}
-            </GlassCard>
-          </Animated.View>
-        );
-      })()}
-
-      {/* Hidden container for capturing circular avatars */}
       <View style={styles.captureContainer} pointerEvents="none">
         {messages.map((message) => {
           const sender = message.sender;
           if (!sender?.avatar_url || avatarImages[message.id]) return null;
           const isPublic = message.is_public === true;
-
           return (
             <View
               key={message.id}
               ref={(ref) => { avatarRefs.current[message.id] = ref; }}
               collapsable={false}
-              style={[
-                styles.captureAvatar,
-                isPublic && styles.captureAvatarPublic,
-              ]}
+              style={[styles.captureAvatar, isPublic && styles.captureAvatarPublic]}
             >
               <Image
                 source={{ uri: sender.avatar_url }}
                 style={styles.captureAvatarImage}
-                onLoad={() => {
-                  setTimeout(() => captureAvatar(message.id), 100);
-                }}
+                onLoad={() => { setTimeout(() => captureAvatar(message.id), 100); }}
               />
             </View>
           );
@@ -741,24 +466,13 @@ export default function MapScreenRedesign({ navigation, route }: Props) {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  map: {
-    flex: 1,
-  },
+  container: { flex: 1 },
+  map: { flex: 1 },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: colors.background.primary,
-  },
-  loadingText: {
-    marginTop: spacing.lg,
-    fontSize: typography.sizes.md,
-    color: colors.text.secondary,
-    textAlign: 'center',
-    paddingHorizontal: spacing.xxxl,
   },
   permissionButtonContainer: {
     marginTop: spacing.xxl,
@@ -771,7 +485,7 @@ const styles = StyleSheet.create({
   },
   permissionButtonText: {
     color: colors.text.primary,
-    fontSize: typography.sizes.md,
+    fontSize: 16,
     fontWeight: '700',
   },
   floatingButtonsContainer: {
@@ -805,9 +519,7 @@ const styles = StyleSheet.create({
     shadowRadius: 30,
     elevation: 20,
   },
-  createFABContainer: {
-    borderRadius: radius.full,
-  },
+  createFABContainer: { borderRadius: radius.full },
   createFAB: {
     width: 80,
     height: 80,
@@ -823,100 +535,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     borderRadius: radius.full,
-  },
-  messageCardContainer: {
-    position: 'absolute',
-    left: spacing.lg,
-    right: 96,
-  },
-  messageCard: {
-  },
-  cardCloseButton: {
-    position: 'absolute',
-    top: spacing.md,
-    right: spacing.md,
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: 'rgba(255,255,255,0.08)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 1,
-  },
-  cardIconRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    marginBottom: spacing.md,
-    marginRight: 32,
-  },
-  cardIconBadge: {
-    width: 48,
-    height: 48,
-    borderRadius: 14,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  cardIconMeta: {
-    flex: 1,
-  },
-  cardIconTitle: {
-    fontSize: typography.sizes.md,
-    fontWeight: '700',
-    color: colors.text.primary,
-    marginBottom: 2,
-  },
-  cardIconSub: {
-    fontSize: typography.sizes.xs,
-    color: colors.primary.cyan,
-    fontWeight: '600',
-  },
-  cardSeparator: {
-    height: 1,
-    backgroundColor: 'rgba(255,255,255,0.08)',
-    marginBottom: spacing.md,
-  },
-  messageCardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: spacing.md,
-  },
-  messageCardHeaderLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-  },
-  senderLabel: {
-    fontSize: typography.sizes.xs,
-    color: colors.text.secondary,
-    marginBottom: 1,
-  },
-  senderName: {
-    fontSize: typography.sizes.sm,
-    fontWeight: '700',
-    color: colors.text.primary,
-  },
-  actionButton: {
-    marginTop: spacing.xs,
-  },
-  navButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.sm,
-    paddingVertical: 14,
-    paddingHorizontal: spacing.md,
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    borderColor: 'rgba(0, 229, 255, 0.35)',
-    overflow: 'hidden',
-  },
-  navButtonText: {
-    color: '#ffffff',
-    fontSize: typography.sizes.sm,
-    fontWeight: '700',
-    letterSpacing: 0.3,
   },
   focusMarker: {
     width: 40,
@@ -950,5 +568,13 @@ const styles = StyleSheet.create({
     width: 52,
     height: 52,
     borderRadius: 26,
+  },
+  insetSpacer: {
+    backgroundColor: 'transparent',
+  },
+  fabIcon: {
+    textShadowColor: 'rgba(0,0,0,0.3)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 4,
   },
 });

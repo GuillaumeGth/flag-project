@@ -8,7 +8,9 @@ import { Ionicons } from '@expo/vector-icons';
 import * as SecureStore from 'expo-secure-store';
 
 import { colors, spacing } from '@/theme-redesign';
+import { RootStackParamList, MainTabParamList } from '@/types';
 import { AuthProvider, useAuth } from '@/contexts/AuthContext';
+import { log } from '@/utils/debug';
 import { LocationProvider } from '@/contexts/LocationContext';
 import { addNotificationResponseListener } from '@/services/notifications';
 import { checkForAppUpdate } from '@/services/appUpdater';
@@ -29,8 +31,8 @@ import SearchUsersScreen from '@/screens/SearchUsersScreen';
 // Register background task
 import './src/tasks/backgroundLocation';
 
-const Stack = createNativeStackNavigator();
-const Tab = createBottomTabNavigator();
+const Stack = createNativeStackNavigator<RootStackParamList>();
+const Tab = createBottomTabNavigator<MainTabParamList>();
 
 function MainTabs() {
   const insets = useSafeAreaInsets();
@@ -84,7 +86,7 @@ function AppNavigator() {
   const { user, loading } = useAuth();
   const [permissionsDone, setPermissionsDone] = useState<boolean | null>(null);
 
-  console.log('[AppNavigator] render: loading =', loading, 'user =', user?.id, 'permissionsDone =', permissionsDone);
+  log('AppNavigator', 'render: loading =', loading, 'user =', user?.id, 'permissionsDone =', permissionsDone);
 
   useEffect(() => {
     SecureStore.getItemAsync(PERMISSIONS_DONE_KEY).then((value) => {
@@ -93,7 +95,7 @@ function AppNavigator() {
   }, []);
 
   if (loading || permissionsDone === null) {
-    console.log('[AppNavigator] showing null (loading)');
+    log('AppNavigator', 'showing null (loading)');
     return null;
   }
 
@@ -103,11 +105,11 @@ function AppNavigator() {
   };
 
   if (!permissionsDone && !user) {
-    console.log('[AppNavigator] showing PermissionsScreen');
+    log('AppNavigator', 'showing PermissionsScreen');
     return <PermissionsScreen onComplete={handlePermissionsComplete} />;
   }
 
-  console.log('[AppNavigator] showing', user ? 'MainTabs' : 'AuthScreen');
+  log('AppNavigator', 'showing', user ? 'MainTabs' : 'AuthScreen');
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       {user ? (

@@ -7,10 +7,14 @@ import {
   Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useAuth } from '@/contexts/AuthContext';
 import { colors } from '@/theme-redesign';
+import { RootStackParamList } from '@/types';
 
-export default function SettingsScreen({ navigation }: any) {
+type Props = NativeStackScreenProps<RootStackParamList, 'Settings'>;
+
+export default function SettingsScreen({ navigation }: Props) {
   const { signOut } = useAuth();
 
   const handleSignOut = () => {

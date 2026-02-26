@@ -13,6 +13,7 @@ import {
   Switch,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { colors, spacing, radius, typography, shadows } from '@/theme-redesign';
 import { supabase } from '@/services/supabase';
 import { fetchUserPublicMessages, fetchDiscoveredPublicMessageIds } from '@/services/messages';
@@ -25,15 +26,12 @@ import {
   updateNotificationPrefs,
   NotificationPrefs,
 } from '@/services/subscriptions';
-import { Message, User } from '@/types';
+import { Message, User, RootStackParamList } from '@/types';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
 const CELL_SIZE = SCREEN_WIDTH / 3;
 
-interface Props {
-  navigation: any;
-  route: any;
-}
+type Props = NativeStackScreenProps<RootStackParamList, 'UserProfile'>;
 
 export default function UserProfileScreen({ navigation, route }: Props) {
   const { userId } = route.params;
@@ -125,8 +123,9 @@ export default function UserProfileScreen({ navigation, route }: Props) {
           onPress={() => {
             const loc = item.location;
             if (loc && typeof loc === 'object' && 'latitude' in loc) {
-              navigation.navigate('Map', {
-                focusLocation: { latitude: loc.latitude, longitude: loc.longitude },
+              navigation.navigate('Main', {
+                screen: 'Map',
+                params: { focusLocation: { latitude: loc.latitude, longitude: loc.longitude } },
               });
             }
           }}

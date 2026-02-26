@@ -9,14 +9,13 @@ import {
   Image,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { fetchFollowedUsers, FLAG_BOT_ID } from '@/services/messages';
-import { User } from '@/types';
+import { User, RootStackParamList } from '@/types';
 import { colors } from '@/theme-redesign';
 
-interface Props {
-  navigation: any;
-}
+type Props = NativeStackScreenProps<RootStackParamList, 'SelectRecipient'>;
 
 export default function SelectRecipientScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets();

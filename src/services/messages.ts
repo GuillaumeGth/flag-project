@@ -1,6 +1,6 @@
 import { supabase, getCachedUserId } from './supabase';
 import * as FileSystem from 'expo-file-system/legacy';
-import { Message, MessageWithSender, Coordinates, User, UndiscoveredMessageMeta, UndiscoveredMessageMapMeta, Conversation, MessageWithUsers } from '@/types';
+import { Message, MessageWithSender, Coordinates, User, UndiscoveredMessageMeta, UndiscoveredMessageMapMeta, Conversation, MessageWithUsers, MessageContentType } from '@/types';
 import {
   getCachedData,
   setCachedData,
@@ -9,20 +9,38 @@ import {
   CACHE_KEYS,
 } from './cache';
 import { reportError } from './errorReporting';
+import { log } from '@/utils/debug';
 
 // Default Fläag Bot user ID (created via seed.sql)
 export const FLAG_BOT_ID = '00000000-0000-0000-0000-000000000001';
 
+// Shape of raw message rows returned by Supabase with user joins
+type RawMessageWithUsers = {
+  id: string;
+  sender_id: string;
+  recipient_id: string;
+  content_type: string;
+  text_content?: string;
+  media_url?: string;
+  location?: unknown;
+  created_at: string;
+  read_at?: string;
+  is_read: boolean;
+  is_public?: boolean;
+  sender: { id: string; display_name?: string; avatar_url?: string } | null;
+  recipient: { id: string; display_name?: string; avatar_url?: string } | null;
+};
+
 // Helper to get current user ID from cached value (avoids getSession() deadlock)
 function getCurrentUserId(): string | null {
   const userId = getCachedUserId();
-  console.log('[messages] getCurrentUserId:', userId);
+  log('messages', 'getCurrentUserId:', userId);
   return userId;
 }
 
 // Fetch only users the current user is subscribed to (for recipient selection)
 export async function fetchFollowedUsers(): Promise<User[]> {
-  const currentUserId = await getCurrentUserId();
+  const currentUserId = getCurrentUserId();
   if (!currentUserId) return [];
 
   // Get IDs of users the current user follows
@@ -42,7 +60,6 @@ export async function fetchFollowedUsers(): Promise<User[]> {
     .order('display_name', { ascending: true });
 
   if (error) {
-    console.error('Error fetching followed users:', error);
     reportError(error, 'messages.fetchFollowedUsers');
     return [];
   }
@@ -51,7 +68,7 @@ export async function fetchFollowedUsers(): Promise<User[]> {
 }
 
 // Build conversations from a list of messages (with user joins)
-function buildConversations(messages: any[], currentUserId: string): Conversation[] {
+function buildConversations(messages: RawMessageWithUsers[], currentUserId: string): Conversation[] {
   const conversationsMap = new Map<string, Conversation>();
 
   // Sort by created_at descending to ensure first entry per user is the latest message
@@ -80,7 +97,7 @@ function buildConversations(messages: any[], currentUserId: string): Conversatio
         },
         lastMessage: {
           id: msg.id,
-          content_type: msg.content_type,
+          content_type: msg.content_type as MessageContentType,
           text_content: msg.text_content,
           created_at: msg.created_at,
           is_read: msg.is_read,
@@ -96,17 +113,17 @@ function buildConversations(messages: any[], currentUserId: string): Conversatio
 
 // Fetch all conversations for current user (with local cache + incremental sync)
 export async function fetchConversations(): Promise<Conversation[]> {
-  console.log('[messages] fetchConversations: START');
-  const currentUserId = await getCurrentUserId();
-  console.log('[messages] fetchConversations: currentUserId =', currentUserId);
+  log('messages', 'fetchConversations: START');
+  const currentUserId = getCurrentUserId();
+  log('messages', 'fetchConversations: currentUserId =', currentUserId);
   if (!currentUserId) {
-    console.log('[messages] fetchConversations: NO USER ID - returning empty');
+    log('messages', 'fetchConversations: NO USER ID - returning empty');
     return [];
   }
 
   const cacheKey = CACHE_KEYS.CONVERSATIONS_MESSAGES;
   const lastSync = await getLastSyncTimestamp(cacheKey);
-  const cachedMessages: any[] = (await getCachedData<any[]>(cacheKey)) || [];
+  const cachedMessages: RawMessageWithUsers[] = (await getCachedData<RawMessageWithUsers[]>(cacheKey)) || [];
 
   let query = supabase
     .from('messages')
@@ -125,11 +142,9 @@ export async function fetchConversations(): Promise<Conversation[]> {
 
   const { data: newMessages, error } = await query;
 
-  console.log('[messages] fetchConversations: query done, error =', error, 'new count =', newMessages?.length, 'cached count =', cachedMessages.length);
+  log('messages', 'fetchConversations: query done, error =', error, 'new count =', newMessages?.length, 'cached count =', cachedMessages.length);
   if (error) {
-    console.error('Error fetching conversations:', error);
     reportError(error, 'messages.fetchConversations');
-    // On error, still return conversations from cache
     if (cachedMessages.length > 0) {
       return buildConversations(cachedMessages, currentUserId);
     }
@@ -137,11 +152,11 @@ export async function fetchConversations(): Promise<Conversation[]> {
   }
 
   // Merge: replace existing messages by id, add new ones
-  const mergedMap = new Map<string, any>();
+  const mergedMap = new Map<string, RawMessageWithUsers>();
   for (const msg of cachedMessages) {
     mergedMap.set(msg.id, msg);
   }
-  for (const msg of (newMessages || [])) {
+  for (const msg of (newMessages || []) as RawMessageWithUsers[]) {
     mergedMap.set(msg.id, msg);
   }
   const allMessages = Array.from(mergedMap.values());
@@ -159,10 +174,10 @@ export async function fetchConversations(): Promise<Conversation[]> {
  * Returns null if no cache exists.
  */
 export async function getCachedConversations(): Promise<Conversation[] | null> {
-  const currentUserId = await getCurrentUserId();
+  const currentUserId = getCurrentUserId();
   if (!currentUserId) return null;
 
-  const cachedMessages = await getCachedData<any[]>(CACHE_KEYS.CONVERSATIONS_MESSAGES);
+  const cachedMessages = await getCachedData<RawMessageWithUsers[]>(CACHE_KEYS.CONVERSATIONS_MESSAGES);
   if (!cachedMessages || cachedMessages.length === 0) return null;
 
   return buildConversations(cachedMessages, currentUserId);
@@ -170,7 +185,7 @@ export async function getCachedConversations(): Promise<Conversation[] | null> {
 
 // Fetch all messages for a specific conversation (with local cache + incremental sync)
 export async function fetchConversationMessages(otherUserId: string): Promise<MessageWithUsers[]> {
-  const currentUserId = await getCurrentUserId();
+  const currentUserId = getCurrentUserId();
   if (!currentUserId) return [];
 
   const cacheKey = CACHE_KEYS.CONVERSATION(otherUserId);
@@ -194,7 +209,6 @@ export async function fetchConversationMessages(otherUserId: string): Promise<Me
   const { data: newMessages, error } = await query;
 
   if (error) {
-    console.error('Error fetching conversation messages:', error);
     reportError(error, 'messages.fetchConversationMessages');
     return cachedMessages.length > 0 ? cachedMessages : [];
   }
@@ -232,7 +246,7 @@ export async function getCachedConversationMessages(otherUserId: string): Promis
 
 // Fetch messages for current user (as recipient)
 export async function fetchMyMessages(): Promise<MessageWithSender[]> {
-  const currentUserId = await getCurrentUserId();
+  const currentUserId = getCurrentUserId();
   if (!currentUserId) return [];
 
   const { data, error } = await supabase
@@ -249,7 +263,6 @@ export async function fetchMyMessages(): Promise<MessageWithSender[]> {
     .order('created_at', { ascending: false });
 
   if (error) {
-    console.error('Error fetching messages:', error);
     reportError(error, 'messages.fetchMyMessages');
     return [];
   }
@@ -259,7 +272,7 @@ export async function fetchMyMessages(): Promise<MessageWithSender[]> {
 
 // Fetch unread messages for map display
 export async function fetchUnreadMessages(): Promise<MessageWithSender[]> {
-  const currentUserId = await getCurrentUserId();
+  const currentUserId = getCurrentUserId();
   if (!currentUserId) return [];
 
   const { data, error } = await supabase
@@ -277,7 +290,6 @@ export async function fetchUnreadMessages(): Promise<MessageWithSender[]> {
     .order('created_at', { ascending: false });
 
   if (error) {
-    console.error('Error fetching unread messages:', error);
     reportError(error, 'messages.fetchUnreadMessages');
     return [];
   }
@@ -287,7 +299,7 @@ export async function fetchUnreadMessages(): Promise<MessageWithSender[]> {
 
 // Fetch read messages (inbox)
 export async function fetchReadMessages(): Promise<MessageWithSender[]> {
-  const currentUserId = await getCurrentUserId();
+  const currentUserId = getCurrentUserId();
   if (!currentUserId) return [];
 
   const { data, error } = await supabase
@@ -305,7 +317,6 @@ export async function fetchReadMessages(): Promise<MessageWithSender[]> {
     .order('read_at', { ascending: false });
 
   if (error) {
-    console.error('Error fetching read messages:', error);
     reportError(error, 'messages.fetchReadMessages');
     return [];
   }
@@ -315,7 +326,7 @@ export async function fetchReadMessages(): Promise<MessageWithSender[]> {
 
 // Fetch only metadata for undiscovered messages (no content for security)
 export async function fetchUndiscoveredMessagesMetadata(): Promise<UndiscoveredMessageMeta[]> {
-  const currentUserId = await getCurrentUserId();
+  const currentUserId = getCurrentUserId();
   if (!currentUserId) return [];
 
   const { data, error } = await supabase
@@ -326,7 +337,6 @@ export async function fetchUndiscoveredMessagesMetadata(): Promise<UndiscoveredM
     .order('created_at', { ascending: false });
 
   if (error) {
-    console.error('Error fetching undiscovered messages metadata:', error);
     reportError(error, 'messages.fetchUndiscoveredMessagesMetadata');
     return [];
   }
@@ -337,11 +347,11 @@ export async function fetchUndiscoveredMessagesMetadata(): Promise<UndiscoveredM
 // Fetch only location metadata for map markers (no content for security)
 // Uses cache + incremental sync. Also removes messages that have been read.
 export async function fetchUndiscoveredMessagesForMap(): Promise<UndiscoveredMessageMapMeta[]> {
-  console.log('[messages] fetchUndiscoveredMessagesForMap: START');
-  const currentUserId = await getCurrentUserId();
-  console.log('[messages] fetchUndiscoveredMessagesForMap: currentUserId =', currentUserId);
+  log('messages', 'fetchUndiscoveredMessagesForMap: START');
+  const currentUserId = getCurrentUserId();
+  log('messages', 'fetchUndiscoveredMessagesForMap: currentUserId =', currentUserId);
   if (!currentUserId) {
-    console.log('[messages] fetchUndiscoveredMessagesForMap: NO USER ID - returning empty');
+    log('messages', 'fetchUndiscoveredMessagesForMap: NO USER ID - returning empty');
     return [];
   }
 
@@ -367,10 +377,9 @@ export async function fetchUndiscoveredMessagesForMap(): Promise<UndiscoveredMes
   }
 
   const { data: newMessages, error } = await query;
-  console.log('[messages] fetchUndiscoveredMessagesForMap: query done, error =', error, 'new count =', newMessages?.length, 'cached count =', cachedMessages.length);
+  log('messages', 'fetchUndiscoveredMessagesForMap: query done, error =', error, 'new count =', newMessages?.length, 'cached count =', cachedMessages.length);
 
   if (error) {
-    console.error('Error fetching undiscovered messages for map:', error);
     reportError(error, 'messages.fetchUndiscoveredMessagesForMap');
     return cachedMessages.length > 0 ? cachedMessages : [];
   }
@@ -434,7 +443,6 @@ export async function fetchMessageById(messageId: string): Promise<MessageWithSe
     .single();
 
   if (error) {
-    console.error('Error fetching message by id:', error);
     reportError(error, 'messages.fetchMessageById');
     return null;
   }
@@ -444,7 +452,7 @@ export async function fetchMessageById(messageId: string): Promise<MessageWithSe
 
 // Fetch current user's public messages
 export async function fetchMyPublicMessages(): Promise<Message[]> {
-  const currentUserId = await getCurrentUserId();
+  const currentUserId = getCurrentUserId();
   if (!currentUserId) return [];
 
   const { data, error } = await supabase
@@ -455,7 +463,6 @@ export async function fetchMyPublicMessages(): Promise<Message[]> {
     .order('created_at', { ascending: false });
 
   if (error) {
-    console.error('Error fetching public messages:', error);
     reportError(error, 'messages.fetchMyPublicMessages');
     return [];
   }
@@ -465,7 +472,7 @@ export async function fetchMyPublicMessages(): Promise<Message[]> {
 
 // Fetch public messages for a specific user (for UserProfileScreen)
 export async function fetchUserPublicMessages(userId: string): Promise<Message[]> {
-  console.log('[messages] fetchUserPublicMessages: userId =', userId);
+  log('messages', 'fetchUserPublicMessages: userId =', userId);
 
   const { data, error } = await supabase
     .from('messages')
@@ -474,10 +481,9 @@ export async function fetchUserPublicMessages(userId: string): Promise<Message[]
     .eq('is_public', true)
     .order('created_at', { ascending: false });
 
-  console.log('[messages] fetchUserPublicMessages: data =', data?.length, 'error =', error);
+  log('messages', 'fetchUserPublicMessages: data =', data?.length, 'error =', error);
 
   if (error) {
-    console.error('Error fetching user public messages:', error);
     reportError(error, 'messages.fetchUserPublicMessages');
     return [];
   }
@@ -487,7 +493,7 @@ export async function fetchUserPublicMessages(userId: string): Promise<Message[]
 
 // Fetch public messages from all followed users (for map display)
 export async function fetchFollowingPublicMessages(): Promise<UndiscoveredMessageMapMeta[]> {
-  const currentUserId = await getCurrentUserId();
+  const currentUserId = getCurrentUserId();
   if (!currentUserId) return [];
 
   // First get list of following IDs
@@ -515,7 +521,6 @@ export async function fetchFollowingPublicMessages(): Promise<UndiscoveredMessag
     .order('created_at', { ascending: false });
 
   if (error) {
-    console.error('Error fetching following public messages:', error);
     reportError(error, 'messages.fetchFollowingPublicMessages');
     return [];
   }
@@ -533,7 +538,6 @@ export async function markPublicMessageDiscovered(messageId: string): Promise<bo
     .upsert({ user_id: currentUserId, message_id: messageId }, { onConflict: 'user_id,message_id' });
 
   if (error) {
-    console.error('Error marking public message as discovered:', error);
     reportError(error, 'messages.markPublicMessageDiscovered');
     return false;
   }
@@ -552,7 +556,6 @@ export async function fetchDiscoveredPublicMessageIds(messageIds: string[]): Pro
     .in('message_id', messageIds);
 
   if (error) {
-    console.error('Error fetching discovered public messages:', error);
     reportError(error, 'messages.fetchDiscoveredPublicMessageIds');
     return new Set();
   }
@@ -569,14 +572,11 @@ export async function sendMessage(
   mediaUrl?: string,
   isPublic?: boolean
 ): Promise<Message | null> {
-  const currentUserId = await getCurrentUserId();
-  if (!currentUserId) {
-    console.error('sendMessage: No authenticated user');
-    return null;
-  }
+  const currentUserId = getCurrentUserId();
+  if (!currentUserId) return null;
 
   // Subscription check is handled by the database RLS policy on messages table
-  console.log('sendMessage:', { recipientId, contentType, hasText: !!textContent, hasMedia: !!mediaUrl, hasLocation: !!location, isPublic });
+  log('messages', 'sendMessage:', { recipientId, contentType, hasText: !!textContent, hasMedia: !!mediaUrl, hasLocation: !!location, isPublic });
 
   const { data, error } = await supabase
     .from('messages')
@@ -594,7 +594,6 @@ is_read: location ? false : true, // Messages without location are immediately r
     .single();
 
   if (error) {
-    console.error('sendMessage error:', error.message, '| code:', error.code, '| details:', error.details, '| hint:', error.hint);
     reportError(error, 'messages.sendMessage', { recipientId, contentType, isPublic });
     return null;
   }
@@ -615,7 +614,6 @@ export async function markMessageAsRead(messageId: string, senderId?: string): P
     .eq('id', messageId);
 
   if (error) {
-    console.error('Error marking message as read:', error);
     reportError(error, 'messages.markMessageAsRead');
     return false;
   }
@@ -628,7 +626,7 @@ export async function markMessageAsRead(messageId: string, senderId?: string): P
   }
 
   // Update read status in global conversations cache
-  const convCached = await getCachedData<any[]>(CACHE_KEYS.CONVERSATIONS_MESSAGES);
+  const convCached = await getCachedData<RawMessageWithUsers[]>(CACHE_KEYS.CONVERSATIONS_MESSAGES);
   if (convCached) {
     const updated = convCached.map(m =>
       m.id === messageId ? { ...m, is_read: true, read_at: readAt } : m
@@ -656,11 +654,8 @@ export async function uploadMedia(
   type: 'photo' | 'audio'
 ): Promise<string | null> {
   try {
-    const currentUserId = await getCurrentUserId();
-    if (!currentUserId) {
-      console.error('No authenticated user');
-      return null;
-    }
+    const currentUserId = getCurrentUserId();
+    if (!currentUserId) return null;
 
     // Read file as base64
     const base64 = await FileSystem.readAsStringAsync(uri, {
@@ -684,7 +679,6 @@ export async function uploadMedia(
       });
 
     if (error) {
-      console.error('Error uploading media:', error.message, error);
       reportError(error, 'messages.uploadMedia', { type });
       return null;
     }
@@ -695,7 +689,6 @@ export async function uploadMedia(
 
     return urlData.publicUrl;
   } catch (e) {
-    console.error('Exception during media upload:', e);
     reportError(e, 'messages.uploadMedia');
     return null;
   }

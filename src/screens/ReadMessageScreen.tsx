@@ -9,23 +9,16 @@ import {
   ScrollView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Audio } from 'expo-av';
 import { markMessageAsRead, fetchMessageById, markPublicMessageDiscovered } from '@/services/messages';
-import { MessageWithSender } from '@/types';
+import { MessageWithSender, RootStackParamList } from '@/types';
 import { colors } from '@/theme-redesign';
 
-interface Props {
-  navigation: any;
-  route: {
-    params: {
-      message?: MessageWithSender;
-      messageId?: string;
-    };
-  };
-}
+type Props = NativeStackScreenProps<RootStackParamList, 'ReadMessage'>;
 
 export default function ReadMessageScreen({ navigation, route }: Props) {
-  const [message, setMessage] = useState<MessageWithSender | null>(route.params.message || null);
+  const [message, setMessage] = useState<MessageWithSender | null>(null);
   const [sound, setSound] = useState<Audio.Sound | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -42,17 +35,9 @@ export default function ReadMessageScreen({ navigation, route }: Props) {
   }, []);
 
   const loadAndMarkAsRead = async () => {
-    let currentMessage = message;
-
-    // If we only have messageId, fetch the full message
-    if (!currentMessage && route.params.messageId) {
-      currentMessage = await fetchMessageById(route.params.messageId);
-      if (currentMessage) {
-        setMessage(currentMessage);
-      }
-    }
-
+    const currentMessage = await fetchMessageById(route.params.messageId);
     if (currentMessage) {
+      setMessage(currentMessage);
       if (currentMessage.is_public) {
         await markPublicMessageDiscovered(currentMessage.id);
       }
@@ -94,8 +79,8 @@ export default function ReadMessageScreen({ navigation, route }: Props) {
           }
         });
       }
-    } catch (error) {
-      console.error('Error playing audio:', error);
+    } catch {
+      // audio playback errors are non-critical
     }
   };
 

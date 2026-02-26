@@ -46,7 +46,7 @@ Pour chaque fichier : **CREATE / MODIFY / DELETE**. Signaler :
 
 | Layer | Emplacement | Règle |
 |-------|-------------|-------|
-| UI | `src/screens/`, `src/components/` | Affichage uniquement, zéro logique métier |
+| UI | `src/screens/`, `src/components/` | Affichage uniquement, zéro logique métier, zéro déclaration d'objet/fonction dans le render (→ 2.6) |
 | Logique | `src/services/*.ts` | Toutes les opérations Supabase/API ici |
 | State partagé | `src/contexts/` | Uniquement pour l'état global (auth, location) |
 | Types | `src/types/` | Interfaces exportées, réutilisables |
@@ -80,7 +80,17 @@ Avant toute implémentation :
 - Input utilisateur validé avant écriture en base
 - Messages privés : abonnement mutuel vérifié par RLS (ne pas re-implémenter côté client)
 
-### 2.6 Design system Fläag
+### 2.6 Render — zéro déclaration inline
+- **Objets, tableaux et fonctions déclarés dans le render → re-créés à chaque rendu** → jamais.
+- Lookup maps statiques (`sizeStyles`, `glowColors`, etc.) → constantes **module-level** (hors du composant).
+- Fonctions pures sans dépendances → **module-level**.
+- Styles dynamiques dépendant de props/state → `useMemo`.
+- Callbacks passés à des enfants → `useCallback`.
+- Objets passés en props (`action={{ ... }}`, `style={{ ... }}`) → `useMemo` ou variable pré-calculée.
+- Config d'interpolation Animated (`inputRange`, `outputRange`) → constantes **module-level** typées `number[]`.
+- Items de liste complexes → composant dédié avec `React.memo` pour isoler l'`animatedStyle`.
+
+### 2.7 Design system Fläag
 - Glassmorphisme : `GlassCard` + `BlurView` (`expo-blur`)
 - Boutons gradient : `PremiumButton`
 - Avatars avec anneau gradient : `PremiumAvatar`
@@ -98,11 +108,12 @@ Produire un plan numéroté :
 2. [SERVICE]  Implémenter les fonctions Supabase dans src/services/<feature>.ts
 3. [TEST]     Écrire les tests unitaires dans __tests__/services/<feature>.test.ts
 4. [SCHEMA]   Mettre à jour supabase/schema.sql (table, RLS, triggers, index)
-5. [UI]       Construire l'écran dans src/screens/<Feature>Screen.tsx
-6. [COMPONENT]Extraire les composants réutilisables vers src/components/
-7. [CONTEXT]  Mettre à jour AuthContext ou LocationContext si nécessaire
-8. [CLAUDE]   Mettre à jour CLAUDE.md si nouveau pattern ou décision archi
-9. [GIT]      Créer branche + PR via github-versioning skill
+5. [SECURITY] Audit sécurité — checklist §2.5 complète avant toute UI
+6. [UI]       Construire l'écran dans src/screens/<Feature>Screen.tsx
+7. [COMPONENT]Extraire les composants réutilisables vers src/components/
+8. [CONTEXT]  Mettre à jour AuthContext ou LocationContext si nécessaire
+9. [CLAUDE]   Mettre à jour CLAUDE.md si nouveau pattern ou décision archi
+10.[GIT]      Créer branche + PR via github-versioning skill
 ```
 
 Pour chaque étape : fichier concerné + changement + raison.
@@ -167,6 +178,15 @@ Après les phases 1–3, présenter à l'utilisateur :
 
 ### Nouveaux types
 <liste des interfaces clés>
+
+### Checklist sécurité
+- [ ] RLS policy définie pour chaque nouvelle table/opération
+- [ ] `user_id` résolu via `auth.uid()` côté Supabase, jamais depuis le client
+- [ ] Aucun secret / clé API dans le code ou AsyncStorage (→ expo-secure-store)
+- [ ] Inputs utilisateur validés avant écriture en base
+- [ ] Données affichées sans évaluation dynamique (pas d'`eval`, pas de `dangerouslySetInnerHTML`)
+- [ ] Accès aux ressources privées vérifié par RLS, pas seulement côté client
+- [ ] Deep links / URL schemes : paramètres validés et non-exécutables
 
 ### Risques / blockers
 <index PostGIS, rebuild natif, nouvelles policies RLS, etc.>

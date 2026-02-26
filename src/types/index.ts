@@ -85,9 +85,11 @@ export interface MessageWithUsers extends Message {
 // Auth state
 export interface AuthState {
   user: User | null;
-  session: any | null;
+  session: import('@supabase/supabase-js').Session | null;
   loading: boolean;
 }
+
+export * from './navigation';
 
 // Location state
 export interface LocationState {

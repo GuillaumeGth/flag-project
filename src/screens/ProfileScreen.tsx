@@ -1,27 +1,14 @@
-/**
- * ProfileScreen - Redesigned with Neo-Cartographic theme
- *
- * This is a premium redesign showcasing:
- * - GlassCard components
- * - PremiumAvatar with gradient ring
- * - Improved visual hierarchy
- * - Micro-animations
- * - Stats cards
- */
-
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
   TouchableOpacity,
   StyleSheet,
-  ActivityIndicator,
   Modal,
   TextInput,
   KeyboardAvoidingView,
   Platform,
   FlatList,
-  Dimensions,
   RefreshControl,
   Animated,
   Image,
@@ -30,71 +17,28 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
+import { CompositeNavigationProp } from '@react-navigation/native';
+import { BottomTabNavigationProp, BottomTabScreenProps } from '@react-navigation/bottom-tabs';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useAuth } from '@/contexts/AuthContext';
 import { colors, shadows, radius, spacing, typography } from '@/theme-redesign';
 import { fetchMyPublicMessages } from '@/services/messages';
 import { fetchFollowerCount } from '@/services/subscriptions';
-import { Message } from '@/types';
+import { Message, MainTabParamList, RootStackParamList } from '@/types';
 import GlassCard from '@/components/redesign/GlassCard';
 import PremiumButton from '@/components/redesign/PremiumButton';
 import PremiumAvatar from '@/components/redesign/PremiumAvatar';
+import GridCell from '@/components/profile/GridCell';
 
-const SCREEN_WIDTH = Dimensions.get('window').width;
-const CELL_SIZE = (SCREEN_WIDTH - 4) / 3; // 2px spacing between cells
-
-// GridCell component with animation
-const GridCell = ({ item, index, onPress }: { item: Message; index: number; onPress: (message: Message) => void }) => {
-  const [itemFade] = useState(new Animated.Value(0));
-
-  useEffect(() => {
-    const delay = index * 30;
-    Animated.timing(itemFade, {
-      toValue: 1,
-      duration: 300,
-      delay,
-      useNativeDriver: true,
-    }).start();
-  }, [index]);
-
-  if (item.content_type === 'photo') {
-    return (
-      <Animated.View style={{ opacity: itemFade }}>
-        <TouchableOpacity style={styles.cell} onPress={() => onPress(item)}>
-          <Image source={{ uri: item.media_url }} style={styles.cellImage} />
-          <LinearGradient
-            colors={['transparent', 'rgba(0,0,0,0.3)']}
-            style={styles.cellOverlay}
-          />
-        </TouchableOpacity>
-      </Animated.View>
-    );
-  }
-
-  if (item.content_type === 'audio') {
-    return (
-      <Animated.View style={{ opacity: itemFade }}>
-        <View style={[styles.cell, styles.cellPlaceholder]}>
-          <View style={styles.cellIconContainer}>
-            <Ionicons name="mic" size={32} color={colors.primary.cyan} />
-          </View>
-        </View>
-      </Animated.View>
-    );
-  }
-
-  // text
-  return (
-    <Animated.View style={{ opacity: itemFade }}>
-      <TouchableOpacity style={[styles.cell, styles.cellPlaceholder]} onPress={() => onPress(item)}>
-        <Text style={styles.cellText} numberOfLines={4}>
-          {item.text_content}
-        </Text>
-      </TouchableOpacity>
-    </Animated.View>
-  );
+type ProfileNavigationProp = CompositeNavigationProp<
+  BottomTabNavigationProp<MainTabParamList, 'Profile'>,
+  NativeStackNavigationProp<RootStackParamList>
+>;
+type Props = Omit<BottomTabScreenProps<MainTabParamList, 'Profile'>, 'navigation'> & {
+  navigation: ProfileNavigationProp;
 };
 
-export default function ProfileScreenRedesign({ navigation }: any) {
+export default function ProfileScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets();
   const { user, updateAvatar, updateDisplayName } = useAuth();
   const [uploading, setUploading] = useState(false);
@@ -108,23 +52,13 @@ export default function ProfileScreenRedesign({ navigation }: any) {
   const [refreshing, setRefreshing] = useState(false);
   const [viewingMessage, setViewingMessage] = useState<Message | null>(null);
 
-  // Animation values
   const [fadeAnim] = useState(new Animated.Value(0));
   const [slideAnim] = useState(new Animated.Value(30));
 
   useEffect(() => {
-    // Entrance animation
     Animated.parallel([
-      Animated.timing(fadeAnim, {
-        toValue: 1,
-        duration: 400,
-        useNativeDriver: true,
-      }),
-      Animated.timing(slideAnim, {
-        toValue: 0,
-        duration: 400,
-        useNativeDriver: true,
-      }),
+      Animated.timing(fadeAnim, { toValue: 1, duration: 400, useNativeDriver: true }),
+      Animated.timing(slideAnim, { toValue: 0, duration: 400, useNativeDriver: true }),
     ]).start();
   }, []);
 
@@ -151,27 +85,18 @@ export default function ProfileScreenRedesign({ navigation }: any) {
 
   const handleChangeAvatar = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (status !== 'granted') {
-      return;
-    }
-
+    if (status !== 'granted') return;
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images'],
       allowsEditing: true,
       aspect: [1, 1],
       quality: 0.8,
     });
-
     if (!result.canceled && result.assets[0]) {
       setUploading(true);
       await updateAvatar(result.assets[0].uri);
       setUploading(false);
     }
-  };
-
-  const handleEditName = () => {
-    setNewName(user?.display_name || '');
-    setEditNameVisible(true);
   };
 
   const handleSaveName = async () => {
@@ -194,63 +119,38 @@ export default function ProfileScreenRedesign({ navigation }: any) {
           <Ionicons name="albums-outline" size={56} color={colors.primary.violet} />
         </View>
         <Text style={styles.emptyText}>Aucun message public</Text>
-        <Text style={styles.emptySubtext}>
-          Partagez votre premier message avec le monde
-        </Text>
+        <Text style={styles.emptySubtext}>Partagez votre premier message avec le monde</Text>
       </View>
     );
   };
 
   const renderHeader = () => (
-    <Animated.View
-      style={[
-        styles.headerContainer,
-        {
-          opacity: fadeAnim,
-          transform: [{ translateY: slideAnim }],
-        },
-      ]}
-    >
-      {/* Gradient background for header */}
+    <Animated.View style={[styles.headerContainer, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
       <LinearGradient
         colors={['rgba(124, 92, 252, 0.08)', 'transparent']}
         style={styles.headerGradient}
       />
 
-      {/* Settings Button */}
-      <TouchableOpacity
-        style={styles.settingsButton}
-        onPress={() => navigation.navigate('Settings')}
-      >
+      <TouchableOpacity style={styles.settingsButton} onPress={() => navigation.navigate('Settings')}>
         <View style={styles.settingsButtonInner}>
           <Ionicons name="settings-outline" size={22} color={colors.text.primary} />
         </View>
       </TouchableOpacity>
 
-      {/* Profile Info Row */}
       <View style={styles.profileRow}>
-        {/* Avatar Section */}
         <TouchableOpacity onPress={handleChangeAvatar} disabled={uploading}>
           {uploading ? (
-            <View style={styles.avatarLoading}>
-              <ActivityIndicator size="large" color={colors.primary.cyan} />
-            </View>
+            <View style={styles.avatarLoading} />
           ) : (
-            <PremiumAvatar
-              uri={user?.avatar_url}
-              name={user?.display_name}
-              size="large"
-              withRing
-              withGlow
-              ringColor="gradient"
-              glowColor="violet"
-            />
+            <PremiumAvatar uri={user?.avatar_url} name={user?.display_name} size="large" withRing withGlow ringColor="gradient" glowColor="violet" />
           )}
         </TouchableOpacity>
 
-        {/* Name & Identifier */}
         <View style={styles.profileInfo}>
-          <TouchableOpacity onPress={handleEditName} style={styles.nameContainer}>
+          <TouchableOpacity
+            onPress={() => { setNewName(user?.display_name || ''); setEditNameVisible(true); }}
+            style={styles.nameContainer}
+          >
             <Text style={styles.displayName}>{user?.display_name || 'Utilisateur'}</Text>
             <View style={styles.editBadge}>
               <Ionicons name="pencil" size={12} color={colors.text.primary} />
@@ -260,25 +160,21 @@ export default function ProfileScreenRedesign({ navigation }: any) {
         </View>
       </View>
 
-      {/* Stats Row */}
       <View style={styles.statsRow}>
         <View style={styles.statCard}>
           <Ionicons name="images" size={18} color={colors.primary.cyan} />
           <Text style={styles.statNumber}>{messages.length}</Text>
         </View>
-
         <View style={styles.statCard}>
           <Ionicons name="people" size={18} color={colors.primary.cyan} />
           <Text style={styles.statNumber}>{followerCount}</Text>
         </View>
-
         <View style={styles.statCard}>
           <Ionicons name="location" size={18} color={colors.primary.cyan} />
           <Text style={styles.statNumber}>24</Text>
         </View>
       </View>
 
-      {/* Divider */}
       <View style={styles.divider} />
     </Animated.View>
   );
@@ -288,7 +184,6 @@ export default function ProfileScreenRedesign({ navigation }: any) {
       {loading ? (
         <>
           {renderHeader()}
-          <ActivityIndicator size="large" color={colors.primary.cyan} style={{ marginTop: 32 }} />
         </>
       ) : (
         <FlatList
@@ -299,32 +194,18 @@ export default function ProfileScreenRedesign({ navigation }: any) {
           ListHeaderComponent={renderHeader}
           ListEmptyComponent={renderEmpty}
           refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={onRefresh}
-              tintColor={colors.primary.cyan}
-            />
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary.cyan} />
           }
           contentContainerStyle={styles.listContent}
           columnWrapperStyle={styles.gridRow}
         />
       )}
 
-      {/* Edit Name Modal */}
-      <Modal
-        visible={editNameVisible}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setEditNameVisible(false)}
-      >
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          style={styles.modalOverlay}
-        >
+      <Modal visible={editNameVisible} transparent animationType="fade" onRequestClose={() => setEditNameVisible(false)}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.modalOverlay}>
           <View style={styles.modalBlur} />
           <GlassCard style={styles.modalCard} withBorder withGlow glowColor="cyan">
             <Text style={styles.modalTitle}>Modifier le nom</Text>
-
             <View style={styles.inputContainer}>
               <TextInput
                 style={styles.modalInput}
@@ -336,51 +217,24 @@ export default function ProfileScreenRedesign({ navigation }: any) {
                 maxLength={50}
               />
             </View>
-
             <View style={styles.modalButtons}>
-              <PremiumButton
-                title="Annuler"
-                variant="ghost"
-                onPress={() => setEditNameVisible(false)}
-                disabled={savingName}
-                style={styles.modalButton}
-              />
-              <PremiumButton
-                title="Enregistrer"
-                variant="gradient"
-                onPress={handleSaveName}
-                loading={savingName}
-                disabled={savingName}
-                style={styles.modalButton}
-                withGlow
-              />
+              <PremiumButton title="Annuler" variant="ghost" onPress={() => setEditNameVisible(false)} disabled={savingName} style={styles.modalButton} />
+              <PremiumButton title="Enregistrer" variant="gradient" onPress={handleSaveName} loading={savingName} disabled={savingName} style={styles.modalButton} withGlow />
             </View>
           </GlassCard>
         </KeyboardAvoidingView>
       </Modal>
 
-      {/* Message Viewer Modal */}
-      <Modal
-        visible={!!viewingMessage}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setViewingMessage(null)}
-      >
+      <Modal visible={!!viewingMessage} transparent animationType="fade" onRequestClose={() => setViewingMessage(null)}>
         <View style={styles.photoViewerOverlay}>
           {viewingMessage?.content_type === 'photo' && viewingMessage?.media_url && (
-            <Image
-              source={{ uri: viewingMessage.media_url }}
-              style={styles.photoViewerImage}
-              resizeMode="contain"
-            />
+            <Image source={{ uri: viewingMessage.media_url }} style={styles.photoViewerImage} resizeMode="contain" />
           )}
           {viewingMessage?.content_type === 'text' && (
             <View style={styles.textViewerContainer}>
               <Text style={styles.textViewerContent}>{viewingMessage.text_content}</Text>
             </View>
           )}
-
-          {/* Close Button */}
           <TouchableOpacity
             style={[styles.photoViewerClose, { top: 60 + insets.top }]}
             onPress={() => setViewingMessage(null)}
@@ -389,8 +243,6 @@ export default function ProfileScreenRedesign({ navigation }: any) {
               <Ionicons name="close" size={28} color={colors.text.primary} />
             </View>
           </TouchableOpacity>
-
-          {/* Location Button */}
           {viewingMessage?.location && (
             <PremiumButton
               title="Voir sur la carte"
@@ -399,10 +251,7 @@ export default function ProfileScreenRedesign({ navigation }: any) {
               onPress={() => {
                 const loc = viewingMessage.location;
                 setViewingMessage(null);
-                navigation.navigate('Main', {
-                  screen: 'Map',
-                  params: { focusLocation: loc },
-                });
+                navigation.navigate('Map', { focusLocation: loc });
               }}
               style={[styles.photoViewerLocationButton, { bottom: 60 + insets.bottom }]}
               withGlow
@@ -461,8 +310,6 @@ const styles = StyleSheet.create({
     height: 64,
     borderRadius: 32,
     backgroundColor: colors.surface.glass,
-    justifyContent: 'center',
-    alignItems: 'center',
   },
   profileInfo: {
     flex: 1,
@@ -521,51 +368,8 @@ const styles = StyleSheet.create({
     marginTop: spacing.xl,
     marginBottom: spacing.lg,
   },
-  gridTitle: {
-    fontSize: typography.sizes.md,
-    fontWeight: '600',
-    color: colors.text.primary,
-    paddingHorizontal: spacing.lg,
-    marginBottom: spacing.md,
-  },
   gridRow: {
     gap: 2,
-  },
-  cell: {
-    width: CELL_SIZE,
-    height: CELL_SIZE,
-    backgroundColor: colors.surface.elevated,
-  },
-  cellImage: {
-    width: '100%',
-    height: '100%',
-  },
-  cellOverlay: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    height: '40%',
-  },
-  cellPlaceholder: {
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: spacing.md,
-    backgroundColor: colors.surface.glassDark,
-  },
-  cellIconContainer: {
-    width: 56,
-    height: 56,
-    borderRadius: radius.full,
-    backgroundColor: colors.surface.glass,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  cellText: {
-    color: colors.text.secondary,
-    fontSize: typography.sizes.xs,
-    textAlign: 'center',
-    lineHeight: 16,
   },
   emptyContainer: {
     alignItems: 'center',

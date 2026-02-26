@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { log, warn } from '@/utils/debug';
 
 const CACHE_PREFIX = 'flag_cache_';
 const SYNC_PREFIX = 'flag_sync_';
@@ -20,7 +21,7 @@ export async function getCachedData<T>(key: string): Promise<T | null> {
     if (!raw) return null;
     return JSON.parse(raw) as T;
   } catch (e) {
-    console.warn('[cache] getCachedData error:', key, e);
+    warn('cache', 'getCachedData error:', key, e);
     return null;
   }
 }
@@ -29,7 +30,7 @@ export async function setCachedData<T>(key: string, data: T): Promise<void> {
   try {
     await AsyncStorage.setItem(CACHE_PREFIX + key, JSON.stringify(data));
   } catch (e) {
-    console.warn('[cache] setCachedData error:', key, e);
+    warn('cache', 'setCachedData error:', key, e);
   }
 }
 
@@ -37,7 +38,7 @@ export async function getLastSyncTimestamp(key: string): Promise<string | null> 
   try {
     return await AsyncStorage.getItem(SYNC_PREFIX + key);
   } catch (e) {
-    console.warn('[cache] getLastSyncTimestamp error:', key, e);
+    warn('cache', 'getLastSyncTimestamp error:', key, e);
     return null;
   }
 }
@@ -46,7 +47,7 @@ export async function setLastSyncTimestamp(key: string, timestamp: string): Prom
   try {
     await AsyncStorage.setItem(SYNC_PREFIX + key, timestamp);
   } catch (e) {
-    console.warn('[cache] setLastSyncTimestamp error:', key, e);
+    warn('cache', 'setLastSyncTimestamp error:', key, e);
   }
 }
 
@@ -54,7 +55,7 @@ export async function removeCachedData(key: string): Promise<void> {
   try {
     await AsyncStorage.multiRemove([CACHE_PREFIX + key, SYNC_PREFIX + key]);
   } catch (e) {
-    console.warn('[cache] removeCachedData error:', key, e);
+    warn('cache', 'removeCachedData error:', key, e);
   }
 }
 
@@ -70,9 +71,9 @@ export async function clearAllCache(): Promise<void> {
     if (cacheKeys.length > 0) {
       await AsyncStorage.multiRemove(cacheKeys);
     }
-    console.log('[cache] cleared all cache:', cacheKeys.length, 'keys');
+    log('cache', 'cleared all cache:', cacheKeys.length, 'keys');
   } catch (e) {
-    console.warn('[cache] clearAllCache error:', e);
+    warn('cache', 'clearAllCache error:', e);
   }
 }
 

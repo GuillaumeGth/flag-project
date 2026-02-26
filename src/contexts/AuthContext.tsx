@@ -3,10 +3,12 @@ import * as WebBrowser from 'expo-web-browser';
 import * as Linking from 'expo-linking';
 import { File } from 'expo-file-system/next';
 import { decode } from 'base64-arraybuffer';
+import { User as SupabaseUser } from '@supabase/supabase-js';
 import { supabase, supabaseReady } from '@/services/supabase';
 import { registerPushToken, unregisterPushToken } from '@/services/notifications';
 import { clearAllCache } from '@/services/cache';
 import { reportError } from '@/services/errorReporting';
+import { log } from '@/utils/debug';
 import { User, AuthState } from '@/types';
 
 WebBrowser.maybeCompleteAuthSession();
@@ -30,7 +32,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   });
 
   const setSessionAndUpdateState = async (accessToken: string, refreshToken: string) => {
-    console.log('[AuthContext] setSessionAndUpdateState: START');
+    log('AuthContext', 'setSessionAndUpdateState: START');
     try {
       const { data, error } = await supabase.auth.setSession({
         access_token: accessToken,
@@ -38,22 +40,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       });
 
       if (error) {
-        console.log('[AuthContext] setSessionAndUpdateState: ERROR', error.message);
+        log('AuthContext', 'setSessionAndUpdateState: ERROR', error.message);
         return { error };
       }
 
-      console.log('[AuthContext] setSessionAndUpdateState: session set, userId:', data.user?.id);
+      log('AuthContext', 'setSessionAndUpdateState: session set, userId:', data.user?.id);
 
       // Wait for Supabase client initialization to complete before allowing screens to mount
       // This ensures getSession() won't hang in data-fetching functions
       // Use supabaseReady (plain promise) instead of getSession() to avoid deadlock
-      console.log('[AuthContext] setSessionAndUpdateState: waiting for supabaseReady...');
+      log('AuthContext', 'setSessionAndUpdateState: waiting for supabaseReady...');
       await supabaseReady;
-      console.log('[AuthContext] setSessionAndUpdateState: supabaseReady resolved');
+      log('AuthContext', 'setSessionAndUpdateState: supabaseReady resolved');
 
       // Force state update in case onAuthStateChange doesn't fire
       if (data.session) {
-        console.log('[AuthContext] setSessionAndUpdateState: forcing setState with user');
+        log('AuthContext', 'setSessionAndUpdateState: forcing setState with user');
         setState((prev) => ({
           ...prev,
           session: data.session,
@@ -64,13 +66,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       return { error: null };
     } catch (e) {
-      console.log('[AuthContext] setSessionAndUpdateState: EXCEPTION', e);
+      log('AuthContext', 'setSessionAndUpdateState: EXCEPTION', e);
       reportError(e, 'auth.setSessionAndUpdateState');
       return { error: e as Error };
     }
   };
 
-  const mapUser = (supabaseUser: any): User => ({
+  const mapUser = (supabaseUser: SupabaseUser): User => ({
     id: supabaseUser.id,
     phone: supabaseUser.phone,
     email: supabaseUser.email,
@@ -80,13 +82,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   });
 
   // Ensure user exists in public.users table (fallback if trigger doesn't work)
-  const ensureUserInDatabase = async (authUser: any) => {
+  const ensureUserInDatabase = async (authUser: SupabaseUser) => {
     if (!authUser?.id) {
-      console.log('ensureUserInDatabase: No authUser.id');
+      log('AuthContext', 'ensureUserInDatabase: No authUser.id');
       return;
     }
 
-    console.log('ensureUserInDatabase: Checking user', authUser.id);
+    log('AuthContext', 'ensureUserInDatabase: Checking user', authUser.id);
 
     const { data: existingUser, error: selectError } = await supabase
       .from('users')
@@ -94,10 +96,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       .eq('id', authUser.id)
       .maybeSingle();
 
-    console.log('ensureUserInDatabase: existingUser=', existingUser, 'selectError=', selectError);
+    log('AuthContext', 'ensureUserInDatabase: existingUser=', existingUser, 'selectError=', selectError);
 
     if (!existingUser) {
-      console.log('User not found in public.users, creating...');
+      log('AuthContext', 'User not found in public.users, creating...');
       const { error } = await supabase.from('users').insert({
         id: authUser.id,
         email: authUser.email,
@@ -111,12 +113,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       });
 
       if (error) {
-        console.log('Error creating user in public.users:', error);
+        log('AuthContext', 'Error creating user in public.users:', error);
       } else {
-        console.log('User created in public.users successfully');
+        log('AuthContext', 'User created in public.users successfully');
       }
     } else {
-      console.log('User already exists in public.users');
+      log('AuthContext', 'User already exists in public.users');
     }
   };
 
@@ -142,7 +144,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   // Sync user profile with Google data if display_name is missing
-  const syncUserProfile = async (authUser: any) => {
+  const syncUserProfile = async (authUser: SupabaseUser) => {
     if (!authUser?.id) return;
 
     const googleName =
@@ -171,14 +173,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     if (Object.keys(updates).length > 0) {
-      console.log('Syncing user profile with Google data:', updates);
+      log('AuthContext', 'Syncing user profile with Google data:', updates);
       const { error } = await supabase
         .from('users')
         .update(updates)
         .eq('id', authUser.id);
 
       if (error) {
-        console.log('Error syncing profile:', error);
+        log('AuthContext', 'Error syncing profile:', error);
       } else {
         // Update local state with the new data
         setState((prev) => ({
@@ -199,7 +201,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Handle deep link for OAuth callback
     const handleDeepLink = async (event: { url: string }) => {
       const url = event.url;
-      console.log('=== DEEP LINK EVENT ===', url);
+      log('AuthContext', '=== DEEP LINK EVENT ===', url);
 
       if (url.includes('auth/callback') || url.includes('auth%2Fcallback')) {
         let accessToken: string | null = null;
@@ -212,7 +214,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           const hashParams = new URLSearchParams(url.substring(hashIndex + 1));
           accessToken = hashParams.get('access_token');
           refreshToken = hashParams.get('refresh_token');
-          console.log('Deep link hash - access:', !!accessToken, 'refresh:', !!refreshToken);
+          log('AuthContext', 'Deep link hash - access:', !!accessToken, 'refresh:', !!refreshToken);
         }
 
         // Try to extract from query params
@@ -224,16 +226,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           code = queryParams.get('code');
           if (!accessToken) accessToken = queryParams.get('access_token');
           if (!refreshToken) refreshToken = queryParams.get('refresh_token');
-          console.log('Deep link query - code:', !!code, 'access:', !!accessToken, 'refresh:', !!refreshToken);
+          log('AuthContext', 'Deep link query - code:', !!code, 'access:', !!accessToken, 'refresh:', !!refreshToken);
         }
 
         if (accessToken && refreshToken) {
           await setSessionAndUpdateState(accessToken, refreshToken);
         } else if (code) {
-          console.log('Exchanging code from deep link');
+          log('AuthContext', 'Exchanging code from deep link');
           const { error } = await supabase.auth.exchangeCodeForSession(code);
           if (error) {
-            console.log('Error exchanging code:', error.message);
+            log('AuthContext', 'Error exchanging code:', error.message);
           }
         }
       }
@@ -253,18 +255,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      console.log('[AuthContext] onAuthStateChange:', _event, 'hasSession:', !!session, 'userId:', session?.user?.id);
+      log('AuthContext', 'onAuthStateChange:', _event, 'hasSession:', !!session, 'userId:', session?.user?.id);
 
       // Wait for Supabase client to be fully initialized before updating state.
       // Use supabaseReady (plain promise) instead of getSession() to avoid deadlock.
       // getSession() acquires an internal lock that's already held during event firing.
-      console.log('[AuthContext] Waiting for supabaseReady...');
+      log('AuthContext', 'Waiting for supabaseReady...');
       await supabaseReady;
-      console.log('[AuthContext] supabaseReady resolved, proceeding with:', _event);
+      log('AuthContext', 'supabaseReady resolved, proceeding with:', _event);
 
       // On explicit sign out, clear everything
       if (_event === 'SIGNED_OUT') {
-        console.log('[AuthContext] SIGNED_OUT -> clearing state');
+        log('AuthContext', 'SIGNED_OUT -> clearing state');
         setState({ user: null, session: null, loading: false });
         return;
       }
@@ -272,7 +274,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // If we have a valid session, update state and run post-login setup
       if (session?.user) {
         const mappedUser = mapUser(session.user);
-        console.log('[AuthContext] Setting user:', mappedUser.id, 'event:', _event);
+        log('AuthContext', 'Setting user:', mappedUser.id, 'event:', _event);
         setState((prev) => ({
           ...prev,
           session,
@@ -281,14 +283,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }));
 
         if (_event === 'SIGNED_IN' || _event === 'INITIAL_SESSION') {
-          console.log('[AuthContext] Running post-login setup for:', _event);
+          log('AuthContext', 'Running post-login setup for:', _event);
           // All post-login operations are fire-and-forget to avoid deadlock.
           // Supabase queries internally call getSession() which would deadlock
           // if awaited inside onAuthStateChange (the auth lock is held).
-          ensureUserInDatabase(session.user).catch((e) => console.log('ensureUserInDatabase error:', e));
-          syncUserProfile(session.user).catch((e) => console.log('Sync profile error:', e));
-          updateUserWithDbAvatar(mappedUser.id).catch((e) => console.log('Update avatar error:', e));
-          registerPushToken(mappedUser.id).catch((e) => console.log('Register push token error:', e));
+          ensureUserInDatabase(session.user).catch((e) => log('AuthContext', 'ensureUserInDatabase error:', e));
+          syncUserProfile(session.user).catch((e) => log('AuthContext', 'Sync profile error:', e));
+          updateUserWithDbAvatar(mappedUser.id).catch((e) => log('AuthContext', 'Update avatar error:', e));
+          registerPushToken(mappedUser.id).catch((e) => log('AuthContext', 'Register push token error:', e));
         }
         return;
       }
@@ -296,10 +298,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // No session: only update loading state on INITIAL_SESSION (no stored session)
       // Never reset user to null from other events (prevents race condition)
       if (_event === 'INITIAL_SESSION') {
-        console.log('[AuthContext] INITIAL_SESSION with no session -> setting loading=false');
+        log('AuthContext', 'INITIAL_SESSION with no session -> setting loading=false');
         setState((prev) => ({ ...prev, loading: false }));
       } else {
-        console.log('[AuthContext] Ignoring event with no session:', _event);
+        log('AuthContext', 'Ignoring event with no session:', _event);
       }
     });
 
@@ -328,8 +330,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signInWithGoogle = async () => {
     try {
       const redirectUrl = 'flag://auth/callback';
-      console.log('=== GOOGLE AUTH START ===');
-      console.log('Redirect URL:', redirectUrl);
+      log('AuthContext', '=== GOOGLE AUTH START ===');
+      log('AuthContext', 'Redirect URL:', redirectUrl);
 
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
@@ -345,16 +347,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (error) throw error;
       if (!data.url) throw new Error('No OAuth URL returned');
 
-      console.log('OAuth URL:', data.url);
+      log('AuthContext', 'OAuth URL:', data.url);
 
       // Use openAuthSessionAsync with flag:// prefix to capture any flag:// redirect
       const result = await WebBrowser.openAuthSessionAsync(data.url, 'flag://');
 
-      console.log('=== AUTH DEBUG ===');
-      console.log('Result type:', result.type);
+      log('AuthContext', '=== AUTH DEBUG ===');
+      log('AuthContext', 'Result type:', result.type);
 
       if (result.type === 'success' && result.url) {
-        console.log('Full URL:', result.url);
+        log('AuthContext', 'Full URL:', result.url);
 
         // Check for error in URL first
         const urlObj = new URL(result.url);
@@ -363,7 +365,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         if (errorParam && errorDescription) {
           const decodedError = decodeURIComponent(errorDescription.replace(/\+/g, ' '));
-          console.log('Auth error from Supabase:', decodedError);
+          log('AuthContext', 'Auth error from Supabase:', decodedError);
           throw new Error(decodedError);
         }
 
@@ -377,26 +379,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           const hashParams = new URLSearchParams(result.url.substring(hashIndex + 1));
           accessToken = hashParams.get('access_token');
           refreshToken = hashParams.get('refresh_token');
-          console.log('Hash params - access:', !!accessToken, 'refresh:', !!refreshToken);
+          log('AuthContext', 'Hash params - access:', !!accessToken, 'refresh:', !!refreshToken);
         }
 
         if (accessToken && refreshToken) {
-          console.log('Setting session with tokens');
+          log('AuthContext', 'Setting session with tokens');
           const { error: sessionError } = await setSessionAndUpdateState(accessToken, refreshToken);
           return { error: sessionError };
         }
 
         // Tokens not in URL, let deep link listener handle it
-        console.log('No tokens in result URL, checking deep link listener...');
+        log('AuthContext', 'No tokens in result URL, checking deep link listener...');
       }
 
       if (result.type === 'cancel') {
-        console.log('User cancelled authentication');
+        log('AuthContext', 'User cancelled authentication');
       }
 
       return { error: null };
     } catch (error) {
-      console.log('Google sign in error:', error);
+      log('AuthContext', 'Google sign in error:', error);
       reportError(error, 'auth.signInWithGoogle');
       return { error: error as Error };
     }
@@ -455,7 +457,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         .eq('id', state.user.id);
 
       if (dbError) {
-        console.log('Error updating users table:', dbError);
+        log('AuthContext', 'Error updating users table:', dbError);
       }
 
       // Update local state
@@ -466,7 +468,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       return { error: null };
     } catch (error) {
-      console.log('Update avatar error:', error);
+      log('AuthContext', 'Update avatar error:', error);
       reportError(error, 'auth.updateAvatar');
       return { error: error as Error };
     }
@@ -501,7 +503,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       return { error: null };
     } catch (error) {
-      console.log('Update display name error:', error);
+      log('AuthContext', 'Update display name error:', error);
       reportError(error, 'auth.updateDisplayName');
       return { error: error as Error };
     }
@@ -511,7 +513,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Unregister push token before signing out
     if (state.user?.id) {
       await unregisterPushToken(state.user.id).catch((e) =>
-        console.log('Unregister push token error:', e)
+        log('AuthContext', 'Unregister push token error:', e)
       );
     }
     // Clear local data cache

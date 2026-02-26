@@ -1,15 +1,21 @@
 import React from 'react';
-import { View, StyleSheet, ViewStyle } from 'react-native';
+import { View, StyleSheet, ViewStyle, StyleProp } from 'react-native';
 import { colors, shadows, radius } from '@/theme-redesign';
 
 interface GlassCardProps {
   children: React.ReactNode;
-  style?: ViewStyle;
+  style?: StyleProp<ViewStyle>;
   intensity?: number;
   withBorder?: boolean;
   withGlow?: boolean;
   glowColor?: 'violet' | 'cyan' | 'magenta';
 }
+
+const GLOW_COLORS = {
+  violet: colors.glow.violet,
+  cyan: colors.glow.cyan,
+  magenta: colors.glow.magenta,
+};
 
 export default function GlassCard({
   children,
@@ -19,12 +25,6 @@ export default function GlassCard({
   withGlow = false,
   glowColor = 'violet',
 }: GlassCardProps) {
-  const glowColors = {
-    violet: colors.glow.violet,
-    cyan: colors.glow.cyan,
-    magenta: colors.glow.magenta,
-  };
-
   return (
     <View
       style={[
@@ -32,7 +32,7 @@ export default function GlassCard({
         withBorder && styles.border,
         withGlow && {
           ...shadows.glow,
-          shadowColor: glowColors[glowColor],
+          shadowColor: GLOW_COLORS[glowColor],
         },
         style,
       ]}

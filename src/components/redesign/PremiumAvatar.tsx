@@ -16,6 +16,28 @@ interface PremiumAvatarProps {
   isBot?: boolean;
 }
 
+const AVATAR_SIZES = {
+  small: 32,
+  medium: 48,
+  large: 64,
+  xlarge: 96,
+};
+
+const GLOW_COLORS = {
+  violet: colors.glow.violet,
+  cyan: colors.glow.cyan,
+  magenta: colors.glow.magenta,
+};
+
+const getInitials = (name?: string): string => {
+  if (!name) return '?';
+  const parts = name.trim().split(' ');
+  if (parts.length >= 2) {
+    return (parts[0][0] + parts[1][0]).toUpperCase();
+  }
+  return name.substring(0, 2).toUpperCase();
+};
+
 /**
  * Premium Avatar with optional glow and gradient ring
  */
@@ -30,31 +52,9 @@ export default function PremiumAvatar({
   style,
   isBot = false,
 }: PremiumAvatarProps) {
-  const sizes = {
-    small: 32,
-    medium: 48,
-    large: 64,
-    xlarge: 96,
-  };
-
-  const containerSize = sizes[size];
+  const containerSize = AVATAR_SIZES[size];
   const avatarSize = withRing ? containerSize - 6 : containerSize;
   const ringSize = containerSize + 4;
-
-  const getInitials = (name?: string): string => {
-    if (!name) return '?';
-    const parts = name.trim().split(' ');
-    if (parts.length >= 2) {
-      return (parts[0][0] + parts[1][0]).toUpperCase();
-    }
-    return name.substring(0, 2).toUpperCase();
-  };
-
-  const glowColors = {
-    violet: colors.glow.violet,
-    cyan: colors.glow.cyan,
-    magenta: colors.glow.magenta,
-  };
 
   const renderAvatar = () => (
     <View
@@ -67,7 +67,7 @@ export default function PremiumAvatar({
         },
         withGlow && {
           ...shadows.glow,
-          shadowColor: glowColors[glowColor],
+          shadowColor: GLOW_COLORS[glowColor],
         },
       ]}
     >

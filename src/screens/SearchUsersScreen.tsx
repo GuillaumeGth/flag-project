@@ -10,14 +10,21 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { CompositeNavigationProp } from '@react-navigation/native';
+import { BottomTabNavigationProp, BottomTabScreenProps } from '@react-navigation/bottom-tabs';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { supabase, getCachedUserId } from '@/services/supabase';
 import { colors } from '@/theme-redesign';
-import { User } from '@/types';
+import { User, MainTabParamList, RootStackParamList } from '@/types';
 
-interface Props {
-  navigation: any;
-}
+type SearchNavigationProp = CompositeNavigationProp<
+  BottomTabNavigationProp<MainTabParamList, 'Search'>,
+  NativeStackNavigationProp<RootStackParamList>
+>;
+type Props = Omit<BottomTabScreenProps<MainTabParamList, 'Search'>, 'navigation'> & {
+  navigation: SearchNavigationProp;
+};
 
 export default function SearchUsersScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets();
@@ -98,7 +105,7 @@ export default function SearchUsersScreen({ navigation }: Props) {
       </View>
 
       {loading && results.length === 0 && (
-        <ActivityIndicator size="small" color={colors.primary} style={styles.loader} />
+        <ActivityIndicator size="small" color={colors.primary.cyan} style={styles.loader} />
       )}
 
       <FlatList
@@ -142,7 +149,7 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.surface.elevatedLight,
+    backgroundColor: colors.surface.glassDark,
     borderRadius: 12,
     paddingHorizontal: 12,
     paddingVertical: 8,
@@ -169,7 +176,7 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: colors.surface.elevatedLight,
+    backgroundColor: colors.surface.glassDark,
     justifyContent: 'center',
     alignItems: 'center',
   },

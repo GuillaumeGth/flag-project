@@ -30,8 +30,20 @@ export default function SearchUsersScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets();
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<User[]>([]);
+  const [topUsers, setTopUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(false);
   const currentUserId = getCachedUserId();
+
+  useEffect(() => {
+    supabase
+      .rpc('get_top_users_by_followers', {
+        limit_count: 10,
+        exclude_user_id: currentUserId || undefined,
+      })
+      .then(({ data }) => {
+        if (data) setTopUsers(data);
+      });
+  }, [currentUserId]);
 
   const search = useCallback(async (text: string) => {
     if (!text.trim()) {
@@ -58,6 +70,9 @@ export default function SearchUsersScreen({ navigation }: Props) {
     const timeout = setTimeout(() => search(query), 300);
     return () => clearTimeout(timeout);
   }, [query, search]);
+
+  const isSearching = query.trim().length > 0;
+  const displayedData = isSearching ? results : topUsers;
 
   const renderUser = ({ item }: { item: User }) => (
     <TouchableOpacity
@@ -109,19 +124,22 @@ export default function SearchUsersScreen({ navigation }: Props) {
       )}
 
       <FlatList
-        data={results}
+        data={displayedData}
         keyExtractor={item => item.id}
         renderItem={renderUser}
+        ListHeaderComponent={
+          !isSearching && topUsers.length > 0 ? (
+            <View style={styles.sectionHeader}>
+              <Ionicons name="trending-up" size={14} color={colors.text.tertiary} />
+              <Text style={styles.sectionHeaderText}>Populaires</Text>
+            </View>
+          ) : null
+        }
         ListEmptyComponent={
-          query.trim().length > 0 && !loading ? (
+          isSearching && !loading ? (
             <View style={styles.emptyContainer}>
               <Ionicons name="search-outline" size={48} color={colors.text.tertiary} />
               <Text style={styles.emptyText}>Aucun utilisateur trouvé</Text>
-            </View>
-          ) : !query.trim() ? (
-            <View style={styles.emptyContainer}>
-              <Ionicons name="people-outline" size={48} color={colors.text.tertiary} />
-              <Text style={styles.emptyText}>Recherchez par nom</Text>
             </View>
           ) : null
         }
@@ -207,5 +225,20 @@ const styles = StyleSheet.create({
   emptyText: {
     color: colors.text.tertiary,
     fontSize: 14,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    backgroundColor: colors.background.primary,
+  },
+  sectionHeaderText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: colors.text.tertiary,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
 });

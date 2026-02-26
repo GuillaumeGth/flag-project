@@ -109,6 +109,9 @@ DROP POLICY IF EXISTS "Recipients can update messages" ON public.messages;
 CREATE POLICY "Recipients can update messages" ON public.messages
     FOR UPDATE USING (auth.uid() = recipient_id);
 
+-- Enable Realtime for messages table
+ALTER PUBLICATION supabase_realtime ADD TABLE messages;
+
 -- Indexes (create if not exists)
 CREATE INDEX IF NOT EXISTS messages_recipient_idx ON public.messages(recipient_id);
 CREATE INDEX IF NOT EXISTS messages_sender_idx ON public.messages(sender_id);

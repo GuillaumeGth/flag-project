@@ -1,10 +1,12 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import {
   fetchConversationMessages,
   getCachedConversationMessages,
 } from '@/services/messages';
+import { supabase } from '@/services/supabase';
 import { MessageWithUsers } from '@/types';
 import { log } from '@/utils/debug';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface UseMessageLoaderResult {
   messages: MessageWithUsers[];
@@ -15,6 +17,7 @@ interface UseMessageLoaderResult {
 export function useMessageLoader(otherUserId: string): UseMessageLoaderResult {
   const [messages, setMessages] = useState<MessageWithUsers[]>([]);
   const [loading, setLoading] = useState(true);
+  const { user } = useAuth();
 
   const loadMessages = useCallback(async () => {
     if (messages.length === 0) {
@@ -29,6 +32,35 @@ export function useMessageLoader(otherUserId: string): UseMessageLoaderResult {
     setMessages(data);
     setLoading(false);
   }, [otherUserId]);
+
+  useEffect(() => {
+    if (!user?.id) return;
+
+    const channel = supabase
+      .channel(`conversation:${user.id}:${otherUserId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'messages',
+          filter: `recipient_id=eq.${user.id}`,
+        },
+        (payload) => {
+          const newMsg = payload.new as { sender_id?: string };
+          if (newMsg?.sender_id === otherUserId) {
+            log('useMessageLoader', 'realtime: new message from', otherUserId);
+            loadMessages();
+          }
+        },
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id, otherUserId]);
 
   return { messages, loading, loadMessages };
 }

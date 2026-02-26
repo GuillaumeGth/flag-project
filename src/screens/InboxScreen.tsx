@@ -15,6 +15,7 @@ import { BottomTabNavigationProp, BottomTabScreenProps } from '@react-navigation
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useAuth } from '@/contexts/AuthContext';
 import { fetchConversations, getCachedConversations, FLAG_BOT_ID } from '@/services/messages';
+import { supabase } from '@/services/supabase';
 import { Conversation, MainTabParamList, RootStackParamList } from '@/types';
 import { colors, shadows, radius, spacing, typography } from '@/theme-redesign';
 import GlassCard from '@/components/redesign/GlassCard';
@@ -147,6 +148,32 @@ export default function InboxScreen({ navigation }: Props) {
     });
     return unsubscribe;
   }, [navigation]);
+
+  useEffect(() => {
+    if (!user?.id) return;
+
+    const channel = supabase
+      .channel(`inbox:${user.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'messages',
+          filter: `recipient_id=eq.${user.id}`,
+        },
+        () => {
+          log('InboxScreen', 'realtime: new message received');
+          loadConversations();
+        },
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id]);
 
   const loadConversations = async () => {
     log('InboxScreen', 'loadConversations: START');

@@ -21,18 +21,23 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '@/contexts/AuthContext';
 import { sendMessage, FLAG_BOT_ID, uploadMedia } from '@/services/messages';
 import { isEitherFollowing } from '@/services/subscriptions';
-import { MessageWithUsers, MessageContentType, RootStackParamList } from '@/types';
+import { fetchReactionsForMessages, toggleReaction } from '@/services/reactions';
+import { MessageWithUsers, MessageContentType, RootStackParamList, ReactionSummary } from '@/types';
 import { colors, shadows, radius, spacing } from '@/theme-redesign';
 import { reportError } from '@/services/errorReporting';
 import GlassCard from '@/components/redesign/GlassCard';
 import PremiumAvatar from '@/components/redesign/PremiumAvatar';
 import MessageBubble from '@/components/conversation/MessageBubble';
 import MessageInput from '@/components/conversation/MessageInput';
+import ReactionPicker from '@/components/conversation/ReactionPicker';
 import ScreenLoader from '@/components/ScreenLoader';
 import { useMessageLoader } from '@/hooks/useMessageLoader';
 import { log } from '@/utils/debug';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Conversation'>;
+
+// Stable empty array to avoid creating new references when no reactions exist
+const EMPTY_REACTIONS: ReactionSummary[] = [];
 
 export default function ConversationScreen({ navigation, route }: Props) {
   const { otherUserId, otherUserName, otherUserAvatarUrl } = route.params;
@@ -48,6 +53,18 @@ export default function ConversationScreen({ navigation, route }: Props) {
   const [playingMessageId, setPlayingMessageId] = useState<string | null>(null);
   const [isPlayingAudio, setIsPlayingAudio] = useState(false);
   const [canSendMessages, setCanSendMessages] = useState<boolean>(true);
+
+  // ── Reactions state ──────────────────────────────────────────────────────
+  const [reactionsMap, setReactionsMap] = useState<Record<string, ReactionSummary[]>>({});
+  // Ref keeps the latest reactionsMap accessible in stable callbacks without
+  // re-creating them on every state update (generationRef pattern).
+  const reactionsMapRef = useRef<Record<string, ReactionSummary[]>>({});
+  const [pickerState, setPickerState] = useState<{ id: string; pageY: number } | null>(null);
+  const pickerMessageId = pickerState?.id ?? null;
+
+  useEffect(() => {
+    reactionsMapRef.current = reactionsMap;
+  }, [reactionsMap]);
 
   const isBot = useMemo(() => otherUserId === FLAG_BOT_ID, [otherUserId]);
   const [messageAnimations] = useState<Map<string, Animated.Value>>(new Map());
@@ -73,6 +90,13 @@ export default function ConversationScreen({ navigation, route }: Props) {
       });
     }
   }, [loading]);
+
+  // Load reactions whenever the message list changes
+  useEffect(() => {
+    if (messages.length === 0 || !user) return;
+    const ids = messages.map((m) => m.id);
+    fetchReactionsForMessages(ids, user.id).then(setReactionsMap);
+  }, [messages, user]);
 
   const checkCanSend = async () => {
     if (isBot) { setCanSendMessages(true); return; }
@@ -163,6 +187,66 @@ export default function ConversationScreen({ navigation, route }: Props) {
     return messageAnimations.get(messageId)!;
   };
 
+  // Stable handler — reads latest state via ref, never recreated when reactionsMap changes
+  const handleReactionToggle = useCallback(
+    async (messageId: string, emoji: string) => {
+      if (!user) return;
+
+      const currentReactions = reactionsMapRef.current[messageId] ?? [];
+      const existing = currentReactions.find((r) => r.emoji === emoji);
+      const hasReacted = existing?.has_reacted ?? false;
+
+      // Optimistic update so the UI responds instantly
+      setReactionsMap((prev) => {
+        const current = [...(prev[messageId] ?? [])];
+        const idx = current.findIndex((r) => r.emoji === emoji);
+
+        if (hasReacted) {
+          if (idx >= 0) {
+            const newCount = current[idx].count - 1;
+            if (newCount <= 0) {
+              current.splice(idx, 1);
+            } else {
+              current[idx] = {
+                ...current[idx],
+                count: newCount,
+                has_reacted: false,
+                user_ids: current[idx].user_ids.filter((id) => id !== user.id),
+              };
+            }
+          }
+        } else {
+          if (idx >= 0) {
+            current[idx] = {
+              ...current[idx],
+              count: current[idx].count + 1,
+              has_reacted: true,
+              user_ids: [...current[idx].user_ids, user.id],
+            };
+          } else {
+            current.push({ emoji, count: 1, has_reacted: true, user_ids: [user.id] });
+          }
+        }
+
+        return { ...prev, [messageId]: current };
+      });
+
+      await toggleReaction(messageId, emoji, user.id, hasReacted);
+    },
+    [user]
+  );
+
+  // Emojis the current user has already reacted with on the message being picked
+  const pickerCurrentReactions = useMemo(() => {
+    if (!pickerMessageId || !user) return EMPTY_REACTIONS;
+    return reactionsMap[pickerMessageId] ?? EMPTY_REACTIONS;
+  }, [pickerMessageId, reactionsMap, user]);
+
+  const pickerActiveEmojis = useMemo(
+    () => pickerCurrentReactions.filter((r) => r.has_reacted).map((r) => r.emoji),
+    [pickerCurrentReactions]
+  );
+
   const renderMessage = ({ item, index }: { item: MessageWithUsers; index: number }) => {
     const isFromMe = item.sender_id === user?.id;
     const prevMessage = index < reversedMessages.length - 1 ? reversedMessages[index + 1] : null;
@@ -178,8 +262,11 @@ export default function ConversationScreen({ navigation, route }: Props) {
         showDateSeparator={showDateSeparator}
         isPlaying={isPlayingAudio}
         playingMessageId={playingMessageId}
+        reactions={reactionsMap[item.id] ?? EMPTY_REACTIONS}
         onPlayAudio={handleAudioPress}
         onViewImage={setFullImageMessage}
+        onLongPress={(pageY) => { if (item.is_read || isFromMe) setPickerState({ id: item.id, pageY }); }}
+        onReactionPress={(emoji) => handleReactionToggle(item.id, emoji)}
         onNavigateToMap={(location) => {
           navigation.navigate('Main', {
             screen: 'Map',
@@ -260,6 +347,17 @@ export default function ConversationScreen({ navigation, route }: Props) {
           </TouchableOpacity>
         </View>
       </Modal>
+
+      {/* Emoji reaction picker — shown on long press over any message */}
+      <ReactionPicker
+        visible={pickerMessageId !== null}
+        currentReactions={pickerActiveEmojis}
+        anchorY={pickerState?.pageY}
+        onSelect={(emoji) => {
+          if (pickerMessageId) handleReactionToggle(pickerMessageId, emoji);
+        }}
+        onClose={() => setPickerState(null)}
+      />
     </View>
   );
 }

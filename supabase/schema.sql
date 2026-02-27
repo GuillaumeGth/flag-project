@@ -694,3 +694,67 @@ CREATE POLICY "Users can delete own reactions" ON public.message_reactions
 
 CREATE INDEX IF NOT EXISTS message_reactions_message_id_idx ON public.message_reactions(message_id);
 CREATE INDEX IF NOT EXISTS message_reactions_user_id_idx ON public.message_reactions(user_id);
+
+-- Function to send push notification to message author when someone reacts
+CREATE OR REPLACE FUNCTION public.send_push_on_reaction()
+RETURNS TRIGGER AS $$
+DECLARE
+    target_tokens TEXT[];
+    token TEXT;
+    reactor_name TEXT;
+    message_author_id UUID;
+    expo_url TEXT := 'https://exp.host/--/api/v2/push/send';
+    payload JSONB;
+BEGIN
+    SELECT sender_id INTO message_author_id
+    FROM public.messages
+    WHERE id = NEW.message_id;
+
+    -- Don't notify if reacting to your own message
+    IF message_author_id = NEW.user_id THEN
+        RETURN NEW;
+    END IF;
+
+    SELECT array_agg(expo_push_token)
+    INTO target_tokens
+    FROM public.user_push_tokens
+    WHERE user_id = message_author_id;
+
+    IF target_tokens IS NULL OR array_length(target_tokens, 1) = 0 THEN
+        RETURN NEW;
+    END IF;
+
+    SELECT COALESCE(display_name, 'Quelqu''un')
+    INTO reactor_name
+    FROM public.users
+    WHERE id = NEW.user_id;
+
+    FOREACH token IN ARRAY target_tokens LOOP
+        payload := jsonb_build_object(
+            'to', token,
+            'sound', 'default',
+            'title', reactor_name || ' a réagi à ton message',
+            'body', NEW.emoji,
+            'data', jsonb_build_object('messageId', NEW.message_id)
+        );
+
+        PERFORM http((
+            'POST',
+            expo_url,
+            ARRAY[http_header('Content-Type', 'application/json')],
+            'application/json',
+            payload::text
+        )::http_request);
+    END LOOP;
+
+    RETURN NEW;
+EXCEPTION WHEN OTHERS THEN
+    RAISE LOG 'send_push_on_reaction error: % %', SQLERRM, SQLSTATE;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+DROP TRIGGER IF EXISTS on_reaction_created_send_push ON public.message_reactions;
+CREATE TRIGGER on_reaction_created_send_push
+    AFTER INSERT ON public.message_reactions
+    FOR EACH ROW EXECUTE FUNCTION public.send_push_on_reaction();

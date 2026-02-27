@@ -31,7 +31,7 @@ interface MessageBubbleProps {
   onPlayAudio: (message: MessageWithUsers) => void;
   onViewImage: (message: MessageWithUsers) => void;
   onNavigateToMap: (location: MessageWithUsers['location']) => void;
-  onLongPress: () => void;
+  onLongPress: (pageY: number) => void;
   onReactionPress: (emoji: string) => void;
 }
 
@@ -81,7 +81,7 @@ export default function MessageBubble({
         {isUndiscovered ? (
           <Pressable
             onPress={() => onNavigateToMap(message.location)}
-            onLongPress={onLongPress}
+            onLongPress={(e) => onLongPress(e.nativeEvent.pageY)}
             delayLongPress={400}
           >
             <GlassCard style={styles.undiscoveredBubble}>
@@ -96,7 +96,7 @@ export default function MessageBubble({
           // Wrapper gives position:relative context for the floating reactions
           <View style={styles.bubbleWrapper}>
             <Pressable
-              onLongPress={onLongPress}
+              onLongPress={(e) => onLongPress(e.nativeEvent.pageY)}
               delayLongPress={400}
               style={[
                 styles.messageBubble,

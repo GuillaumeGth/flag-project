@@ -59,7 +59,8 @@ export default function ConversationScreen({ navigation, route }: Props) {
   // Ref keeps the latest reactionsMap accessible in stable callbacks without
   // re-creating them on every state update (generationRef pattern).
   const reactionsMapRef = useRef<Record<string, ReactionSummary[]>>({});
-  const [pickerMessageId, setPickerMessageId] = useState<string | null>(null);
+  const [pickerState, setPickerState] = useState<{ id: string; pageY: number } | null>(null);
+  const pickerMessageId = pickerState?.id ?? null;
 
   useEffect(() => {
     reactionsMapRef.current = reactionsMap;
@@ -264,7 +265,7 @@ export default function ConversationScreen({ navigation, route }: Props) {
         reactions={reactionsMap[item.id] ?? EMPTY_REACTIONS}
         onPlayAudio={handleAudioPress}
         onViewImage={setFullImageMessage}
-        onLongPress={() => setPickerMessageId(item.id)}
+        onLongPress={(pageY) => { if (item.is_read || isFromMe) setPickerState({ id: item.id, pageY }); }}
         onReactionPress={(emoji) => handleReactionToggle(item.id, emoji)}
         onNavigateToMap={(location) => {
           navigation.navigate('Main', {
@@ -351,10 +352,11 @@ export default function ConversationScreen({ navigation, route }: Props) {
       <ReactionPicker
         visible={pickerMessageId !== null}
         currentReactions={pickerActiveEmojis}
+        anchorY={pickerState?.pageY}
         onSelect={(emoji) => {
           if (pickerMessageId) handleReactionToggle(pickerMessageId, emoji);
         }}
-        onClose={() => setPickerMessageId(null)}
+        onClose={() => setPickerState(null)}
       />
     </View>
   );

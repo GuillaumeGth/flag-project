@@ -2,7 +2,7 @@ import { supabase } from './supabase';
 import { MessageReaction, ReactionSummary } from '@/types/reactions';
 import { reportError } from './errorReporting';
 
-export const ALLOWED_EMOJIS = ['❤️', '😂', '😮', '😢', '😡', '👍'] as const;
+export const ALLOWED_EMOJIS = ['❤️', '🫂', '😂', '😮', '😢', '😡', '👍'] as const;
 export type AllowedEmoji = (typeof ALLOWED_EMOJIS)[number];
 
 type MutableReactionEntry = {

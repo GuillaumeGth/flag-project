@@ -288,6 +288,12 @@ export default function MapScreen({ navigation, route }: Props) {
     }
   }, [userLocation]);
 
+  const handleNavigateToMessage = useCallback(() => {
+    if (selectedMessage && selectedMsgLocation) {
+      fetchRoute(selectedMsgLocation, selectedMessage.id);
+    }
+  }, [selectedMessage, selectedMsgLocation, fetchRoute]);
+
   const openInMaps = useCallback(() => {
     if (!routeCoordinates || routeCoordinates.length === 0) return;
     const dest = routeCoordinates[routeCoordinates.length - 1];
@@ -351,7 +357,7 @@ export default function MapScreen({ navigation, route }: Props) {
         pitchEnabled={false}
         moveOnMarkerPress={false}
       >
-        {messages.map((message) => {
+        {messages.filter((msg) => msg.sender?.id !== user?.id).map((message) => {
           const location = getMessageLocation(message);
           if (!location) return null;
           const capturedImage = avatarImages[message.id];
@@ -376,13 +382,6 @@ export default function MapScreen({ navigation, route }: Props) {
           </>
         )}
 
-        {focusMarkerCoords && (
-          <Marker coordinate={focusMarkerCoords} anchor={MARKER_ANCHOR} tracksViewChanges>
-            <View style={styles.focusMarker}>
-              <Ionicons name="flag" size={36} color={colors.primary.cyan} />
-            </View>
-          </Marker>
-        )}
       </MapView>
 
       <View style={[styles.floatingButtonsContainer, { top: insets.top + 16 }]}>
@@ -441,7 +440,7 @@ export default function MapScreen({ navigation, route }: Props) {
       )}
 
       <View style={styles.captureContainer} pointerEvents="none">
-        {messages.map((message) => {
+        {messages.filter((msg) => msg.sender?.id !== user?.id).map((message) => {
           const sender = message.sender;
           if (!sender?.avatar_url || avatarImages[message.id]) return null;
           const isPublic = message.is_public === true;

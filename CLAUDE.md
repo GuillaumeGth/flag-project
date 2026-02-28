@@ -50,6 +50,7 @@ supabase/
 ## Services clés
 
 - **`messages.ts`** — CRUD messages, requêtes carte, upload médias, cache incrémental
+- **`reactions.ts`** — Réactions emoji sur les messages (`toggleReaction`, `fetchReactionsForMessages`)
 - **`location.ts`** — Distance Haversine, permissions, watch foreground/background
 - **`notifications.ts`** — Tokens push, notifications locales de proximité
 - **`subscriptions.ts`** — Follow/unfollow, vérification abonnement
@@ -59,7 +60,7 @@ supabase/
 
 ## Base de données
 
-Tables principales : `users`, `messages`, `subscriptions`, `discovered_public_messages`, `user_push_tokens`, `error_logs`, `app_config`
+Tables principales : `users`, `messages`, `message_reactions`, `subscriptions`, `discovered_public_messages`, `user_push_tokens`, `error_logs`, `app_config`
 
 Points importants :
 - **PostGIS** pour les requêtes géographiques (type `GEOGRAPHY POINT`)
@@ -75,6 +76,13 @@ Points importants :
 - **300m** : seuil de notification background (`PROXIMITY_RADIUS` dans `backgroundLocation.ts`) — notifie l'utilisateur bien avant qu'il soit à portée de lecture
 
 ## Patterns importants
+
+### Réactions emoji
+- Appui long sur un message → `ReactionPicker` (modal centré, glassmorphism, 6 emoji : ❤️ 😂 😮 😢 😡 👍)
+- Les réactions sont affichées comme badges flottants (`ReactionBadge`) en bas à droite de la bulle
+- Mise à jour optimiste côté client puis sync Supabase via `toggleReaction`
+- Pattern `generationRef` dans `ConversationScreen` : `reactionsMapRef` garde la dernière valeur de `reactionsMap` accessible dans les callbacks stables (`useCallback` avec deps `[user]` seulement)
+- Table `message_reactions` avec contrainte UNIQUE `(message_id, user_id, emoji)` — RLS basée sur la visibilité du message parent
 
 ### Cache
 - Toutes les fetches supportent le sync incrémental via timestamp

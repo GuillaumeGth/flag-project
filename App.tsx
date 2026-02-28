@@ -162,9 +162,8 @@ export default function App() {
 
   useEffect(() => {
     const subscription = addNotificationResponseListener(() => {
-      // Navigate to Inbox tab to trigger message refetch via focus listener
       if (navigationRef.current?.isReady()) {
-        navigationRef.current.navigate('Main', { screen: 'Map' });
+        navigationRef.current.navigate('Main', { screen: 'Map', params: { refresh: Date.now() } });
       }
     });
     return () => subscription.remove();

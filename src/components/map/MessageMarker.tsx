@@ -1,19 +1,19 @@
 import React from 'react';
 import { Image } from 'react-native';
 import { Marker } from 'react-native-maps';
-import { UndiscoveredMessageMapMeta, Coordinates } from '@/types';
+import { Coordinates } from '@/types';
 
 interface MessageMarkerProps {
-  message: UndiscoveredMessageMapMeta;
+  markerId: string;
   location: Coordinates;
   avatarUri: string;
   isTarget: boolean;
   hasActiveRoute: boolean;
-  onPress: (message: UndiscoveredMessageMapMeta) => void;
+  onPress: () => void;
 }
 
 export default function MessageMarker({
-  message,
+  markerId,
   location,
   avatarUri,
   isTarget,
@@ -24,10 +24,10 @@ export default function MessageMarker({
 
   return (
     <Marker
-      key={message.id}
+      key={markerId}
       coordinate={location}
       image={{ uri: avatarUri }}
-      onPress={() => onPress(message)}
+      onPress={onPress}
       opacity={opacity}
     />
   );

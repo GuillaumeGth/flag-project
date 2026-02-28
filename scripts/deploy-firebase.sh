@@ -49,7 +49,7 @@ fi
 if [ "$SKIP_BUILD" = false ]; then
   echo "🔨 Build Android en cours (EAS local)..."
   cd "$(dirname "$0")/.."
-  npx eas build --platform android --local --output ./build-latest.apk
+  npx eas build --platform android --profile preview --local --output ./build-latest.apk
   APK_PATH="./build-latest.apk"
   echo "✅ Build terminé : $APK_PATH"
 else

@@ -23,7 +23,7 @@ export type RootStackParamList = {
 
 // Bottom tab navigator screens
 export type MainTabParamList = {
-  Map: { messageId?: string; focusLocation?: Coordinates; toast?: ToastParams } | undefined;
+  Map: { messageId?: string; focusLocation?: Coordinates; toast?: ToastParams; refresh?: number } | undefined;
   Inbox: undefined;
   Search: undefined;
   Profile: undefined;

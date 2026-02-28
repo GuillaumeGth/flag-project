@@ -24,9 +24,12 @@ import { colors, shadows, radius, spacing } from '@/theme-redesign';
 import Toast from '@/components/Toast';
 import SelectedMessageCard from '@/components/map/SelectedMessageCard';
 import MessageMarker from '@/components/map/MessageMarker';
+import ClusterPickerModal from '@/components/map/ClusterPickerModal';
 import ScreenLoader from '@/components/ScreenLoader';
 import { useMapMessages } from '@/hooks/useMapMessages';
 import { useMapMarkers } from '@/hooks/useMapMarkers';
+import { useClusteredMarkers, MessageCluster } from '@/hooks/useClusteredMarkers';
+import { getMessageLocation } from '@/utils/mapUtils';
 import { log } from '@/utils/debug';
 
 type MapNavigationProp = CompositeNavigationProp<
@@ -46,59 +49,6 @@ const FAB_GRADIENT_END = { x: 1, y: 1 } as const;
 const PERMISSION_GRADIENT_END = { x: 1, y: 0 } as const;
 const MARKER_ANCHOR = { x: 0.3, y: 1 } as const;
 
-const parseWKBHex = (wkbHex: string): Coordinates | null => {
-  try {
-    if (wkbHex.length < 42) return null;
-    const isLittleEndian = wkbHex.substring(0, 2) === '01';
-    const typeHex = wkbHex.substring(2, 10);
-    let coordStart = 10;
-    if (typeHex === '01000020' || typeHex === '20000001') coordStart = 18;
-    const lngHex = wkbHex.substring(coordStart, coordStart + 16);
-    const latHex = wkbHex.substring(coordStart + 16, coordStart + 32);
-    const hexToDouble = (hex: string, littleEndian: boolean): number => {
-      const bytes = [];
-      for (let i = 0; i < hex.length; i += 2) bytes.push(parseInt(hex.substring(i, i + 2), 16));
-      if (littleEndian) bytes.reverse();
-      const buffer = new ArrayBuffer(8);
-      const view = new DataView(buffer);
-      bytes.forEach((b, i) => view.setUint8(i, b));
-      return view.getFloat64(0, false);
-    };
-    const lng = hexToDouble(lngHex, isLittleEndian);
-    const lat = hexToDouble(latHex, isLittleEndian);
-    if (!isNaN(lng) && !isNaN(lat) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180) return { longitude: lng, latitude: lat };
-  } catch (e) {
-    log('MapScreen', 'WKB parse error:', e);
-  }
-  return null;
-};
-
-const getMessageLocation = (message: UndiscoveredMessageMapMeta): Coordinates | null => {
-  if (!message.location) return null;
-  if (typeof message.location === 'object') {
-    const loc = message.location as unknown as Record<string, unknown>;
-    if (loc.type === 'Point' && Array.isArray(loc.coordinates) && loc.coordinates.length >= 2) {
-      const [lng, lat] = loc.coordinates as number[];
-      if (typeof lng === 'number' && typeof lat === 'number' && !isNaN(lng) && !isNaN(lat)) return { longitude: lng, latitude: lat };
-    }
-    if (typeof loc.latitude === 'number' && typeof loc.longitude === 'number' && !isNaN(loc.latitude as number) && !isNaN(loc.longitude as number)) {
-      return { longitude: loc.longitude as number, latitude: loc.latitude as number };
-    }
-  }
-  if (typeof message.location === 'string') {
-    if (/^[0-9A-Fa-f]+$/.test(message.location) && message.location.length >= 42) {
-      const coords = parseWKBHex(message.location);
-      if (coords) return coords;
-    }
-    const match = message.location.match(/POINT\(([^ ]+) ([^)]+)\)/);
-    if (match) {
-      const lng = parseFloat(match[1]);
-      const lat = parseFloat(match[2]);
-      if (!isNaN(lng) && !isNaN(lat)) return { longitude: lng, latitude: lat };
-    }
-  }
-  return null;
-};
 
 export default function MapScreen({ navigation, route }: Props) {
   const insets = useSafeAreaInsets();
@@ -109,7 +59,14 @@ export default function MapScreen({ navigation, route }: Props) {
   const { messages, loading, loadMessages } = useMapMessages();
   const { avatarImages, avatarRefs, captureAvatar, canReadMessage, formatDistance } = useMapMarkers(userLocation, messages);
 
+  const otherMessages = useMemo(
+    () => messages.filter(msg => msg.sender?.id !== user?.id),
+    [messages, user?.id],
+  );
+  const clusters = useClusteredMarkers(otherMessages);
+
   const [selectedMessage, setSelectedMessage] = useState<UndiscoveredMessageMapMeta | null>(null);
+  const [selectedCluster, setSelectedCluster] = useState<MessageCluster | null>(null);
   const [centerLocation, setCenterLocation] = useState<Coordinates | null>(null);
   const [centeredMessageId, setCenteredMessageId] = useState<string | null>(null);
   const [focusLocation, setFocusLocation] = useState<unknown>(null);
@@ -150,6 +107,11 @@ export default function MapScreen({ navigation, route }: Props) {
       if (params?.toast) {
         setToastData({ visible: true, message: params.toast.message, type: params.toast.type });
         navigation.setParams({ toast: undefined });
+      }
+
+      if (params?.refresh) {
+        navigation.setParams({ refresh: undefined });
+        if (user) loadMessages();
       }
 
       if (params?.messageId) {
@@ -314,6 +276,10 @@ export default function MapScreen({ navigation, route }: Props) {
     }
   }, [canReadMessage, fetchRoute]);
 
+  const handleClusterPress = useCallback((cluster: MessageCluster) => {
+    setSelectedCluster(cluster);
+  }, []);
+
   if (locationLoading || !userLocation) {
     return (
       <View style={styles.loadingContainer}>
@@ -357,20 +323,22 @@ export default function MapScreen({ navigation, route }: Props) {
         pitchEnabled={false}
         moveOnMarkerPress={false}
       >
-        {messages.filter((msg) => msg.sender?.id !== user?.id).map((message) => {
-          const location = getMessageLocation(message);
-          if (!location) return null;
-          const capturedImage = avatarImages[message.id];
-          if (!message.sender?.avatar_url || !capturedImage) return null;
+        {clusters.map((cluster) => {
+          const capturedImage = avatarImages[cluster.id];
+          if (!capturedImage) return null;
           return (
             <MessageMarker
-              key={message.id}
-              message={message}
-              location={location}
+              key={cluster.id}
+              markerId={cluster.id}
+              location={cluster.location}
               avatarUri={capturedImage}
-              isTarget={message.id === routeTargetId}
+              isTarget={cluster.messages.some(m => m.id === routeTargetId)}
               hasActiveRoute={!!routeCoordinates}
-              onPress={handleMarkerPress}
+              onPress={() =>
+                cluster.messages.length > 1
+                  ? handleClusterPress(cluster)
+                  : handleMarkerPress(cluster.messages[0])
+              }
             />
           );
         })}
@@ -440,26 +408,38 @@ export default function MapScreen({ navigation, route }: Props) {
       )}
 
       <View style={styles.captureContainer} pointerEvents="none">
-        {messages.filter((msg) => msg.sender?.id !== user?.id).map((message) => {
-          const sender = message.sender;
-          if (!sender?.avatar_url || avatarImages[message.id]) return null;
-          const isPublic = message.is_public === true;
+        {clusters.map((cluster) => {
+          if (avatarImages[cluster.id]) return null;
+          const count = cluster.messages.length;
           return (
             <View
-              key={message.id}
-              ref={(ref) => { avatarRefs.current[message.id] = ref; }}
+              key={cluster.id}
+              ref={(ref) => { avatarRefs.current[cluster.id] = ref; }}
               collapsable={false}
-              style={[styles.captureAvatar, isPublic && styles.captureAvatarPublic]}
+              style={styles.captureAvatarWrapper}
             >
-              <Image
-                source={{ uri: sender.avatar_url }}
-                style={styles.captureAvatarImage}
-                onLoad={() => { setTimeout(() => captureAvatar(message.id), 100); }}
-              />
+              <View style={[styles.captureAvatar, cluster.isPublic && styles.captureAvatarPublic]}>
+                <Image
+                  source={{ uri: cluster.senderAvatarUrl }}
+                  style={styles.captureAvatarImage}
+                  onLoad={() => { setTimeout(() => captureAvatar(cluster.id), 100); }}
+                />
+              </View>
+              {count > 1 && (
+                <View style={styles.clusterBadge}>
+                  <Text style={styles.clusterBadgeText}>{count}</Text>
+                </View>
+              )}
             </View>
           );
         })}
       </View>
+
+      <ClusterPickerModal
+        cluster={selectedCluster}
+        onSelect={handleMarkerPress}
+        onClose={() => setSelectedCluster(null)}
+      />
     </View>
   );
 }
@@ -543,10 +523,16 @@ const styles = StyleSheet.create({
   },
   captureContainer: {
     position: 'absolute',
-    top: 50,
-    left: 50,
-    zIndex: 9999,
-    opacity: 0.01,
+    top: -200,
+    left: -200,
+    zIndex: -1,
+  },
+  captureAvatarWrapper: {
+    width: 70,
+    height: 70,
+    justifyContent: 'flex-end',
+    alignItems: 'flex-start',
+    marginBottom: 5,
   },
   captureAvatar: {
     width: 56,
@@ -555,9 +541,28 @@ const styles = StyleSheet.create({
     borderRadius: 28,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 5,
     borderWidth: 2,
     borderColor: '#fff',
+  },
+  clusterBadge: {
+    position: 'absolute',
+    top: 7,
+    right: 7,
+    minWidth: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: colors.primary.cyan,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 5,
+    borderWidth: 2,
+    borderColor: '#fff',
+  },
+  clusterBadgeText: {
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: '800',
+    lineHeight: 16,
   },
   captureAvatarPublic: {
     borderWidth: 3,

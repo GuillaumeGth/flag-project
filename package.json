@@ -16,6 +16,7 @@
     "deploy:existing": "bash scripts/deploy-firebase.sh --skip-build",
     "distribute": "bash scripts/deploy-firebase.sh --skip-build",
     "deploy:ios": "bash scripts/deploy-firebase-ios.sh",
+    "deploy:android": "bash scripts/deploy-firebase.sh",
     "deploy:ios:existing": "bash scripts/deploy-firebase-ios.sh --skip-build",
     "testers:ios": "firebase appdistribution:testers:list beta-testers --project flag-322022"
   },

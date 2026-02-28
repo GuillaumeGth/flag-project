@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import {
   View,
   Text,
+  Image,
   TouchableOpacity,
   StyleSheet,
   ActivityIndicator,
@@ -30,11 +31,11 @@ export default function AuthScreen() {
   return (
     <View style={styles.container}>
       <View style={styles.content}>
-        <Text style={styles.title}>Fläag</Text>
-        <Text style={styles.subtitle}>
-          Messages ancrés dans le monde réel
-        </Text>
-
+        <Image
+          source={require('@/assets/icon.png')}
+          style={styles.logo}
+          resizeMode="contain"
+        />
         <TouchableOpacity
           style={styles.googleButton}
           onPress={handleGoogleSignIn}
@@ -94,11 +95,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: 32,
   },
-  title: {
-    fontSize: 48,
-    fontWeight: 'bold',
-    color: colors.primary.cyan,
-    textAlign: 'center',
+  logo: {
+    width: 280,
+    height: 280,
+    alignSelf: 'center',
     marginBottom: 8,
   },
   subtitle: {

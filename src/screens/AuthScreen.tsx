@@ -2,60 +2,18 @@ import React, { useState } from 'react';
 import {
   View,
   Text,
-  TextInput,
   TouchableOpacity,
   StyleSheet,
   ActivityIndicator,
-  KeyboardAvoidingView,
-  Platform,
 } from 'react-native';
+import Svg, { Path, G } from 'react-native-svg';
 import { useAuth } from '@/contexts/AuthContext';
 import { colors } from '@/theme-redesign';
 
 export default function AuthScreen() {
-  const { signInWithPhone, verifyOtp, signInWithGoogle } = useAuth();
-  const [phone, setPhone] = useState('');
-  const [otp, setOtp] = useState('');
-  const [step, setStep] = useState<'phone' | 'otp'>('phone');
+  const { signInWithGoogle } = useAuth();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-
-  const handleSendOtp = async () => {
-    if (!phone.trim()) {
-      setError('Entrez votre numéro de téléphone');
-      return;
-    }
-
-    setLoading(true);
-    setError('');
-
-    const { error } = await signInWithPhone(phone);
-
-    setLoading(false);
-    if (error) {
-      setError(error.message);
-    } else {
-      setStep('otp');
-    }
-  };
-
-  const handleVerifyOtp = async () => {
-    if (!otp.trim()) {
-      setError('Entrez le code reçu par SMS');
-      return;
-    }
-
-    setLoading(true);
-    setError('');
-
-    const { error } = await verifyOtp(phone, otp);
-
-    setLoading(false);
-    if (error) {
-      setError(error.message);
-    }
-    // Success: AuthContext will handle navigation
-  };
 
   const handleGoogleSignIn = async () => {
     setLoading(true);
@@ -70,100 +28,59 @@ export default function AuthScreen() {
   };
 
   return (
-    <KeyboardAvoidingView
-      style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-    >
+    <View style={styles.container}>
       <View style={styles.content}>
         <Text style={styles.title}>Fläag</Text>
         <Text style={styles.subtitle}>
           Messages ancrés dans le monde réel
         </Text>
 
-        {step === 'phone' ? (
-          <>
-            <TextInput
-              style={styles.input}
-              placeholder="Numéro de téléphone"
-              placeholderTextColor={colors.text.tertiary}
-              keyboardType="phone-pad"
-              value={phone}
-              onChangeText={setPhone}
-              autoComplete="tel"
-            />
-
-            <TouchableOpacity
-              style={styles.button}
-              onPress={handleSendOtp}
-              disabled={loading}
-            >
-              {loading ? (
-                <ActivityIndicator color="#fff" />
-              ) : (
-                <Text style={styles.buttonText}>Recevoir le code</Text>
-              )}
-            </TouchableOpacity>
-
-            <View style={styles.divider}>
-              <View style={styles.dividerLine} />
-              <Text style={styles.dividerText}>ou</Text>
-              <View style={styles.dividerLine} />
-            </View>
-
-            <TouchableOpacity
-              style={styles.googleButton}
-              onPress={handleGoogleSignIn}
-              disabled={loading}
-            >
+        <TouchableOpacity
+          style={styles.googleButton}
+          onPress={handleGoogleSignIn}
+          disabled={loading}
+        >
+          {loading ? (
+            <ActivityIndicator color={colors.text.primary} />
+          ) : (
+            <>
+              <GoogleIcon />
               <Text style={styles.googleButtonText}>
                 Continuer avec Google
               </Text>
-            </TouchableOpacity>
-          </>
-        ) : (
-          <>
-            <Text style={styles.otpInfo}>
-              Code envoyé au {phone}
-            </Text>
-
-            <TextInput
-              style={styles.input}
-              placeholder="Code à 6 chiffres"
-              placeholderTextColor={colors.text.tertiary}
-              keyboardType="number-pad"
-              value={otp}
-              onChangeText={setOtp}
-              maxLength={6}
-            />
-
-            <TouchableOpacity
-              style={styles.button}
-              onPress={handleVerifyOtp}
-              disabled={loading}
-            >
-              {loading ? (
-                <ActivityIndicator color="#fff" />
-              ) : (
-                <Text style={styles.buttonText}>Vérifier</Text>
-              )}
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.backButton}
-              onPress={() => {
-                setStep('phone');
-                setOtp('');
-                setError('');
-              }}
-            >
-              <Text style={styles.backButtonText}>Changer de numéro</Text>
-            </TouchableOpacity>
-          </>
-        )}
+            </>
+          )}
+        </TouchableOpacity>
 
         {error ? <Text style={styles.error}>{error}</Text> : null}
       </View>
-    </KeyboardAvoidingView>
+    </View>
+  );
+}
+
+function GoogleIcon() {
+  return (
+    <Svg width={20} height={20} viewBox="0 0 48 48" style={styles.googleIcon}>
+      <G>
+        <Path
+          fill="#EA4335"
+          d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"
+        />
+        <Path
+          fill="#4285F4"
+          d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"
+        />
+        <Path
+          fill="#FBBC05"
+          d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"
+        />
+        <Path
+          fill="#34A853"
+          d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"
+        />
+        <Path fill="none" d="M0 0h48v48H0z" />
+      </G>
+    </Svg>
   );
 }
 
@@ -190,68 +107,24 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: 48,
   },
-  input: {
-    borderWidth: 1,
-    borderColor: colors.border.default,
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    fontSize: 16,
-    marginBottom: 16,
-    backgroundColor: colors.background.primary.tertiary,
-    color: colors.text.primary,
-  },
-  button: {
-    backgroundColor: colors.primary.cyan,
-    borderRadius: 12,
-    paddingVertical: 16,
-    alignItems: 'center',
-  },
-  buttonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  divider: {
+  googleButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginVertical: 24,
-  },
-  dividerLine: {
-    flex: 1,
-    height: 1,
-    backgroundColor: colors.border.default,
-  },
-  dividerText: {
-    paddingHorizontal: 16,
-    color: colors.text.tertiary,
-  },
-  googleButton: {
+    justifyContent: 'center',
     borderWidth: 1,
     borderColor: colors.border.default,
     borderRadius: 12,
     paddingVertical: 16,
-    alignItems: 'center',
     backgroundColor: colors.background.primary.tertiary,
+    gap: 12,
+  },
+  googleIcon: {
+    marginRight: 0,
   },
   googleButtonText: {
     color: colors.text.primary,
     fontSize: 16,
     fontWeight: '600',
-  },
-  otpInfo: {
-    fontSize: 14,
-    color: colors.text.secondary,
-    textAlign: 'center',
-    marginBottom: 16,
-  },
-  backButton: {
-    marginTop: 16,
-    alignItems: 'center',
-  },
-  backButtonText: {
-    color: colors.primary.cyanLight,
-    fontSize: 14,
   },
   error: {
     color: colors.error,

@@ -525,7 +525,18 @@ export async function fetchFollowingPublicMessages(): Promise<UndiscoveredMessag
     return [];
   }
 
-  return (data || []) as unknown as UndiscoveredMessageMapMeta[];
+  const allMessages = (data || []) as unknown as UndiscoveredMessageMapMeta[];
+  if (allMessages.length === 0) return [];
+
+  // Filter out messages already discovered by the current user
+  const { data: discoveredRows } = await supabase
+    .from('discovered_public_messages')
+    .select('message_id')
+    .eq('user_id', currentUserId)
+    .in('message_id', allMessages.map(m => m.id));
+
+  const discoveredIds = new Set((discoveredRows || []).map(r => r.message_id));
+  return allMessages.filter(m => !discoveredIds.has(m.id));
 }
 
 // Mark a public message as discovered by the current user

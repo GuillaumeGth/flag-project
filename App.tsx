@@ -12,6 +12,7 @@ import { RootStackParamList, MainTabParamList } from '@/types';
 import { AuthProvider, useAuth } from '@/contexts/AuthContext';
 import { log } from '@/utils/debug';
 import { LocationProvider } from '@/contexts/LocationContext';
+import ScreenLoader from '@/components/ScreenLoader';
 import { addNotificationResponseListener } from '@/services/notifications';
 import { checkForAppUpdate } from '@/services/appUpdater';
 
@@ -90,14 +91,18 @@ function AppNavigator() {
   log('AppNavigator', 'render: loading =', loading, 'user =', user?.id, 'permissionsDone =', permissionsDone);
 
   useEffect(() => {
-    SecureStore.getItemAsync(PERMISSIONS_DONE_KEY).then((value) => {
-      setPermissionsDone(value === 'true');
-    });
+    SecureStore.getItemAsync(PERMISSIONS_DONE_KEY)
+      .then((value) => {
+        setPermissionsDone(value === 'true');
+      })
+      .catch(() => {
+        setPermissionsDone(false);
+      });
   }, []);
 
   if (loading || permissionsDone === null) {
-    log('AppNavigator', 'showing null (loading)');
-    return null;
+    log('AppNavigator', 'showing loader (loading)');
+    return <ScreenLoader />;
   }
 
   const handlePermissionsComplete = async () => {

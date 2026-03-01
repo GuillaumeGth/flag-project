@@ -198,6 +198,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   useEffect(() => {
+    // Safety timeout: if auth initialization doesn't complete in 10s (e.g. network
+    // hung on expired-token refresh), unblock the UI so the user isn't stuck on a
+    // loading screen forever.
+    const loadingTimeout = setTimeout(() => {
+      setState((prev) => {
+        if (prev.loading) {
+          log('AuthContext', 'Loading timeout reached, forcing loading=false');
+          return { ...prev, loading: false };
+        }
+        return prev;
+      });
+    }, 10000);
+
     // Handle deep link for OAuth callback
     const handleDeepLink = async (event: { url: string }) => {
       const url = event.url;
@@ -306,6 +319,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     });
 
     return () => {
+      clearTimeout(loadingTimeout);
       subscription.unsubscribe();
       linkingSubscription.remove();
     };

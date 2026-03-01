@@ -30,6 +30,7 @@ export const colors = {
 
   // === Gradients (for backgrounds, buttons, highlights) ===
   gradients: {
+    button: ['#A78BFA', '#8B5CF6', '#7C3AED', '#6D28D9', '#5B21B6'] as const, // Button gradient (5-stop purple)
     primary: ['#A78BFA', '#7C3AED'] as const,           // Purple gradient
     discovery: ['#D8B4FE', '#A78BFA', '#7C3AED'] as const, // Lavender > purple > deep purple
     heroButton: ['#F3E8FF', '#E9D5FF', '#D8B4FE', '#C4B5FD', '#A78BFA', '#8B5CF6', '#7C3AED'] as const, // Ultra-vibrant purple cascade

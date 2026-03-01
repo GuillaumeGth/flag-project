@@ -34,6 +34,7 @@ import './src/tasks/backgroundLocation';
 const Stack = createNativeStackNavigator<RootStackParamList>();
 const Tab = createBottomTabNavigator<MainTabParamList>();
 
+
 function MainTabs() {
   const insets = useSafeAreaInsets();
   const tabBarHeight = 50 + insets.bottom;
@@ -58,9 +59,9 @@ function MainTabs() {
             iconName = 'help-outline';
           }
 
-          return <Ionicons name={iconName} size={24} color={color} />;
+          return <Ionicons name={iconName} size={size} color={color} />;
         },
-        tabBarActiveTintColor: colors.primary.cyan,
+        tabBarActiveTintColor: '#A78BFA',
         tabBarInactiveTintColor: colors.text.tertiary,
         tabBarStyle: {
           backgroundColor: colors.surface.elevated,

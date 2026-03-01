@@ -411,13 +411,7 @@ export default function CreateMessageScreen({ navigation, route }: Props) {
         activeOpacity={0.8}
       >
         <LinearGradient
-          colors={[
-            '#A78BFA',
-            '#8B5CF6',
-            '#7C3AED',
-            '#6D28D9',
-            '#5B21B6',
-          ]}
+          colors={colors.gradients.button}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 0 }}
           style={styles.sendButton}

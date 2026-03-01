@@ -188,7 +188,7 @@ export default function MessageInput({
             ) : !sending ? (
               <TouchableOpacity onPress={handleSend} activeOpacity={0.9}>
                 <LinearGradient
-                  colors={colors.gradients.primary}
+                  colors={colors.gradients.button}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 0 }}
                   style={[styles.sendButton, shadows.glow]}

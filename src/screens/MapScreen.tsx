@@ -43,7 +43,6 @@ type Props = Omit<BottomTabScreenProps<MainTabParamList, 'Map'>, 'navigation'> &
 const LAT_DELTA = 0.009;
 const LNG_DELTA = 0.009;
 
-const FAB_GRADIENT_COLORS = ['#A78BFA', '#8B5CF6', '#7C3AED', '#6D28D9', '#5B21B6'] as const;
 const GRADIENT_START = { x: 0, y: 0 } as const;
 const FAB_GRADIENT_END = { x: 1, y: 1 } as const;
 const PERMISSION_GRADIENT_END = { x: 1, y: 0 } as const;
@@ -287,7 +286,7 @@ export default function MapScreen({ navigation, route }: Props) {
         {permission !== 'granted' && (
           <TouchableOpacity style={styles.permissionButtonContainer} onPress={requestPermission} activeOpacity={0.9}>
             <LinearGradient
-              colors={colors.gradients.primary}
+              colors={colors.gradients.button}
               start={GRADIENT_START}
               end={PERMISSION_GRADIENT_END}
               style={styles.permissionButton}
@@ -380,7 +379,7 @@ export default function MapScreen({ navigation, route }: Props) {
           activeOpacity={0.8}
         >
           <LinearGradient
-            colors={FAB_GRADIENT_COLORS}
+            colors={colors.gradients.button}
             start={GRADIENT_START}
             end={FAB_GRADIENT_END}
             style={styles.createFAB}
@@ -426,9 +425,14 @@ export default function MapScreen({ navigation, route }: Props) {
                 />
               </View>
               {count > 1 && (
-                <View style={styles.clusterBadge}>
+                <LinearGradient
+                  colors={colors.gradients.button}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.clusterBadge}
+                >
                   <Text style={styles.clusterBadgeText}>{count}</Text>
-                </View>
+                </LinearGradient>
               )}
             </View>
           );
@@ -551,7 +555,6 @@ const styles = StyleSheet.create({
     minWidth: 26,
     height: 26,
     borderRadius: 13,
-    backgroundColor: colors.primary.cyan,
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 5,

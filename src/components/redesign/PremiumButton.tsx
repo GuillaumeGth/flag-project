@@ -113,7 +113,7 @@ export default function PremiumButton({
         activeOpacity={0.8}
       >
         <LinearGradient
-          colors={colors.gradients.primary}
+          colors={colors.gradients.button}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 0 }}
           style={buttonStyle}

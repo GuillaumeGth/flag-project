@@ -19,7 +19,7 @@ import { Audio } from 'expo-av';
 import * as ImagePicker from 'expo-image-picker';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '@/contexts/AuthContext';
-import { sendMessage, FLAG_BOT_ID, uploadMedia } from '@/services/messages';
+import { sendMessage, FLAG_BOT_ID, uploadMedia, deleteMessage } from '@/services/messages';
 import { isEitherFollowing } from '@/services/subscriptions';
 import { fetchReactionsForMessages, toggleReaction } from '@/services/reactions';
 import { MessageWithUsers, MessageContentType, RootStackParamList, ReactionSummary } from '@/types';
@@ -29,7 +29,6 @@ import GlassCard from '@/components/redesign/GlassCard';
 import PremiumAvatar from '@/components/redesign/PremiumAvatar';
 import MessageBubble from '@/components/conversation/MessageBubble';
 import MessageInput from '@/components/conversation/MessageInput';
-import ReactionPicker from '@/components/conversation/ReactionPicker';
 import ScreenLoader from '@/components/ScreenLoader';
 import { useMessageLoader } from '@/hooks/useMessageLoader';
 import { log } from '@/utils/debug';
@@ -53,14 +52,13 @@ export default function ConversationScreen({ navigation, route }: Props) {
   const [playingMessageId, setPlayingMessageId] = useState<string | null>(null);
   const [isPlayingAudio, setIsPlayingAudio] = useState(false);
   const [canSendMessages, setCanSendMessages] = useState<boolean>(true);
+  const [selectedMessageId, setSelectedMessageId] = useState<string | null>(null);
 
   // ── Reactions state ──────────────────────────────────────────────────────
   const [reactionsMap, setReactionsMap] = useState<Record<string, ReactionSummary[]>>({});
   // Ref keeps the latest reactionsMap accessible in stable callbacks without
   // re-creating them on every state update (generationRef pattern).
   const reactionsMapRef = useRef<Record<string, ReactionSummary[]>>({});
-  const [pickerState, setPickerState] = useState<{ id: string; pageY: number } | null>(null);
-  const pickerMessageId = pickerState?.id ?? null;
 
   useEffect(() => {
     reactionsMapRef.current = reactionsMap;
@@ -102,6 +100,16 @@ export default function ConversationScreen({ navigation, route }: Props) {
     if (isBot) { setCanSendMessages(true); return; }
     const eitherFollowing = await isEitherFollowing(otherUserId);
     setCanSendMessages(eitherFollowing);
+  };
+
+  const handleDeleteSelected = async () => {
+    if (!selectedMessageId || !user) return;
+    const msg = messages.find((m) => m.id === selectedMessageId);
+    if (!msg) return;
+    const isSender = msg.sender_id === user.id;
+    setSelectedMessageId(null);
+    await deleteMessage(selectedMessageId, otherUserId, isSender);
+    await loadMessages();
   };
 
   const reversedMessages = useMemo(() => [...messages].reverse(), [messages]);
@@ -236,17 +244,6 @@ export default function ConversationScreen({ navigation, route }: Props) {
     [user]
   );
 
-  // Emojis the current user has already reacted with on the message being picked
-  const pickerCurrentReactions = useMemo(() => {
-    if (!pickerMessageId || !user) return EMPTY_REACTIONS;
-    return reactionsMap[pickerMessageId] ?? EMPTY_REACTIONS;
-  }, [pickerMessageId, reactionsMap, user]);
-
-  const pickerActiveEmojis = useMemo(
-    () => pickerCurrentReactions.filter((r) => r.has_reacted).map((r) => r.emoji),
-    [pickerCurrentReactions]
-  );
-
   const renderMessage = ({ item, index }: { item: MessageWithUsers; index: number }) => {
     const isFromMe = item.sender_id === user?.id;
     const prevMessage = index < reversedMessages.length - 1 ? reversedMessages[index + 1] : null;
@@ -263,9 +260,14 @@ export default function ConversationScreen({ navigation, route }: Props) {
         isPlaying={isPlayingAudio}
         playingMessageId={playingMessageId}
         reactions={reactionsMap[item.id] ?? EMPTY_REACTIONS}
+        isSelected={selectedMessageId === item.id}
+        onPress={() => { if (selectedMessageId) setSelectedMessageId(null); }}
         onPlayAudio={handleAudioPress}
         onViewImage={setFullImageMessage}
-        onLongPress={(pageY) => { if (item.is_read || isFromMe) setPickerState({ id: item.id, pageY }); }}
+        onLongPress={() => {
+            const isDeleted = isFromMe ? item.deleted_by_sender : item.deleted_by_recipient;
+            if (!isDeleted) setSelectedMessageId((prev) => prev === item.id ? null : item.id);
+          }}
         onReactionPress={(emoji) => handleReactionToggle(item.id, emoji)}
         onNavigateToMap={(location) => {
           navigation.navigate('Main', {
@@ -279,18 +281,26 @@ export default function ConversationScreen({ navigation, route }: Props) {
 
   const header = (
     <View style={styles.header}>
-      <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+      <TouchableOpacity
+        onPress={() => selectedMessageId ? setSelectedMessageId(null) : navigation.goBack()}
+        style={styles.backButton}
+      >
         <Ionicons name="arrow-back" size={24} color={colors.text.primary} />
       </TouchableOpacity>
       <TouchableOpacity
         style={styles.headerProfile}
-        onPress={() => !isBot && navigation.navigate('UserProfile', { userId: otherUserId })}
-        disabled={isBot}
-        activeOpacity={isBot ? 1 : 0.7}
+        onPress={() => !isBot && !selectedMessageId && navigation.navigate('UserProfile', { userId: otherUserId })}
+        disabled={isBot || !!selectedMessageId}
+        activeOpacity={isBot || !!selectedMessageId ? 1 : 0.7}
       >
         <PremiumAvatar uri={otherUserAvatarUrl} name={otherUserName} size="small" isBot={isBot} withGlow={isBot} glowColor="cyan" />
         <Text style={styles.headerTitle}>{otherUserName}</Text>
       </TouchableOpacity>
+      {selectedMessageId && (
+        <TouchableOpacity onPress={handleDeleteSelected} style={styles.deleteButton}>
+          <Ionicons name="trash-outline" size={22} color={colors.primary.magenta} />
+        </TouchableOpacity>
+      )}
     </View>
   );
 
@@ -348,16 +358,6 @@ export default function ConversationScreen({ navigation, route }: Props) {
         </View>
       </Modal>
 
-      {/* Emoji reaction picker — shown on long press over any message */}
-      <ReactionPicker
-        visible={pickerMessageId !== null}
-        currentReactions={pickerActiveEmojis}
-        anchorY={pickerState?.pageY}
-        onSelect={(emoji) => {
-          if (pickerMessageId) handleReactionToggle(pickerMessageId, emoji);
-        }}
-        onClose={() => setPickerState(null)}
-      />
     </View>
   );
 }
@@ -384,6 +384,9 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface.glass,
   },
   backButton: {
+    padding: spacing.sm,
+  },
+  deleteButton: {
     padding: spacing.sm,
   },
   headerProfile: {

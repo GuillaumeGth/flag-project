@@ -27,6 +27,8 @@ type RawMessageWithUsers = {
   read_at?: string;
   is_read: boolean;
   is_public?: boolean;
+  deleted_by_sender: boolean;
+  deleted_by_recipient: boolean;
   sender: { id: string; display_name?: string; avatar_url?: string } | null;
   recipient: { id: string; display_name?: string; avatar_url?: string } | null;
 };
@@ -227,7 +229,7 @@ export async function fetchConversationMessages(otherUserId: string): Promise<Me
     (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
   );
 
-  // Update cache
+  // Update cache (store all, including soft-deleted, so merge stays accurate)
   const syncTimestamp = new Date().toISOString();
   await setCachedData(cacheKey, allMessages);
   await setLastSyncTimestamp(cacheKey, syncTimestamp);
@@ -239,6 +241,7 @@ export async function fetchConversationMessages(otherUserId: string): Promise<Me
  * Get cached conversation messages immediately (for instant UI display).
  */
 export async function getCachedConversationMessages(otherUserId: string): Promise<MessageWithUsers[] | null> {
+  const currentUserId = getCurrentUserId();
   const cached = await getCachedData<MessageWithUsers[]>(CACHE_KEYS.CONVERSATION(otherUserId));
   if (!cached || cached.length === 0) return null;
   return cached;
@@ -654,6 +657,32 @@ export async function markMessageAsRead(messageId: string, senderId?: string): P
       );
       await setCachedData(CACHE_KEYS.CONVERSATION(senderId), updated);
     }
+  }
+
+  return true;
+}
+
+// Soft-delete a message for the current user (sender or recipient)
+export async function deleteMessage(messageId: string, otherUserId: string, isSender: boolean): Promise<boolean> {
+  const field = isSender ? 'deleted_by_sender' : 'deleted_by_recipient';
+
+  const { error } = await supabase
+    .from('messages')
+    .update({ [field]: true })
+    .eq('id', messageId);
+
+  if (error) {
+    reportError(error, 'messages.deleteMessage');
+    return false;
+  }
+
+  // Update per-conversation cache immediately so UI stays consistent
+  const perConvCached = await getCachedData<MessageWithUsers[]>(CACHE_KEYS.CONVERSATION(otherUserId));
+  if (perConvCached) {
+    const updated = perConvCached.map((m) =>
+      m.id === messageId ? { ...m, [field]: true } : m
+    );
+    await setCachedData(CACHE_KEYS.CONVERSATION(otherUserId), updated);
   }
 
   return true;

@@ -28,10 +28,12 @@ interface MessageBubbleProps {
   isPlaying: boolean;
   playingMessageId: string | null;
   reactions: ReactionSummary[];
+  isSelected: boolean;
+  onPress: () => void;
   onPlayAudio: (message: MessageWithUsers) => void;
   onViewImage: (message: MessageWithUsers) => void;
   onNavigateToMap: (location: MessageWithUsers['location']) => void;
-  onLongPress: (pageY: number) => void;
+  onLongPress: () => void;
   onReactionPress: (emoji: string) => void;
 }
 
@@ -43,6 +45,8 @@ export default function MessageBubble({
   isPlaying,
   playingMessageId,
   reactions,
+  isSelected,
+  onPress,
   onPlayAudio,
   onViewImage,
   onNavigateToMap,
@@ -50,6 +54,7 @@ export default function MessageBubble({
   onReactionPress,
 }: MessageBubbleProps) {
   const isUndiscovered = !isFromMe && !message.is_read && message.location;
+  const isDeleted = isFromMe ? !!message.deleted_by_sender : !!message.deleted_by_recipient;
   const hasReactions = reactions.length > 0;
 
   const animatedStyle = useMemo(
@@ -81,7 +86,7 @@ export default function MessageBubble({
         {isUndiscovered ? (
           <Pressable
             onPress={() => onNavigateToMap(message.location)}
-            onLongPress={(e) => onLongPress(e.nativeEvent.pageY)}
+            onLongPress={onLongPress}
             delayLongPress={400}
           >
             <GlassCard style={styles.undiscoveredBubble}>
@@ -96,51 +101,56 @@ export default function MessageBubble({
           // Wrapper gives position:relative context for the floating reactions
           <View style={styles.bubbleWrapper}>
             <Pressable
-              onLongPress={(e) => onLongPress(e.nativeEvent.pageY)}
+              onPress={onPress}
+              onLongPress={!isDeleted ? onLongPress : undefined}
               delayLongPress={400}
               style={[
                 styles.messageBubble,
                 isFromMe ? styles.messageBubbleRight : styles.messageBubbleLeft,
                 hasReactions && styles.messageBubbleWithReactions,
+                isSelected && styles.messageBubbleSelected,
+                isDeleted && styles.messageBubbleDeleted,
               ]}
             >
-              {message.content_type === 'photo' && message.media_url && (
-                <TouchableOpacity activeOpacity={0.9} onPress={() => onViewImage(message)}>
-                  <Image source={{ uri: message.media_url }} style={styles.messageImage} />
-                </TouchableOpacity>
-              )}
+              {isDeleted ? (
+                <Text style={styles.deletedText}>Message supprimé</Text>
+              ) : (
+                <>
+                  {message.content_type === 'photo' && message.media_url && (
+                    <TouchableOpacity activeOpacity={0.9} onPress={() => onViewImage(message)}>
+                      <Image source={{ uri: message.media_url }} style={styles.messageImage} />
+                    </TouchableOpacity>
+                  )}
 
-              {message.content_type === 'audio' && message.media_url && (
-                <TouchableOpacity
-                  style={styles.audioMessage}
-                  activeOpacity={0.7}
-                  onPress={() => onPlayAudio(message)}
-                >
-                  <View style={styles.audioIconContainer}>
-                    <Ionicons
-                      name={
-                        playingMessageId === message.id && isPlaying ? 'pause' : 'play'
-                      }
-                      size={18}
-                      color={isFromMe ? colors.text.primary : colors.primary.cyan}
-                    />
-                  </View>
-                  <Text style={[styles.audioText, isFromMe && styles.audioTextRight]}>
-                    {playingMessageId === message.id && isPlaying
-                      ? 'En lecture...'
-                      : 'Message audio'}
-                  </Text>
-                </TouchableOpacity>
-              )}
+                  {message.content_type === 'audio' && message.media_url && (
+                    <TouchableOpacity
+                      style={styles.audioMessage}
+                      activeOpacity={0.7}
+                      onPress={() => onPlayAudio(message)}
+                    >
+                      <View style={styles.audioIconContainer}>
+                        <Ionicons
+                          name={playingMessageId === message.id && isPlaying ? 'pause' : 'play'}
+                          size={18}
+                          color={isFromMe ? colors.text.primary : colors.primary.cyan}
+                        />
+                      </View>
+                      <Text style={[styles.audioText, isFromMe && styles.audioTextRight]}>
+                        {playingMessageId === message.id && isPlaying ? 'En lecture...' : 'Message audio'}
+                      </Text>
+                    </TouchableOpacity>
+                  )}
 
-              {message.text_content && (
-                <Text style={[styles.messageText, isFromMe && styles.messageTextRight]}>
-                  {message.text_content}
-                </Text>
+                  {message.text_content && (
+                    <Text style={[styles.messageText, isFromMe && styles.messageTextRight]}>
+                      {message.text_content}
+                    </Text>
+                  )}
+                </>
               )}
 
               <View style={styles.messageFooter}>
-                {message.location && (
+                {!isDeleted && message.location && (
                   <TouchableOpacity
                     activeOpacity={0.7}
                     onPress={() => onNavigateToMap(message.location)}
@@ -234,6 +244,19 @@ const styles = StyleSheet.create({
   // Extra bottom margin when reactions are floating below the bubble
   messageBubbleWithReactions: {
     marginBottom: 16,
+  },
+  messageBubbleSelected: {
+    borderWidth: 1.5,
+    borderColor: 'rgba(124, 92, 252, 0.6)',
+    opacity: 0.85,
+  },
+  messageBubbleDeleted: {
+    opacity: 0.5,
+  },
+  deletedText: {
+    fontSize: typography.sizes.sm,
+    color: colors.text.tertiary,
+    fontStyle: 'italic',
   },
   // Reactions row floats outside the bubble at bottom-right
   reactionsFloat: {

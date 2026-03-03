@@ -30,6 +30,8 @@ created_at: string;
   read_at?: string;
   is_read: boolean;
   is_public?: boolean;
+  deleted_by_sender?: boolean;
+  deleted_by_recipient?: boolean;
 }
 
 // Message with sender info for display

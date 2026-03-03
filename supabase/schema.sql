@@ -74,7 +74,9 @@ CREATE TABLE IF NOT EXISTS public.messages (
     is_read BOOLEAN DEFAULT FALSE,
     is_public BOOLEAN DEFAULT FALSE,
     read_at TIMESTAMPTZ,
-    created_at TIMESTAMPTZ DEFAULT NOW()
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    deleted_by_sender BOOLEAN NOT NULL DEFAULT FALSE,
+    deleted_by_recipient BOOLEAN NOT NULL DEFAULT FALSE
 );
 
 -- Enable RLS
@@ -108,6 +110,10 @@ CREATE POLICY "Users can send messages" ON public.messages
 DROP POLICY IF EXISTS "Recipients can update messages" ON public.messages;
 CREATE POLICY "Recipients can update messages" ON public.messages
     FOR UPDATE USING (auth.uid() = recipient_id);
+
+DROP POLICY IF EXISTS "Senders can soft delete messages" ON public.messages;
+CREATE POLICY "Senders can soft delete messages" ON public.messages
+    FOR UPDATE USING (auth.uid() = sender_id);
 
 -- Enable Realtime for messages table
 ALTER PUBLICATION supabase_realtime ADD TABLE messages;

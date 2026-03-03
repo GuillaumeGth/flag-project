@@ -16,6 +16,7 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as ImagePicker from 'expo-image-picker';
 import { Audio } from 'expo-av';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocation } from '@/contexts/LocationContext';
 import { sendMessage, uploadMedia } from '@/services/messages';
 import { MessageContentType, RootStackParamList } from '@/types';
@@ -26,6 +27,7 @@ type Props = NativeStackScreenProps<RootStackParamList, 'CreateMessage'>;
 type Recipient = { id: string; name: string };
 
 export default function CreateMessageScreen({ navigation, route }: Props) {
+  const insets = useSafeAreaInsets();
   const { current: userLocation } = useLocation();
 
   // Support both old format (single recipient) and new format (multiple recipients)
@@ -300,7 +302,7 @@ export default function CreateMessageScreen({ navigation, route }: Props) {
       onHide={hideToast}
     />
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <View style={styles.header}>
+      <View style={[styles.header, { marginTop: insets.top }]}>
         <TouchableOpacity onPress={() => navigation.goBack()}>
           <Ionicons name="arrow-back" size={24} color={colors.text.primary} />
         </TouchableOpacity>
@@ -444,7 +446,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     marginBottom: spacing.xxl,
-    marginTop: 48,
   },
   title: {
     fontSize: typography.sizes.lg,

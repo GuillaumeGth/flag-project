@@ -11,6 +11,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Audio } from 'expo-av';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { markMessageAsRead, fetchMessageById, markPublicMessageDiscovered } from '@/services/messages';
 import { MessageWithSender, RootStackParamList } from '@/types';
 import { colors } from '@/theme-redesign';
@@ -18,6 +19,7 @@ import { colors } from '@/theme-redesign';
 type Props = NativeStackScreenProps<RootStackParamList, 'ReadMessage'>;
 
 export default function ReadMessageScreen({ navigation, route }: Props) {
+  const insets = useSafeAreaInsets();
   const [message, setMessage] = useState<MessageWithSender | null>(null);
   const [sound, setSound] = useState<Audio.Sound | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -117,7 +119,7 @@ export default function ReadMessageScreen({ navigation, route }: Props) {
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: insets.top }]}>
         <TouchableOpacity onPress={() => navigation.goBack()}>
           <Ionicons name="arrow-back" size={24} color={colors.text.primary} />
         </TouchableOpacity>
@@ -196,7 +198,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 16,
-    paddingTop: 56,
     paddingBottom: 16,
     borderBottomWidth: 1,
     borderBottomColor: colors.border.default,

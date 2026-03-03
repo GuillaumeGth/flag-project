@@ -11,7 +11,9 @@ import * as Notifications from 'expo-notifications';
 import { Camera } from 'expo-camera';
 import { Audio } from 'expo-av';
 import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors } from '@/theme-redesign';
+import PremiumButton from '@/components/redesign/PremiumButton';
 
 interface PermissionItem {
   key: string;
@@ -26,6 +28,7 @@ interface PermissionsScreenProps {
 }
 
 export default function PermissionsScreen({ onComplete }: PermissionsScreenProps) {
+  const insets = useSafeAreaInsets();
   const [permissions, setPermissions] = useState<PermissionItem[]>([
     {
       key: 'location',
@@ -186,7 +189,7 @@ export default function PermissionsScreen({ onComplete }: PermissionsScreenProps
   }
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { paddingTop: insets.top + 20, paddingBottom: insets.bottom + 16 }]}>
       <View style={styles.progress}>
         {permissions.map((_, i) => (
           <View
@@ -208,13 +211,15 @@ export default function PermissionsScreen({ onComplete }: PermissionsScreenProps
         <Text style={styles.title}>{current.label}</Text>
         <Text style={styles.description}>{current.description}</Text>
 
-        <TouchableOpacity
-          style={styles.button}
+        <PremiumButton
+          title="Autoriser"
           onPress={() => requestPermission(current.key)}
+          variant="gradient"
+          size="large"
+          fullWidth
+          loading={requesting}
           disabled={requesting}
-        >
-          <Text style={styles.buttonText}>Autoriser</Text>
-        </TouchableOpacity>
+        />
 
         <TouchableOpacity
           style={styles.skipButton}
@@ -237,8 +242,6 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.background.primary,
     paddingHorizontal: 32,
-    paddingTop: 80,
-    paddingBottom: 40,
   },
   progress: {
     flexDirection: 'row',
@@ -286,19 +289,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: 48,
     lineHeight: 22,
-  },
-  button: {
-    backgroundColor: colors.primary.cyan,
-    borderRadius: 12,
-    paddingVertical: 16,
-    paddingHorizontal: 48,
-    alignItems: 'center',
-    width: '100%',
-  },
-  buttonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
   },
   skipButton: {
     marginTop: 16,

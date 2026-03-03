@@ -27,6 +27,7 @@ export default function MessageMarker({
       key={markerId}
       coordinate={location}
       image={{ uri: avatarUri }}
+      anchor={{ x: 0.5, y: 0.9 }}
       onPress={onPress}
       opacity={opacity}
     />

@@ -8,10 +8,12 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import Svg, { Path, G } from 'react-native-svg';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '@/contexts/AuthContext';
 import { colors } from '@/theme-redesign';
 
 export default function AuthScreen() {
+  const insets = useSafeAreaInsets();
   const { signInWithGoogle } = useAuth();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -29,10 +31,10 @@ export default function AuthScreen() {
   };
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { paddingTop: insets.top }]}>
       <View style={styles.content}>
         <Image
-          source={require('@/assets/icon.png')}
+          source={require('@/assets/splash.png')}
           style={styles.logo}
           resizeMode="contain"
         />

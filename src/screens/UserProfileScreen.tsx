@@ -14,6 +14,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, spacing, radius, typography, shadows } from '@/theme-redesign';
 import { supabase } from '@/services/supabase';
 import { fetchUserPublicMessages, fetchDiscoveredPublicMessageIds } from '@/services/messages';
@@ -34,6 +35,7 @@ const CELL_SIZE = SCREEN_WIDTH / 3;
 type Props = NativeStackScreenProps<RootStackParamList, 'UserProfile'>;
 
 export default function UserProfileScreen({ navigation, route }: Props) {
+  const insets = useSafeAreaInsets();
   const { userId } = route.params;
 
   const [userProfile, setUserProfile] = useState<User | null>(null);
@@ -254,7 +256,7 @@ export default function UserProfileScreen({ navigation, route }: Props) {
 
   return (
     <View style={styles.container}>
-      <View style={styles.headerSpacer} />
+      <View style={[styles.headerSpacer, { paddingTop: insets.top }]} />
 
       {loading ? (
         <>
@@ -380,9 +382,7 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.background.primary,
   },
-  headerSpacer: {
-    paddingTop: 48,
-  },
+  headerSpacer: {},
   backButton: {
     padding: 4,
     marginRight: 4,

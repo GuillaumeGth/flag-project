@@ -46,7 +46,6 @@ const LNG_DELTA = 0.009;
 const GRADIENT_START = { x: 0, y: 0 } as const;
 const FAB_GRADIENT_END = { x: 1, y: 1 } as const;
 const PERMISSION_GRADIENT_END = { x: 1, y: 0 } as const;
-const MARKER_ANCHOR = { x: 0.3, y: 1 } as const;
 
 
 export default function MapScreen({ navigation, route }: Props) {
@@ -269,11 +268,7 @@ export default function MapScreen({ navigation, route }: Props) {
 
   const handleMarkerPress = useCallback((message: UndiscoveredMessageMapMeta) => {
     setSelectedMessage(message);
-    const location = getMessageLocation(message);
-    if (location && !canReadMessage(location)) {
-      fetchRoute(location, message.id);
-    }
-  }, [canReadMessage, fetchRoute]);
+  }, []);
 
   const handleClusterPress = useCallback((cluster: MessageCluster) => {
     setSelectedCluster(cluster);
@@ -529,14 +524,12 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: -200,
     left: -200,
-    zIndex: -1,
   },
   captureAvatarWrapper: {
     width: 70,
     height: 70,
-    justifyContent: 'flex-end',
-    alignItems: 'flex-start',
-    marginBottom: 5,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   captureAvatar: {
     width: 56,
@@ -547,6 +540,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderWidth: 2,
     borderColor: '#fff',
+    overflow: 'hidden',
   },
   clusterBadge: {
     position: 'absolute',

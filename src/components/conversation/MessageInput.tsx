@@ -11,8 +11,9 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Audio } from 'expo-av';
-import { MessageContentType } from '@/types';
+import { MessageContentType, MessageWithUsers } from '@/types';
 import { colors, spacing, radius, shadows } from '@/theme-redesign';
+import ReplyPreview from './ReplyPreview';
 import GlassCard from '@/components/redesign/GlassCard';
 import { reportError } from '@/services/errorReporting';
 
@@ -20,6 +21,8 @@ interface MessageInputProps {
   sending: boolean;
   canSendMessages: boolean;
   paddingBottom: number;
+  replyTo?: MessageWithUsers;
+  onCancelReply: () => void;
   onSend: (params: {
     text: string;
     mediaUri: string | null;
@@ -33,6 +36,8 @@ export default function MessageInput({
   sending,
   canSendMessages,
   paddingBottom,
+  replyTo,
+  onCancelReply,
   onSend,
   onPickImage,
   onTakePhoto,
@@ -121,7 +126,8 @@ export default function MessageInput({
   };
 
   return (
-    <View style={[styles.inputContainer, { paddingBottom: spacing.lg + paddingBottom }]}>
+    <View style={[styles.inputContainer, { paddingBottom: paddingBottom }]}>
+      {replyTo && <ReplyPreview replyTo={replyTo} onCancel={onCancelReply} />}
       {mediaUri && (
         <View style={styles.mediaPreview}>
           {contentType === 'photo' ? (

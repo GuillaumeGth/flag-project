@@ -76,7 +76,8 @@ CREATE TABLE IF NOT EXISTS public.messages (
     read_at TIMESTAMPTZ,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     deleted_by_sender BOOLEAN NOT NULL DEFAULT FALSE,
-    deleted_by_recipient BOOLEAN NOT NULL DEFAULT FALSE
+    deleted_by_recipient BOOLEAN NOT NULL DEFAULT FALSE,
+    reply_to_id UUID REFERENCES public.messages(id) ON DELETE SET NULL
 );
 
 -- Enable RLS
@@ -124,6 +125,7 @@ CREATE INDEX IF NOT EXISTS messages_sender_idx ON public.messages(sender_id);
 CREATE INDEX IF NOT EXISTS messages_location_idx ON public.messages USING GIST(location);
 DROP INDEX IF EXISTS messages_unread_idx;
 CREATE INDEX messages_unread_idx ON public.messages(recipient_id) WHERE is_read = FALSE;
+CREATE INDEX IF NOT EXISTS messages_reply_to_idx ON public.messages(reply_to_id);
 
 -- Function to auto-create user profile on signup
 -- Supports both phone auth (display_name) and Google OAuth (full_name/name)

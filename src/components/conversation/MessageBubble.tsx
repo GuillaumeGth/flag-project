@@ -9,8 +9,9 @@ import {
   Animated,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { MessageWithUsers } from '@/types';
+import { MessageWithUsers, MessageReply } from '@/types';
 import { ReactionSummary } from '@/types/reactions';
+import QuotedMessage from './QuotedMessage';
 import { colors, spacing, radius, shadows, typography } from '@/theme-redesign';
 import { formatTime, formatDateSeparator } from '@/utils/date';
 import GlassCard from '@/components/redesign/GlassCard';
@@ -28,6 +29,8 @@ interface MessageBubbleProps {
   isPlaying: boolean;
   playingMessageId: string | null;
   reactions: ReactionSummary[];
+  reply?: MessageReply;
+  onQuotedPress?: () => void;
   isSelected: boolean;
   onPress: () => void;
   onPlayAudio: (message: MessageWithUsers) => void;
@@ -45,6 +48,8 @@ export default function MessageBubble({
   isPlaying,
   playingMessageId,
   reactions,
+  reply,
+  onQuotedPress,
   isSelected,
   onPress,
   onPlayAudio,
@@ -112,6 +117,7 @@ export default function MessageBubble({
                 isDeleted && styles.messageBubbleDeleted,
               ]}
             >
+              {reply && <QuotedMessage reply={reply} isFromMe={isFromMe} onPress={onQuotedPress} />}
               {isDeleted ? (
                 <Text style={styles.deletedText}>Message supprimé</Text>
               ) : (
@@ -224,6 +230,7 @@ const styles = StyleSheet.create({
   bubbleWrapper: {
     position: 'relative',
     maxWidth: '75%',
+    minWidth: '50%',
   },
   messageBubble: {
     padding: spacing.md,

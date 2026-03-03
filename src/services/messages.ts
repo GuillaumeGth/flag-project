@@ -1,6 +1,6 @@
 import { supabase, getCachedUserId } from './supabase';
 import * as FileSystem from 'expo-file-system/legacy';
-import { Message, MessageWithSender, Coordinates, User, UndiscoveredMessageMeta, UndiscoveredMessageMapMeta, Conversation, MessageWithUsers, MessageContentType } from '@/types';
+import { Message, MessageWithSender, Coordinates, User, UndiscoveredMessageMeta, UndiscoveredMessageMapMeta, Conversation, MessageWithUsers, MessageContentType, MessageReply } from '@/types';
 import {
   getCachedData,
   setCachedData,
@@ -29,9 +29,71 @@ type RawMessageWithUsers = {
   is_public?: boolean;
   deleted_by_sender: boolean;
   deleted_by_recipient: boolean;
+  reply_to_id?: string | null;
   sender: { id: string; display_name?: string; avatar_url?: string } | null;
   recipient: { id: string; display_name?: string; avatar_url?: string } | null;
 };
+
+type RawReplyRow = {
+  id: string;
+  content_type: string;
+  text_content?: string;
+  media_url?: string;
+  deleted_by_sender: boolean;
+  deleted_by_recipient: boolean;
+  sender_id: string;
+  sender: { display_name?: string } | null;
+};
+
+// Fetch the reply-to message content for a set of IDs (avoids self-referential join issue in PostgREST)
+async function fetchReplyMessages(ids: string[], currentUserId: string): Promise<Map<string, MessageReply>> {
+  const map = new Map<string, MessageReply>();
+  if (ids.length === 0) return map;
+
+  const { data, error } = await supabase
+    .from('messages')
+    .select('id, content_type, text_content, media_url, deleted_by_sender, deleted_by_recipient, sender_id, sender:users!sender_id(display_name)')
+    .in('id', ids);
+
+  if (error || !data) return map;
+
+  for (const r of data as RawReplyRow[]) {
+    map.set(r.id, {
+      id: r.id,
+      content_type: r.content_type as MessageContentType,
+      text_content: r.text_content,
+      media_url: r.media_url,
+      sender_display_name: r.sender?.display_name,
+      is_deleted_for_viewer: r.sender_id === currentUserId
+        ? r.deleted_by_sender
+        : r.deleted_by_recipient,
+    });
+  }
+  return map;
+}
+
+// Maps a raw Supabase row to the typed MessageWithUsers
+function mapRawMessage(raw: RawMessageWithUsers, replyMap: Map<string, MessageReply>): MessageWithUsers {
+  const { reply_to_id, ...rest } = raw;
+  return {
+    ...rest,
+    content_type: raw.content_type as MessageContentType,
+    location: raw.location as unknown as Coordinates,
+    sender: raw.sender ?? { id: '', display_name: undefined, avatar_url: undefined },
+    recipient: raw.recipient ?? { id: '', display_name: undefined, avatar_url: undefined },
+    reply_to_id: reply_to_id ?? undefined,
+    reply_to: reply_to_id ? replyMap.get(reply_to_id) : undefined,
+  };
+}
+
+// Strips reply_to when id is falsy — cleans up cache entries left by a previous bug
+// where PostgREST returned [] for the self-referential join, producing {id: undefined, ...}
+function stripInvalidReply(msg: MessageWithUsers): MessageWithUsers {
+  if (msg.reply_to && !msg.reply_to.id) {
+    return { ...msg, reply_to: undefined };
+  }
+  return msg;
+}
 
 // Helper to get current user ID from cached value (avoids getSession() deadlock)
 function getCurrentUserId(): string | null {
@@ -192,7 +254,7 @@ export async function fetchConversationMessages(otherUserId: string): Promise<Me
 
   const cacheKey = CACHE_KEYS.CONVERSATION(otherUserId);
   const lastSync = await getLastSyncTimestamp(cacheKey);
-  const cachedMessages: MessageWithUsers[] = (await getCachedData<MessageWithUsers[]>(cacheKey)) || [];
+  const cachedMessages: MessageWithUsers[] = ((await getCachedData<MessageWithUsers[]>(cacheKey)) || []).map(stripInvalidReply);
 
   let query = supabase
     .from('messages')
@@ -220,8 +282,13 @@ export async function fetchConversationMessages(otherUserId: string): Promise<Me
   for (const msg of cachedMessages) {
     mergedMap.set(msg.id, msg);
   }
-  for (const msg of (newMessages || []) as MessageWithUsers[]) {
-    mergedMap.set(msg.id, msg);
+  // Collect reply_to_id values that need to be resolved
+  const rawList = (newMessages || []) as RawMessageWithUsers[];
+  const replyIds = [...new Set(rawList.map(m => m.reply_to_id).filter((id): id is string => !!id))];
+  const replyMap = await fetchReplyMessages(replyIds, currentUserId);
+
+  for (const raw of rawList) {
+    mergedMap.set(raw.id, mapRawMessage(raw, replyMap));
   }
 
   // Sort by created_at ascending
@@ -244,7 +311,7 @@ export async function getCachedConversationMessages(otherUserId: string): Promis
   const currentUserId = getCurrentUserId();
   const cached = await getCachedData<MessageWithUsers[]>(CACHE_KEYS.CONVERSATION(otherUserId));
   if (!cached || cached.length === 0) return null;
-  return cached;
+  return cached.map(stripInvalidReply);
 }
 
 // Fetch messages for current user (as recipient)
@@ -584,7 +651,8 @@ export async function sendMessage(
   location: Coordinates | null,
   textContent?: string,
   mediaUrl?: string,
-  isPublic?: boolean
+  isPublic?: boolean,
+  replyToId?: string
 ): Promise<Message | null> {
   const currentUserId = getCurrentUserId();
   if (!currentUserId) return null;
@@ -603,6 +671,7 @@ export async function sendMessage(
       location: location ? `POINT(${location.longitude} ${location.latitude})` : null,
 is_read: location ? false : true, // Messages without location are immediately readable
       is_public: isPublic || false,
+      reply_to_id: replyToId ?? null,
     })
     .select()
     .single();

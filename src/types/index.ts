@@ -17,6 +17,17 @@ export interface Coordinates {
 // Message content types
 export type MessageContentType = 'text' | 'photo' | 'audio';
 
+// Quoted message attached to a reply (resolved at fetch time, immutable)
+export interface MessageReply {
+  readonly id: string;
+  readonly content_type: MessageContentType;
+  readonly text_content?: string;
+  readonly media_url?: string;
+  readonly sender_display_name?: string;
+  /** True when the quoted message has been soft-deleted by the current viewer */
+  readonly is_deleted_for_viewer: boolean;
+}
+
 // Message type
 export interface Message {
   id: string;
@@ -26,12 +37,14 @@ export interface Message {
   text_content?: string;
   media_url?: string;
   location: Coordinates;
-created_at: string;
+  created_at: string;
   read_at?: string;
   is_read: boolean;
   is_public?: boolean;
   deleted_by_sender?: boolean;
   deleted_by_recipient?: boolean;
+  reply_to_id?: string;
+  reply_to?: MessageReply;
 }
 
 // Message with sender info for display

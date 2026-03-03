@@ -10,6 +10,7 @@ import {
   Image,
   Modal,
   Animated,
+  Keyboard,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -43,8 +44,17 @@ export default function ConversationScreen({ navigation, route }: Props) {
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
   const flatListRef = useRef<FlatList>(null);
+  // Stores measured heights per message id — used for reliable scroll-to
+  const itemHeightsRef = useRef<Map<string, number>>(new Map());
 
   const { messages, loading, loadMessages } = useMessageLoader(otherUserId);
+
+  const [keyboardVisible, setKeyboardVisible] = useState(false);
+  useEffect(() => {
+    const show = Keyboard.addListener('keyboardWillShow', () => setKeyboardVisible(true));
+    const hide = Keyboard.addListener('keyboardDidHide', () => setKeyboardVisible(false));
+    return () => { show.remove(); hide.remove(); };
+  }, []);
 
   const [sending, setSending] = useState(false);
   const [fullImageMessage, setFullImageMessage] = useState<MessageWithUsers | null>(null);
@@ -53,6 +63,7 @@ export default function ConversationScreen({ navigation, route }: Props) {
   const [isPlayingAudio, setIsPlayingAudio] = useState(false);
   const [canSendMessages, setCanSendMessages] = useState<boolean>(true);
   const [selectedMessageId, setSelectedMessageId] = useState<string | null>(null);
+  const [replyToMessage, setReplyToMessage] = useState<MessageWithUsers | null>(null);
 
   // ── Reactions state ──────────────────────────────────────────────────────
   const [reactionsMap, setReactionsMap] = useState<Record<string, ReactionSummary[]>>({});
@@ -102,6 +113,13 @@ export default function ConversationScreen({ navigation, route }: Props) {
     setCanSendMessages(eitherFollowing);
   };
 
+  const handleReplySelected = useCallback(() => {
+    if (!selectedMessageId) return;
+    const msg = messages.find((m) => m.id === selectedMessageId);
+    if (msg) setReplyToMessage(msg);
+    setSelectedMessageId(null);
+  }, [selectedMessageId, messages]);
+
   const handleDeleteSelected = async () => {
     if (!selectedMessageId || !user) return;
     const msg = messages.find((m) => m.id === selectedMessageId);
@@ -113,6 +131,17 @@ export default function ConversationScreen({ navigation, route }: Props) {
   };
 
   const reversedMessages = useMemo(() => [...messages].reverse(), [messages]);
+
+  const handleScrollToMessage = useCallback((messageId: string) => {
+    const index = reversedMessages.findIndex((m) => m.id === messageId);
+    if (index === -1) return;
+    // Sum heights of items before the target (they appear "below" the target in the inverted list)
+    let offset = spacing.lg; // contentContainerStyle initial padding
+    for (let i = 0; i < index; i++) {
+      offset += (itemHeightsRef.current.get(reversedMessages[i].id) ?? 72) + spacing.sm;
+    }
+    flatListRef.current?.scrollToOffset({ offset, animated: true });
+  }, [reversedMessages]);
 
   const handleSend = async ({ text, mediaUri, contentType }: { text: string; mediaUri: string | null; contentType: MessageContentType }) => {
     const hasText = !!text.trim();
@@ -136,13 +165,17 @@ export default function ConversationScreen({ navigation, route }: Props) {
         finalContentType = 'text';
       }
 
+      const replyId = replyToMessage?.id;
       const message = await sendMessage(
         otherUserId,
         finalContentType,
         null,
         hasText ? text.trim() : undefined,
-        uploadedMediaUrl
+        uploadedMediaUrl,
+        undefined,
+        replyId
       );
+      if (message) setReplyToMessage(null);
 
       if (message) {
         await loadMessages();
@@ -252,6 +285,7 @@ export default function ConversationScreen({ navigation, route }: Props) {
       : index === reversedMessages.length - 1;
 
     return (
+      <View onLayout={(e) => { itemHeightsRef.current.set(item.id, e.nativeEvent.layout.height); }}>
       <MessageBubble
         message={item}
         isFromMe={isFromMe}
@@ -260,6 +294,8 @@ export default function ConversationScreen({ navigation, route }: Props) {
         isPlaying={isPlayingAudio}
         playingMessageId={playingMessageId}
         reactions={reactionsMap[item.id] ?? EMPTY_REACTIONS}
+        reply={item.reply_to}
+        onQuotedPress={item.reply_to ? () => handleScrollToMessage(item.reply_to!.id) : undefined}
         isSelected={selectedMessageId === item.id}
         onPress={() => { if (selectedMessageId) setSelectedMessageId(null); }}
         onPlayAudio={handleAudioPress}
@@ -276,6 +312,7 @@ export default function ConversationScreen({ navigation, route }: Props) {
           });
         }}
       />
+      </View>
     );
   };
 
@@ -297,9 +334,14 @@ export default function ConversationScreen({ navigation, route }: Props) {
         <Text style={styles.headerTitle}>{otherUserName}</Text>
       </TouchableOpacity>
       {selectedMessageId && (
-        <TouchableOpacity onPress={handleDeleteSelected} style={styles.deleteButton}>
-          <Ionicons name="trash-outline" size={22} color={colors.primary.magenta} />
-        </TouchableOpacity>
+        <>
+          <TouchableOpacity onPress={handleReplySelected} style={styles.deleteButton}>
+            <Ionicons name="return-down-back-outline" size={22} color={colors.primary.cyan} />
+          </TouchableOpacity>
+          <TouchableOpacity onPress={handleDeleteSelected} style={styles.deleteButton}>
+            <Ionicons name="trash-outline" size={22} color={colors.primary.magenta} />
+          </TouchableOpacity>
+        </>
       )}
     </View>
   );
@@ -330,6 +372,7 @@ export default function ConversationScreen({ navigation, route }: Props) {
           keyExtractor={(item) => item.id}
           renderItem={renderMessage}
           inverted
+          style={{ flex: 1 }}
           contentContainerStyle={styles.messagesContent}
           maintainVisibleContentPosition={{ minIndexForVisible: 0 }}
           removeClippedSubviews={false}
@@ -338,7 +381,9 @@ export default function ConversationScreen({ navigation, route }: Props) {
         <MessageInput
           sending={sending}
           canSendMessages={canSendMessages}
-          paddingBottom={insets.bottom}
+          paddingBottom={keyboardVisible ? 0 : insets.bottom}
+          replyTo={replyToMessage ?? undefined}
+          onCancelReply={() => setReplyToMessage(null)}
           onSend={handleSend}
           onPickImage={pickImage}
           onTakePhoto={takePhoto}

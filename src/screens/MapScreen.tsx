@@ -305,6 +305,39 @@ export default function MapScreen({ navigation, route }: Props) {
 
       <View style={[styles.insetSpacer, { height: insets.top }]} />
 
+      <View style={styles.captureContainer} pointerEvents="none">
+        {clusters.map((cluster) => {
+          if (avatarImages[cluster.id]) return null;
+          const count = cluster.messages.length;
+          return (
+            <View
+              key={cluster.id}
+              ref={(ref) => { avatarRefs.current[cluster.id] = ref; }}
+              collapsable={false}
+              style={styles.captureAvatarWrapper}
+            >
+              <View style={[styles.captureAvatar, cluster.isPublic && styles.captureAvatarPublic]}>
+                <Image
+                  source={{ uri: cluster.senderAvatarUrl }}
+                  style={styles.captureAvatarImage}
+                  onLoad={() => { setTimeout(() => captureAvatar(cluster.id), 100); }}
+                />
+              </View>
+              {count > 1 && (
+                <LinearGradient
+                  colors={colors.gradients.button}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.clusterBadge}
+                >
+                  <Text style={styles.clusterBadgeText}>{count}</Text>
+                </LinearGradient>
+              )}
+            </View>
+          );
+        })}
+      </View>
+
       <MapView
         ref={mapRef}
         style={styles.map}
@@ -401,39 +434,6 @@ export default function MapScreen({ navigation, route }: Props) {
         />
       )}
 
-      <View style={styles.captureContainer} pointerEvents="none">
-        {clusters.map((cluster) => {
-          if (avatarImages[cluster.id]) return null;
-          const count = cluster.messages.length;
-          return (
-            <View
-              key={cluster.id}
-              ref={(ref) => { avatarRefs.current[cluster.id] = ref; }}
-              collapsable={false}
-              style={styles.captureAvatarWrapper}
-            >
-              <View style={[styles.captureAvatar, cluster.isPublic && styles.captureAvatarPublic]}>
-                <Image
-                  source={{ uri: cluster.senderAvatarUrl }}
-                  style={styles.captureAvatarImage}
-                  onLoad={() => { setTimeout(() => captureAvatar(cluster.id), 100); }}
-                />
-              </View>
-              {count > 1 && (
-                <LinearGradient
-                  colors={colors.gradients.button}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                  style={styles.clusterBadge}
-                >
-                  <Text style={styles.clusterBadgeText}>{count}</Text>
-                </LinearGradient>
-              )}
-            </View>
-          );
-        })}
-      </View>
-
       <ClusterPickerModal
         cluster={selectedCluster}
         onSelect={handleMarkerPress}
@@ -522,14 +522,15 @@ const styles = StyleSheet.create({
   },
   captureContainer: {
     position: 'absolute',
-    top: -200,
-    left: -200,
+    top: 0,
+    left: 0,
   },
   captureAvatarWrapper: {
     width: 70,
     height: 70,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: 'transparent',
   },
   captureAvatar: {
     width: 56,

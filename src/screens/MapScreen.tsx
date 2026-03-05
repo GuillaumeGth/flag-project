@@ -522,8 +522,9 @@ const styles = StyleSheet.create({
   },
   captureContainer: {
     position: 'absolute',
-    top: -200,
-    left: -200,
+    top: 0,
+    left: 0,
+    opacity: 0,
   },
   captureAvatarWrapper: {
     width: 70,

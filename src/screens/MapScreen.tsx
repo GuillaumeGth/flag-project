@@ -4,7 +4,6 @@ import {
   StyleSheet,
   TouchableOpacity,
   Text,
-  Image,
   Animated,
   Linking,
   Platform,
@@ -13,7 +12,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, CompositeNavigationProp } from '@react-navigation/native';
 import { BottomTabNavigationProp, BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import MapView, { Marker, Polyline } from 'react-native-maps';
+import MapView, { Polyline } from 'react-native-maps';
 import { Ionicons } from '@expo/vector-icons';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -55,7 +54,7 @@ export default function MapScreen({ navigation, route }: Props) {
   const mapRef = useRef<MapView>(null);
 
   const { messages, loading, loadMessages } = useMapMessages();
-  const { avatarImages, avatarRefs, captureAvatar, canReadMessage, formatDistance } = useMapMarkers(userLocation, messages);
+  const { canReadMessage, formatDistance } = useMapMarkers(userLocation);
 
   const otherMessages = useMemo(
     () => messages.filter(msg => msg.sender?.id !== user?.id),
@@ -317,25 +316,23 @@ export default function MapScreen({ navigation, route }: Props) {
         pitchEnabled={false}
         moveOnMarkerPress={false}
       >
-        {clusters.map((cluster) => {
-          const capturedImage = avatarImages[cluster.id];
-          if (!capturedImage) return null;
-          return (
-            <MessageMarker
-              key={cluster.id}
-              markerId={cluster.id}
-              location={cluster.location}
-              avatarUri={capturedImage}
-              isTarget={cluster.messages.some(m => m.id === routeTargetId)}
-              hasActiveRoute={!!routeCoordinates}
-              onPress={() =>
-                cluster.messages.length > 1
-                  ? handleClusterPress(cluster)
-                  : handleMarkerPress(cluster.messages[0])
-              }
-            />
-          );
-        })}
+        {clusters.map((cluster) => (
+          <MessageMarker
+            key={cluster.id}
+            markerId={cluster.id}
+            location={cluster.location}
+            avatarUrl={cluster.senderAvatarUrl}
+            isPublic={cluster.isPublic}
+            count={cluster.messages.length}
+            isTarget={cluster.messages.some(m => m.id === routeTargetId)}
+            hasActiveRoute={!!routeCoordinates}
+            onPress={() =>
+              cluster.messages.length > 1
+                ? handleClusterPress(cluster)
+                : handleMarkerPress(cluster.messages[0])
+            }
+          />
+        ))}
 
         {routeCoordinates && (
           <>
@@ -400,39 +397,6 @@ export default function MapScreen({ navigation, route }: Props) {
           onClose={handleCloseCard}
         />
       )}
-
-      <View style={styles.captureContainer} pointerEvents="none">
-        {clusters.map((cluster) => {
-          if (avatarImages[cluster.id]) return null;
-          const count = cluster.messages.length;
-          return (
-            <View
-              key={cluster.id}
-              ref={(ref) => { avatarRefs.current[cluster.id] = ref; }}
-              collapsable={false}
-              style={styles.captureAvatarWrapper}
-            >
-              <View style={[styles.captureAvatar, cluster.isPublic && styles.captureAvatarPublic]}>
-                <Image
-                  source={{ uri: cluster.senderAvatarUrl }}
-                  style={styles.captureAvatarImage}
-                  onLoad={() => { setTimeout(() => captureAvatar(cluster.id), 100); }}
-                />
-              </View>
-              {count > 1 && (
-                <LinearGradient
-                  colors={colors.gradients.button}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                  style={styles.clusterBadge}
-                >
-                  <Text style={styles.clusterBadgeText}>{count}</Text>
-                </LinearGradient>
-              )}
-            </View>
-          );
-        })}
-      </View>
 
       <ClusterPickerModal
         cluster={selectedCluster}
@@ -519,56 +483,6 @@ const styles = StyleSheet.create({
     height: 40,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  captureContainer: {
-    position: 'absolute',
-    top: -200,
-    left: -200,
-  },
-  captureAvatarWrapper: {
-    width: 70,
-    height: 70,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  captureAvatar: {
-    width: 56,
-    height: 56,
-    backgroundColor: '#fff',
-    borderRadius: 28,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 2,
-    borderColor: '#fff',
-    overflow: 'hidden',
-  },
-  clusterBadge: {
-    position: 'absolute',
-    top: 7,
-    right: 7,
-    minWidth: 26,
-    height: 26,
-    borderRadius: 13,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 5,
-    borderWidth: 2,
-    borderColor: '#fff',
-  },
-  clusterBadgeText: {
-    color: '#fff',
-    fontSize: 13,
-    fontWeight: '800',
-    lineHeight: 16,
-  },
-  captureAvatarPublic: {
-    borderWidth: 3,
-    borderColor: colors.primary.violet,
-  },
-  captureAvatarImage: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
   },
   insetSpacer: {
     backgroundColor: 'transparent',

@@ -1,6 +1,6 @@
 import { supabase, getCachedUserId } from './supabase';
 import * as FileSystem from 'expo-file-system/legacy';
-import { Message, MessageWithSender, Coordinates, User, UndiscoveredMessageMeta, UndiscoveredMessageMapMeta, Conversation, MessageWithUsers, MessageContentType } from '@/types';
+import { Message, MessageWithSender, Coordinates, User, UndiscoveredMessageMeta, UndiscoveredMessageMapMeta, OwnFlagMapMeta, Conversation, MessageWithUsers, MessageContentType } from '@/types';
 import {
   getCachedData,
   setCachedData,
@@ -199,7 +199,8 @@ export async function fetchConversationMessages(otherUserId: string): Promise<Me
     .select(`
       *,
       sender:users!sender_id (id, display_name, avatar_url),
-      recipient:users!recipient_id (id, display_name, avatar_url)
+      recipient:users!recipient_id (id, display_name, avatar_url),
+      reply_to:messages!reply_to_message_id (id, content_type, text_content, media_url, deleted_by_sender, deleted_by_recipient, sender:users!sender_id (display_name))
     `)
     .or(`and(sender_id.eq.${currentUserId},recipient_id.eq.${otherUserId}),and(sender_id.eq.${otherUserId},recipient_id.eq.${currentUserId})`)
     .order('created_at', { ascending: true });
@@ -577,6 +578,36 @@ export async function fetchDiscoveredPublicMessageIds(messageIds: string[]): Pro
   return new Set((data || []).map(d => d.message_id));
 }
 
+// Fetch the current user's own sent flags with location (for map display in "mine" mode)
+export async function fetchMyFlagsForMap(): Promise<OwnFlagMapMeta[]> {
+  const currentUserId = getCurrentUserId();
+  if (!currentUserId) return [];
+
+  const { data, error } = await supabase
+    .from('messages')
+    .select(`
+      id,
+      location,
+      created_at,
+      is_public,
+      content_type,
+      text_content,
+      media_url,
+      recipient_id,
+      recipient:users!recipient_id (id, display_name, avatar_url)
+    `)
+    .eq('sender_id', currentUserId)
+    .not('location', 'is', null)
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    reportError(error, 'messages.fetchMyFlagsForMap');
+    return [];
+  }
+
+  return (data || []) as unknown as OwnFlagMapMeta[];
+}
+
 // Send a new message (only to users the sender is subscribed to)
 export async function sendMessage(
   recipientId: string | null,
@@ -584,7 +615,8 @@ export async function sendMessage(
   location: Coordinates | null,
   textContent?: string,
   mediaUrl?: string,
-  isPublic?: boolean
+  isPublic?: boolean,
+  replyToMessageId?: string | null
 ): Promise<Message | null> {
   const currentUserId = getCurrentUserId();
   if (!currentUserId) return null;
@@ -603,6 +635,7 @@ export async function sendMessage(
       location: location ? `POINT(${location.longitude} ${location.latitude})` : null,
 is_read: location ? false : true, // Messages without location are immediately readable
       is_public: isPublic || false,
+      ...(replyToMessageId ? { reply_to_message_id: replyToMessageId } : {}),
     })
     .select()
     .single();

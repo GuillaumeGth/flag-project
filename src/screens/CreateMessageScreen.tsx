@@ -40,7 +40,7 @@ export default function CreateMessageScreen({ navigation, route }: Props) {
     ? recipients.map(r => r.name).join(', ')
     : 'Sélectionner';
 
-  const [isPublic, setIsPublic] = useState(false);
+  const [isPublic, setIsPublic] = useState(true);
   const [contentType, setContentType] = useState<MessageContentType>('text');
   const [textContent, setTextContent] = useState('');
   const [mediaUri, setMediaUri] = useState<string | null>(null);

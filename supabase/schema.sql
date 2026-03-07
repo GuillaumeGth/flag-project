@@ -76,7 +76,8 @@ CREATE TABLE IF NOT EXISTS public.messages (
     read_at TIMESTAMPTZ,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     deleted_by_sender BOOLEAN NOT NULL DEFAULT FALSE,
-    deleted_by_recipient BOOLEAN NOT NULL DEFAULT FALSE
+    deleted_by_recipient BOOLEAN NOT NULL DEFAULT FALSE,
+    reply_to_message_id UUID REFERENCES messages(id) ON DELETE SET NULL
 );
 
 -- Enable RLS

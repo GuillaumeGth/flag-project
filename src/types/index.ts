@@ -17,6 +17,17 @@ export interface Coordinates {
 // Message content types
 export type MessageContentType = 'text' | 'photo' | 'audio';
 
+// Quoted message data embedded inside a reply (shape returned by Supabase join)
+export interface MessageReply {
+  id: string;
+  content_type: MessageContentType;
+  text_content?: string;
+  media_url?: string;
+  deleted_by_sender?: boolean;
+  deleted_by_recipient?: boolean;
+  sender?: { display_name?: string } | null;
+}
+
 // Message type
 export interface Message {
   id: string;
@@ -32,6 +43,8 @@ created_at: string;
   is_public?: boolean;
   deleted_by_sender?: boolean;
   deleted_by_recipient?: boolean;
+  reply_to_message_id?: string | null;
+  reply_to?: MessageReply | null;
 }
 
 // Message with sender info for display
@@ -53,6 +66,19 @@ export interface UndiscoveredMessageMapMeta {
   created_at: string;
   is_public?: boolean;
   sender?: Pick<User, 'id' | 'display_name' | 'avatar_url'>;
+}
+
+// Metadata for the current user's own sent flags on the map
+export interface OwnFlagMapMeta {
+  id: string;
+  location: string | Coordinates;
+  created_at: string;
+  is_public: boolean;
+  content_type: MessageContentType;
+  text_content?: string | null;
+  media_url?: string | null;
+  recipient_id: string | null;
+  recipient?: Pick<User, 'id' | 'display_name' | 'avatar_url'> | null;
 }
 
 // For map markers

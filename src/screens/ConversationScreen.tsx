@@ -29,6 +29,7 @@ import GlassCard from '@/components/redesign/GlassCard';
 import PremiumAvatar from '@/components/redesign/PremiumAvatar';
 import MessageBubble from '@/components/conversation/MessageBubble';
 import MessageInput from '@/components/conversation/MessageInput';
+import ReactionPicker from '@/components/conversation/ReactionPicker';
 import ScreenLoader from '@/components/ScreenLoader';
 import { useMessageLoader } from '@/hooks/useMessageLoader';
 import { log } from '@/utils/debug';
@@ -39,7 +40,7 @@ type Props = NativeStackScreenProps<RootStackParamList, 'Conversation'>;
 const EMPTY_REACTIONS: ReactionSummary[] = [];
 
 export default function ConversationScreen({ navigation, route }: Props) {
-  const { otherUserId, otherUserName, otherUserAvatarUrl } = route.params;
+  const { otherUserId, otherUserName, otherUserAvatarUrl, scrollToMessageId } = route.params;
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
   const flatListRef = useRef<FlatList>(null);
@@ -53,6 +54,9 @@ export default function ConversationScreen({ navigation, route }: Props) {
   const [isPlayingAudio, setIsPlayingAudio] = useState(false);
   const [canSendMessages, setCanSendMessages] = useState<boolean>(true);
   const [selectedMessageId, setSelectedMessageId] = useState<string | null>(null);
+  const [replyToMessage, setReplyToMessage] = useState<MessageWithUsers | null>(null);
+  const [pickerMessageId, setPickerMessageId] = useState<string | null>(null);
+  const [pickerAnchorY, setPickerAnchorY] = useState<number | undefined>(undefined);
 
   // ── Reactions state ──────────────────────────────────────────────────────
   const [reactionsMap, setReactionsMap] = useState<Record<string, ReactionSummary[]>>({});
@@ -84,7 +88,11 @@ export default function ConversationScreen({ navigation, route }: Props) {
   useEffect(() => {
     if (messages.length > 0 && !loading) {
       requestAnimationFrame(() => {
-        flatListRef.current?.scrollToOffset({ offset: 0, animated: false });
+        if (scrollToMessageId) {
+          setTimeout(() => handleScrollToMessage(scrollToMessageId), 200);
+        } else {
+          flatListRef.current?.scrollToOffset({ offset: 0, animated: false });
+        }
       });
     }
   }, [loading]);
@@ -114,6 +122,13 @@ export default function ConversationScreen({ navigation, route }: Props) {
 
   const reversedMessages = useMemo(() => [...messages].reverse(), [messages]);
 
+  const handleScrollToMessage = useCallback((messageId: string) => {
+    const index = reversedMessages.findIndex((m) => m.id === messageId);
+    if (index >= 0) {
+      flatListRef.current?.scrollToIndex({ index, animated: true, viewPosition: 0.5 });
+    }
+  }, [reversedMessages]);
+
   const handleSend = async ({ text, mediaUri, contentType }: { text: string; mediaUri: string | null; contentType: MessageContentType }) => {
     const hasText = !!text.trim();
     const hasMedia = !!mediaUri;
@@ -141,8 +156,11 @@ export default function ConversationScreen({ navigation, route }: Props) {
         finalContentType,
         null,
         hasText ? text.trim() : undefined,
-        uploadedMediaUrl
+        uploadedMediaUrl,
+        false,
+        replyToMessage?.id ?? null
       );
+      setReplyToMessage(null);
 
       if (message) {
         await loadMessages();
@@ -261,14 +279,23 @@ export default function ConversationScreen({ navigation, route }: Props) {
         playingMessageId={playingMessageId}
         reactions={reactionsMap[item.id] ?? EMPTY_REACTIONS}
         isSelected={selectedMessageId === item.id}
-        onPress={() => { if (selectedMessageId) setSelectedMessageId(null); }}
+        onPress={() => {
+            if (pickerMessageId) { setPickerMessageId(null); return; }
+            if (selectedMessageId) setSelectedMessageId(null);
+          }}
         onPlayAudio={handleAudioPress}
         onViewImage={setFullImageMessage}
-        onLongPress={() => {
+        onLongPress={(pageY) => {
             const isDeleted = isFromMe ? item.deleted_by_sender : item.deleted_by_recipient;
-            if (!isDeleted) setSelectedMessageId((prev) => prev === item.id ? null : item.id);
+            if (!isDeleted) {
+              setPickerMessageId(item.id);
+              setPickerAnchorY(pageY);
+              setSelectedMessageId((prev) => prev === item.id ? null : item.id);
+            }
           }}
         onReactionPress={(emoji) => handleReactionToggle(item.id, emoji)}
+        onScrollToMessage={handleScrollToMessage}
+        showSenderNameInReply={false}
         onNavigateToMap={(location) => {
           navigation.navigate('Main', {
             screen: 'Map',
@@ -297,9 +324,21 @@ export default function ConversationScreen({ navigation, route }: Props) {
         <Text style={styles.headerTitle}>{otherUserName}</Text>
       </TouchableOpacity>
       {selectedMessageId && (
-        <TouchableOpacity onPress={handleDeleteSelected} style={styles.deleteButton}>
-          <Ionicons name="trash-outline" size={22} color={colors.primary.magenta} />
-        </TouchableOpacity>
+        <>
+          <TouchableOpacity
+            onPress={() => {
+              const msg = messages.find((m) => m.id === selectedMessageId);
+              if (msg) setReplyToMessage(msg);
+              setSelectedMessageId(null);
+            }}
+            style={styles.deleteButton}
+          >
+            <Ionicons name="return-up-back-outline" size={22} color={colors.primary.cyan} />
+          </TouchableOpacity>
+          <TouchableOpacity onPress={handleDeleteSelected} style={styles.deleteButton}>
+            <Ionicons name="trash-outline" size={22} color={colors.primary.magenta} />
+          </TouchableOpacity>
+        </>
       )}
     </View>
   );
@@ -333,17 +372,43 @@ export default function ConversationScreen({ navigation, route }: Props) {
           contentContainerStyle={styles.messagesContent}
           maintainVisibleContentPosition={{ minIndexForVisible: 0 }}
           removeClippedSubviews={false}
+          onScrollBeginDrag={() => setPickerMessageId(null)}
+          onScrollToIndexFailed={(info) => {
+            // Scroll to approximate position first (forces render), then retry exact index
+            flatListRef.current?.scrollToOffset({ offset: info.averageItemLength * info.index, animated: false });
+            setTimeout(() => {
+              flatListRef.current?.scrollToIndex({ index: info.index, animated: true, viewPosition: 0.5 });
+            }, 150);
+          }}
         />
 
         <MessageInput
           sending={sending}
           canSendMessages={canSendMessages}
           paddingBottom={insets.bottom}
+          replyTo={replyToMessage}
+          onCancelReply={() => setReplyToMessage(null)}
           onSend={handleSend}
           onPickImage={pickImage}
           onTakePhoto={takePhoto}
         />
       </KeyboardAvoidingView>
+
+      <ReactionPicker
+        visible={!!pickerMessageId}
+        anchorY={pickerAnchorY}
+        currentReactions={
+          pickerMessageId
+            ? (reactionsMap[pickerMessageId] ?? EMPTY_REACTIONS)
+                .filter((r) => r.has_reacted)
+                .map((r) => r.emoji)
+            : []
+        }
+        onSelect={(emoji) => {
+          if (pickerMessageId) handleReactionToggle(pickerMessageId, emoji);
+        }}
+        onClose={() => setPickerMessageId(null)}
+      />
 
       <Modal visible={!!fullImageMessage} transparent animationType="fade" onRequestClose={() => setFullImageMessage(null)}>
         <View style={styles.fullImageModal}>

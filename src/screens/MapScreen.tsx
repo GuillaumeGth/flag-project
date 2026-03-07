@@ -19,15 +19,18 @@ import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocation } from '@/contexts/LocationContext';
 import { useAuth } from '@/contexts/AuthContext';
-import { UndiscoveredMessageMapMeta, Coordinates, MainTabParamList, RootStackParamList } from '@/types';
+import { UndiscoveredMessageMapMeta, OwnFlagMapMeta, Coordinates, MainTabParamList, RootStackParamList } from '@/types';
 import { colors, shadows, radius, spacing } from '@/theme-redesign';
 import Toast from '@/components/Toast';
 import SelectedMessageCard from '@/components/map/SelectedMessageCard';
+import OwnFlagCard from '@/components/map/OwnFlagCard';
 import MessageMarker from '@/components/map/MessageMarker';
+import MapModePill, { MapMode } from '@/components/map/MapModePill';
 import ClusterPickerModal from '@/components/map/ClusterPickerModal';
 import ScreenLoader from '@/components/ScreenLoader';
 import { useMapMessages } from '@/hooks/useMapMessages';
 import { useMapMarkers } from '@/hooks/useMapMarkers';
+import { useMyFlags } from '@/hooks/useMyFlags';
 import { useClusteredMarkers, MessageCluster } from '@/hooks/useClusteredMarkers';
 import { getMessageLocation } from '@/utils/mapUtils';
 import { log } from '@/utils/debug';
@@ -54,8 +57,9 @@ export default function MapScreen({ navigation, route }: Props) {
   const { current: userLocation, loading: locationLoading, refreshLocation, requestPermission, permission } = useLocation();
   const mapRef = useRef<MapView>(null);
 
+  // --- Explore mode ---
   const { messages, loading, loadMessages } = useMapMessages();
-  const { avatarImages, avatarRefs, captureAvatar, canReadMessage, formatDistance } = useMapMarkers(userLocation, messages);
+  const { avatarImages, avatarRefs, captureAvatar, clearAvatarImages, canReadMessage, formatDistance } = useMapMarkers(userLocation, messages);
 
   const otherMessages = useMemo(
     () => messages.filter(msg => msg.sender?.id !== user?.id),
@@ -63,19 +67,68 @@ export default function MapScreen({ navigation, route }: Props) {
   );
   const clusters = useClusteredMarkers(otherMessages);
 
+  // --- Mine mode ---
+  const { flags: myFlags, loadFlags } = useMyFlags();
+  const [mapMode, setMapMode] = useState<MapMode>('explore');
+
+  // Convert own flags to the UndiscoveredMessageMapMeta shape so we can reuse useClusteredMarkers
+  const myFlagsAsMapMeta = useMemo<UndiscoveredMessageMapMeta[]>(
+    () => myFlags.map(flag => ({
+      id: flag.id,
+      location: flag.location,
+      created_at: flag.created_at,
+      is_public: flag.is_public,
+      // Same id for all → one cluster group. Avatar = recipient's (private) or own (public).
+      sender: {
+        id: user?.id ?? '',
+        display_name: user?.display_name,
+        avatar_url: (!flag.is_public && flag.recipient?.avatar_url)
+          ? flag.recipient.avatar_url
+          : user?.avatar_url,
+      },
+    })),
+    [myFlags, user],
+  );
+  const ownClusters = useClusteredMarkers(myFlagsAsMapMeta);
+
+  // When own flags reload, invalidate cached avatars so new recipient avatars are captured
+  useEffect(() => {
+    if (myFlags.length > 0) {
+      clearAvatarImages(myFlags.map(f => f.id));
+    }
+  }, [myFlags]);
+
+  const ownFlagLabelMap = useMemo(() => {
+    const map: Record<string, string> = {};
+    for (const flag of myFlags) {
+      map[flag.id] = flag.recipient?.display_name ?? (flag.is_public ? 'Public' : 'Flaag');
+    }
+    return map;
+  }, [myFlags]);
+
+  // --- Selection state ---
   const [selectedMessage, setSelectedMessage] = useState<UndiscoveredMessageMapMeta | null>(null);
   const [selectedCluster, setSelectedCluster] = useState<MessageCluster | null>(null);
+  const [selectedOwnFlag, setSelectedOwnFlag] = useState<OwnFlagMapMeta | null>(null);
+
+  // --- Centering / focus state ---
   const [centerLocation, setCenterLocation] = useState<Coordinates | null>(null);
   const [centeredMessageId, setCenteredMessageId] = useState<string | null>(null);
+  const [centeredOwnFlagId, setCenteredOwnFlagId] = useState<string | null>(null);
   const [focusLocation, setFocusLocation] = useState<unknown>(null);
   const [focusMarkerCoords, setFocusMarkerCoords] = useState<Coordinates | null>(null);
+
+  // --- Toast & route ---
   const [toastData, setToastData] = useState<{ visible: boolean; message: string; type: 'success' | 'warning' | 'error' }>({ visible: false, message: '', type: 'success' });
   const [routeCoordinates, setRouteCoordinates] = useState<Array<{ latitude: number; longitude: number }> | null>(null);
   const [routeTargetId, setRouteTargetId] = useState<string | null>(null);
   const [isLoadingRoute, setIsLoadingRoute] = useState(false);
 
+  // --- Animations ---
   const [cardSlideAnim] = useState(new Animated.Value(200));
   const [cardOpacityAnim] = useState(new Animated.Value(0));
+  const [ownFlagSlideAnim] = useState(new Animated.Value(200));
+  const [ownFlagOpacityAnim] = useState(new Animated.Value(0));
 
   const selectedMsgLocation = useMemo(
     () => (selectedMessage ? getMessageLocation(selectedMessage) : null),
@@ -97,6 +150,7 @@ export default function MapScreen({ navigation, route }: Props) {
     }, [])
   );
 
+  // Navigation params handler
   useEffect(() => {
     const unsubscribe = navigation.addListener('focus', () => {
       const params = navigation.getState()?.routes?.find((r: { name: string }) => r.name === 'Map')?.params ?? route?.params;
@@ -112,20 +166,39 @@ export default function MapScreen({ navigation, route }: Props) {
         if (user) loadMessages();
       }
 
-      if (params?.messageId) {
+      // Switch to mine mode if requested
+      if (params?.mine) {
+        setMapMode('mine');
+        setSelectedMessage(null);
+        setRouteCoordinates(null);
+        loadFlags();
+        navigation.setParams({ mine: undefined });
+
+        // If a specific own flag is targeted, center on it after loading
+        if (params?.messageId) {
+          setCenteredOwnFlagId(params.messageId);
+          setCenteredMessageId(null);
+          setFocusLocation(null);
+          navigation.setParams({ messageId: undefined });
+        }
+      } else if (params?.messageId) {
         setCenteredMessageId(params.messageId);
+        setCenteredOwnFlagId(null);
         setFocusLocation(null);
         navigation.setParams({ messageId: undefined });
       } else if (params?.focusLocation) {
         setFocusLocation(params.focusLocation);
         setCenteredMessageId(null);
+        setCenteredOwnFlagId(null);
         navigation.setParams({ focusLocation: undefined });
-      } else {
+      } else if (!params?.mine) {
         setCenterLocation(null);
         setCenteredMessageId(null);
+        setCenteredOwnFlagId(null);
         setFocusLocation(null);
         setFocusMarkerCoords(null);
         setSelectedMessage(null);
+        setSelectedOwnFlag(null);
       }
     });
 
@@ -137,14 +210,15 @@ export default function MapScreen({ navigation, route }: Props) {
     if (params?.focusLocation) {
       setFocusLocation(params.focusLocation);
       setCenteredMessageId(null);
-    } else if (params?.messageId) {
+    } else if (params?.messageId && !params?.mine) {
       setCenteredMessageId(params.messageId);
       setFocusLocation(null);
     }
   }, [route?.params]);
 
+  // Center on user location (initial)
   useEffect(() => {
-    if (userLocation && mapRef.current && !centeredMessageId && !focusLocation) {
+    if (userLocation && mapRef.current && !centeredMessageId && !centeredOwnFlagId && !focusLocation) {
       mapRef.current.animateToRegion({
         latitude: userLocation.latitude,
         longitude: userLocation.longitude,
@@ -152,8 +226,9 @@ export default function MapScreen({ navigation, route }: Props) {
         longitudeDelta: LNG_DELTA,
       }, 500);
     }
-  }, [userLocation, centeredMessageId, focusLocation]);
+  }, [userLocation, centeredMessageId, centeredOwnFlagId, focusLocation]);
 
+  // Animate explore card
   useEffect(() => {
     if (selectedMessage) {
       Animated.parallel([
@@ -166,6 +241,20 @@ export default function MapScreen({ navigation, route }: Props) {
     }
   }, [selectedMessage]);
 
+  // Animate own flag card
+  useEffect(() => {
+    if (selectedOwnFlag) {
+      Animated.parallel([
+        Animated.spring(ownFlagSlideAnim, { toValue: 0, friction: 8, tension: 40, useNativeDriver: true }),
+        Animated.timing(ownFlagOpacityAnim, { toValue: 1, duration: 250, useNativeDriver: true }),
+      ]).start();
+    } else {
+      ownFlagSlideAnim.setValue(200);
+      ownFlagOpacityAnim.setValue(0);
+    }
+  }, [selectedOwnFlag]);
+
+  // Center on explore message
   useEffect(() => {
     if (!centeredMessageId || !mapRef.current || messages.length === 0) return;
     const targetMessage = messages.find((m) => m.id === centeredMessageId);
@@ -176,6 +265,18 @@ export default function MapScreen({ navigation, route }: Props) {
     setSelectedMessage(targetMessage);
     mapRef.current.animateToRegion({ latitude: location.latitude, longitude: location.longitude, latitudeDelta: 0.02, longitudeDelta: 0.02 }, 500);
   }, [centeredMessageId, messages, userLocation]);
+
+  // Center on own flag
+  useEffect(() => {
+    if (!centeredOwnFlagId || !mapRef.current || myFlags.length === 0) return;
+    const targetFlag = myFlags.find((f) => f.id === centeredOwnFlagId);
+    if (!targetFlag) return;
+    const location = getMessageLocation(targetFlag as unknown as UndiscoveredMessageMapMeta);
+    if (!location) return;
+    setSelectedOwnFlag(targetFlag);
+    setCenteredOwnFlagId(null);
+    mapRef.current.animateToRegion({ latitude: location.latitude, longitude: location.longitude, latitudeDelta: 0.02, longitudeDelta: 0.02 }, 500);
+  }, [centeredOwnFlagId, myFlags]);
 
   useEffect(() => {
     if (!focusLocation || !mapRef.current) return;
@@ -195,6 +296,17 @@ export default function MapScreen({ navigation, route }: Props) {
     }, 100);
     return () => clearTimeout(timeout);
   }, [routeCoordinates]);
+
+  const handleModeSwitch = useCallback((mode: MapMode) => {
+    setMapMode(mode);
+    setSelectedMessage(null);
+    setSelectedOwnFlag(null);
+    setRouteCoordinates(null);
+    setRouteTargetId(null);
+    if (mode === 'mine') {
+      loadFlags();
+    }
+  }, [loadFlags]);
 
   const centerOnUser = useCallback(() => {
     if (userLocation && mapRef.current) {
@@ -219,6 +331,23 @@ export default function MapScreen({ navigation, route }: Props) {
     setSelectedMessage(null);
     setRouteCoordinates(null);
   }, []);
+
+  const handleCloseOwnFlagCard = useCallback(() => {
+    setSelectedOwnFlag(null);
+  }, []);
+
+  const handleViewOwnFlagConversation = useCallback(() => {
+    if (!selectedOwnFlag?.recipient_id) return;
+    const flagId = selectedOwnFlag.id;
+    const recipientId = selectedOwnFlag.recipient_id;
+    const recipientName = selectedOwnFlag.recipient?.display_name ?? '';
+    setSelectedOwnFlag(null);
+    navigation.navigate('Conversation', {
+      otherUserId: recipientId,
+      otherUserName: recipientName,
+      scrollToMessageId: flagId,
+    });
+  }, [selectedOwnFlag, navigation]);
 
   const fetchRoute = useCallback(async (destination: Coordinates, messageId: string) => {
     if (!userLocation) return;
@@ -267,8 +396,13 @@ export default function MapScreen({ navigation, route }: Props) {
   }, [routeCoordinates]);
 
   const handleMarkerPress = useCallback((message: UndiscoveredMessageMapMeta) => {
-    setSelectedMessage(message);
-  }, []);
+    if (mapMode === 'mine') {
+      const ownFlag = myFlags.find(f => f.id === message.id);
+      if (ownFlag) setSelectedOwnFlag(ownFlag);
+    } else {
+      setSelectedMessage(message);
+    }
+  }, [mapMode, myFlags]);
 
   const handleClusterPress = useCallback((cluster: MessageCluster) => {
     setSelectedCluster(cluster);
@@ -305,8 +439,17 @@ export default function MapScreen({ navigation, route }: Props) {
 
       <View style={[styles.insetSpacer, { height: insets.top }]} />
 
+      {/* Pill mode toggle */}
+      <MapModePill
+        mode={mapMode}
+        onChange={handleModeSwitch}
+        style={{ top: insets.top + 12 }}
+      />
+
+      {/* Off-screen avatar captures */}
       <View style={styles.captureContainer} pointerEvents="none">
-        {clusters.map((cluster) => {
+        {/* Explore mode: one capture per cluster */}
+        {mapMode === 'explore' && clusters.map((cluster) => {
           if (avatarImages[cluster.id]) return null;
           const count = cluster.messages.length;
           return (
@@ -336,6 +479,32 @@ export default function MapScreen({ navigation, route }: Props) {
             </View>
           );
         })}
+
+        {/* Mine mode: one capture per own-flag cluster (same avatar URL for all) */}
+        {mapMode === 'mine' && ownClusters.map((cluster) => {
+          if (avatarImages[cluster.id]) return null;
+          return (
+            <View
+              key={cluster.id}
+              ref={(ref) => { avatarRefs.current[cluster.id] = ref; }}
+              collapsable={false}
+              style={styles.captureAvatarWrapper}
+            >
+              <View style={[styles.captureAvatar, styles.captureAvatarOwn]}>
+                <Image
+                  source={{ uri: cluster.senderAvatarUrl }}
+                  style={styles.captureAvatarImage}
+                  onLoad={() => { setTimeout(() => captureAvatar(cluster.id), 100); }}
+                />
+              </View>
+              {cluster.messages.length > 1 && (
+                <View style={styles.clusterBadgeSolid}>
+                  <Text style={styles.clusterBadgeText}>{cluster.messages.length}</Text>
+                </View>
+              )}
+            </View>
+          );
+        })}
       </View>
 
       <MapView
@@ -350,7 +519,8 @@ export default function MapScreen({ navigation, route }: Props) {
         pitchEnabled={false}
         moveOnMarkerPress={false}
       >
-        {clusters.map((cluster) => {
+        {/* Explore mode markers */}
+        {mapMode === 'explore' && clusters.map((cluster) => {
           const capturedImage = avatarImages[cluster.id];
           if (!capturedImage) return null;
           return (
@@ -370,6 +540,27 @@ export default function MapScreen({ navigation, route }: Props) {
           );
         })}
 
+        {/* Mine mode markers */}
+        {mapMode === 'mine' && ownClusters.map((cluster) => {
+          const capturedImage = avatarImages[cluster.id];
+          if (!capturedImage) return null;
+          return (
+            <MessageMarker
+              key={cluster.id}
+              markerId={cluster.id}
+              location={cluster.location}
+              avatarUri={capturedImage}
+              isTarget={false}
+              hasActiveRoute={false}
+              onPress={() =>
+                cluster.messages.length > 1
+                  ? handleClusterPress(cluster)
+                  : handleMarkerPress(cluster.messages[0])
+              }
+            />
+          );
+        })}
+
         {routeCoordinates && (
           <>
             <Polyline coordinates={routeCoordinates} strokeColor="rgba(255,255,255,0.9)" strokeWidth={10} />
@@ -379,47 +570,48 @@ export default function MapScreen({ navigation, route }: Props) {
 
       </MapView>
 
-      <View style={[styles.floatingButtonsContainer, { top: insets.top + 16 }]}>
+      {routeCoordinates && (
+        <View style={[styles.floatingButtonsContainer, { top: insets.top + 16 }]}>
+          <TouchableOpacity onPress={openInMaps} activeOpacity={0.9} style={[styles.floatingButton, styles.floatingButtonMaps]}>
+            <Ionicons name="walk-outline" size={22} color={colors.primary.cyan} />
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={clearRoute}
+            activeOpacity={0.9}
+            style={[styles.floatingButton, styles.floatingButtonDanger]}
+          >
+            <Ionicons name="close" size={22} color="#FF6B6B" />
+          </TouchableOpacity>
+        </View>
+      )}
+
+      <View style={[styles.bottomRightContainer, { bottom: 24 + insets.bottom }]}>
+        <View style={[styles.createFABGlowContainer]}>
+          <TouchableOpacity
+            style={styles.createFABContainer}
+            onPress={navigateToCreate}
+            activeOpacity={0.8}
+          >
+            <LinearGradient
+              colors={colors.gradients.button}
+              start={GRADIENT_START}
+              end={FAB_GRADIENT_END}
+              style={styles.createFAB}
+            >
+              <View style={styles.createFABInner}>
+                <FontAwesome name="paper-plane" size={32} color="#FFFFFF" style={styles.fabIcon} />
+              </View>
+            </LinearGradient>
+          </TouchableOpacity>
+        </View>
+
         <TouchableOpacity onPress={centerOnUser} activeOpacity={0.9} style={styles.floatingButton}>
           <Ionicons name="locate" size={22} color={colors.primary.cyan} />
         </TouchableOpacity>
-
-        {routeCoordinates && (
-          <>
-            <TouchableOpacity onPress={openInMaps} activeOpacity={0.9} style={[styles.floatingButton, styles.floatingButtonMaps]}>
-              <Ionicons name="walk-outline" size={22} color={colors.primary.cyan} />
-            </TouchableOpacity>
-            <TouchableOpacity
-              onPress={clearRoute}
-              activeOpacity={0.9}
-              style={[styles.floatingButton, styles.floatingButtonDanger]}
-            >
-              <Ionicons name="close" size={22} color="#FF6B6B" />
-            </TouchableOpacity>
-          </>
-        )}
       </View>
 
-      <View style={[styles.createFABGlowContainer, { bottom: 24 + insets.bottom }]}>
-        <TouchableOpacity
-          style={styles.createFABContainer}
-          onPress={navigateToCreate}
-          activeOpacity={0.8}
-        >
-          <LinearGradient
-            colors={colors.gradients.button}
-            start={GRADIENT_START}
-            end={FAB_GRADIENT_END}
-            style={styles.createFAB}
-          >
-            <View style={styles.createFABInner}>
-              <FontAwesome name="paper-plane" size={32} color="#FFFFFF" style={styles.fabIcon} />
-            </View>
-          </LinearGradient>
-        </TouchableOpacity>
-      </View>
-
-      {selectedMessage && (
+      {/* Explore: selected message card */}
+      {selectedMessage && mapMode === 'explore' && (
         <SelectedMessageCard
           message={selectedMessage}
           isReadable={canReadMessage(selectedMsgLocation)}
@@ -434,10 +626,23 @@ export default function MapScreen({ navigation, route }: Props) {
         />
       )}
 
+      {/* Mine: selected own flag card */}
+      {selectedOwnFlag && mapMode === 'mine' && (
+        <OwnFlagCard
+          flag={selectedOwnFlag}
+          cardSlideAnim={ownFlagSlideAnim}
+          cardOpacityAnim={ownFlagOpacityAnim}
+          bottomOffset={24 + insets.bottom}
+          onClose={handleCloseOwnFlagCard}
+          onViewConversation={selectedOwnFlag.recipient_id ? handleViewOwnFlagConversation : undefined}
+        />
+      )}
+
       <ClusterPickerModal
         cluster={selectedCluster}
         onSelect={handleMarkerPress}
         onClose={() => setSelectedCluster(null)}
+        labelMap={mapMode === 'mine' ? ownFlagLabelMap : undefined}
       />
     </View>
   );
@@ -488,9 +693,13 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(0, 229, 255, 0.35)',
   },
-  createFABGlowContainer: {
+  bottomRightContainer: {
     position: 'absolute',
     right: spacing.lg,
+    alignItems: 'center',
+    gap: spacing.md,
+  },
+  createFABGlowContainer: {
     shadowColor: '#C4B5FD',
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.9,
@@ -556,6 +765,20 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: '#fff',
   },
+  clusterBadgeSolid: {
+    position: 'absolute',
+    top: 7,
+    right: 7,
+    minWidth: 26,
+    height: 26,
+    borderRadius: 13,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 5,
+    borderWidth: 2,
+    borderColor: '#fff',
+    backgroundColor: colors.primary.violet,
+  },
   clusterBadgeText: {
     color: '#fff',
     fontSize: 13,
@@ -565,6 +788,10 @@ const styles = StyleSheet.create({
   captureAvatarPublic: {
     borderWidth: 3,
     borderColor: colors.primary.violet,
+  },
+  captureAvatarOwn: {
+    borderWidth: 3,
+    borderColor: '#F59E0B',
   },
   captureAvatarImage: {
     width: 52,

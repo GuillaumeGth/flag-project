@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, TouchableOpacity, Modal, FlatList, StyleSheet, Image } from 'react-native';
 import { BlurView } from 'expo-blur';
 import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { UndiscoveredMessageMapMeta } from '@/types';
 import { MessageCluster } from '@/hooks/useClusteredMarkers';
 import { colors, spacing, radius } from '@/theme-redesign';
@@ -11,9 +12,11 @@ interface ClusterPickerModalProps {
   cluster: MessageCluster | null;
   onSelect: (message: UndiscoveredMessageMapMeta) => void;
   onClose: () => void;
+  labelMap?: Record<string, string>;
 }
 
-export default function ClusterPickerModal({ cluster, onSelect, onClose }: ClusterPickerModalProps) {
+export default function ClusterPickerModal({ cluster, onSelect, onClose, labelMap }: ClusterPickerModalProps) {
+  const insets = useSafeAreaInsets();
   if (!cluster) return null;
 
   const sender = cluster.messages[0].sender;
@@ -23,7 +26,7 @@ export default function ClusterPickerModal({ cluster, onSelect, onClose }: Clust
       <TouchableOpacity style={styles.backdrop} onPress={onClose} activeOpacity={1}>
         <View style={styles.sheet}>
           <BlurView intensity={60} tint="dark" style={StyleSheet.absoluteFill} />
-          <View style={styles.content}>
+          <View style={[styles.content, { paddingBottom: spacing.xxl + insets.bottom }]}>
             <View style={styles.header}>
               <Image source={{ uri: cluster.senderAvatarUrl }} style={styles.avatar} />
               <View style={styles.headerText}>
@@ -49,7 +52,7 @@ export default function ClusterPickerModal({ cluster, onSelect, onClose }: Clust
                       color={item.is_public ? colors.primary.violet : colors.primary.cyan}
                     />
                   </View>
-                  <Text style={styles.itemLabel}>Flaag {index + 1}</Text>
+                  <Text style={styles.itemLabel}>{labelMap?.[item.id] ?? `Flaag ${index + 1}`}</Text>
                   <Text style={styles.itemDate}>{formatMessageDate(item.created_at)}</Text>
                   <Ionicons name="chevron-forward" size={14} color={colors.text.secondary} />
                 </TouchableOpacity>
@@ -76,7 +79,6 @@ const styles = StyleSheet.create({
   },
   content: {
     padding: spacing.lg,
-    paddingBottom: spacing.xxl,
   },
   header: {
     flexDirection: 'row',

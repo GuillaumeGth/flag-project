@@ -1,20 +1,23 @@
 import React from 'react';
-import { View, Text, Image, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, Image, Pressable, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { MessageReply } from '@/types';
+import { MessageReply } from '@/types/index';
 import { colors, spacing, radius, typography } from '@/theme-redesign';
 
 interface QuotedMessageProps {
   reply: MessageReply;
   isFromMe: boolean;
+  showSenderName?: boolean;
   onPress?: () => void;
 }
 
-export default function QuotedMessage({ reply, isFromMe, onPress }: QuotedMessageProps) {
+export default function QuotedMessage({ reply, isFromMe, showSenderName = true, onPress }: QuotedMessageProps) {
   const accentColor = isFromMe ? 'rgba(255,255,255,0.5)' : colors.primary.violet;
   const bgColor = isFromMe ? 'rgba(0,0,0,0.15)' : 'rgba(124,92,252,0.08)';
 
-  if (reply.is_deleted_for_viewer) {
+  const isDeleted = reply.deleted_by_sender && reply.deleted_by_recipient;
+
+  if (isDeleted) {
     return (
       <View style={[styles.container, { backgroundColor: bgColor }]}>
         <View style={[styles.accentBar, { backgroundColor: accentColor }]} />
@@ -26,17 +29,18 @@ export default function QuotedMessage({ reply, isFromMe, onPress }: QuotedMessag
   const isPhoto = reply.content_type === 'photo' && !!reply.media_url;
 
   return (
-    <TouchableOpacity
+    <Pressable
       onPress={onPress}
       disabled={!onPress}
-      activeOpacity={0.7}
-      style={[styles.container, { backgroundColor: bgColor }]}
+      style={({ pressed }) => [styles.container, { backgroundColor: bgColor, opacity: pressed && onPress ? 0.7 : 1 }]}
     >
       <View style={[styles.accentBar, { backgroundColor: accentColor }]} />
       <View style={styles.content}>
-        <Text style={[styles.senderName, { color: accentColor }]} numberOfLines={1}>
-          {reply.sender_display_name ?? 'Utilisateur'}
-        </Text>
+        {showSenderName && (
+          <Text style={[styles.senderName, { color: accentColor }]} numberOfLines={1}>
+            {reply.sender?.display_name ?? 'Utilisateur'}
+          </Text>
+        )}
         <View style={styles.previewRow}>
           {reply.content_type === 'audio' && (
             <Ionicons name="mic" size={11} color={colors.text.tertiary} style={styles.icon} />
@@ -56,7 +60,7 @@ export default function QuotedMessage({ reply, isFromMe, onPress }: QuotedMessag
       {isPhoto && (
         <Image source={{ uri: reply.media_url! }} style={styles.thumbnail} />
       )}
-    </TouchableOpacity>
+    </Pressable>
   );
 }
 

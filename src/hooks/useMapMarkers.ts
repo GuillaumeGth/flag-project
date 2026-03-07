@@ -9,6 +9,7 @@ interface UseMapMarkersResult {
   avatarImages: Record<string, string>;
   avatarRefs: React.MutableRefObject<Record<string, View | null>>;
   captureAvatar: (messageId: string) => Promise<void>;
+  clearAvatarImages: (ids: string[]) => void;
   canReadMessage: (messageLocation: Coordinates | null) => boolean;
   formatDistance: (messageLocation: Coordinates | null) => string | null;
 }
@@ -19,6 +20,14 @@ export function useMapMarkers(
 ): UseMapMarkersResult {
   const [avatarImages, setAvatarImages] = useState<Record<string, string>>({});
   const avatarRefs = useRef<Record<string, View | null>>({});
+
+  const clearAvatarImages = useCallback((ids: string[]) => {
+    setAvatarImages(prev => {
+      const updated = { ...prev };
+      for (const id of ids) delete updated[id];
+      return updated;
+    });
+  }, []);
 
   const captureAvatar = useCallback(async (messageId: string) => {
     const ref = avatarRefs.current[messageId];
@@ -50,5 +59,5 @@ export function useMapMarkers(
     return `${(distance / 1000).toFixed(1)}km`;
   }, [userLocation]);
 
-  return { avatarImages, avatarRefs, captureAvatar, canReadMessage, formatDistance };
+  return { avatarImages, avatarRefs, captureAvatar, clearAvatarImages, canReadMessage, formatDistance };
 }

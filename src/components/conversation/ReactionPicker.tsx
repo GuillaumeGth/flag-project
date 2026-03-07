@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { TouchableOpacity, Text, Modal, StyleSheet, Pressable, useWindowDimensions } from 'react-native';
+import { TouchableOpacity, Text, StyleSheet, useWindowDimensions } from 'react-native';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -42,6 +42,9 @@ export default function ReactionPicker({
     if (visible) {
       scale.value = withSpring(1, SPRING_CONFIG);
       opacity.value = withTiming(1, TIMING_OPEN);
+    } else {
+      scale.value = 0.7;
+      opacity.value = 0;
     }
   }, [visible, scale, opacity]);
 
@@ -50,63 +53,52 @@ export default function ReactionPicker({
     opacity: opacity.value,
   }));
 
+  if (!visible) return null;
+
   // Position pill above the long-pressed message, clamped within screen bounds
   const pillTop = anchorY != null
     ? Math.min(
         Math.max(PILL_MARGIN, anchorY - PILL_HEIGHT - PILL_MARGIN),
         screenHeight - PILL_HEIGHT - PILL_MARGIN
       )
-    : undefined;
+    : screenHeight / 2 - PILL_HEIGHT;
 
   return (
-    <Modal
-      visible={visible}
-      transparent
-      animationType="fade"
-      onRequestClose={onClose}
-      statusBarTranslucent
+    // pointerEvents="box-none" lets touches pass through the wrapper to elements below,
+    // only the pill itself captures presses.
+    <Animated.View
+      style={[styles.wrapper, { top: pillTop }, animatedPillStyle]}
+      pointerEvents="box-none"
     >
-      {/* Tap outside the pill to dismiss */}
-      <Pressable style={styles.overlay} onPress={onClose}>
-        {/* Swallow presses on the pill itself so they don't close the picker */}
-        <Animated.View
-          style={[
-            animatedPillStyle,
-            pillTop != null && { position: 'absolute', top: pillTop, left: 16, right: 16, alignItems: 'center' },
-          ]}
-          pointerEvents="box-none"
-        >
-          <Pressable onPress={() => {}} style={styles.pill}>
-            {ALLOWED_EMOJIS.map((emoji) => {
-              const isActive = currentReactions.includes(emoji);
-              return (
-                <TouchableOpacity
-                  key={emoji}
-                  style={[styles.emojiButton, isActive && styles.emojiButtonActive]}
-                  onPress={() => {
-                    onSelect(emoji);
-                    onClose();
-                  }}
-                  activeOpacity={0.65}
-                >
-                  <Text style={styles.emojiText}>{emoji}</Text>
-                </TouchableOpacity>
-              );
-            })}
-          </Pressable>
-        </Animated.View>
-      </Pressable>
-    </Modal>
+      <TouchableOpacity activeOpacity={1} style={styles.pill}>
+        {ALLOWED_EMOJIS.map((emoji) => {
+          const isActive = currentReactions.includes(emoji);
+          return (
+            <TouchableOpacity
+              key={emoji}
+              style={[styles.emojiButton, isActive && styles.emojiButtonActive]}
+              onPress={() => {
+                onSelect(emoji);
+                onClose();
+              }}
+              activeOpacity={0.65}
+            >
+              <Text style={styles.emojiText}>{emoji}</Text>
+            </TouchableOpacity>
+          );
+        })}
+      </TouchableOpacity>
+    </Animated.View>
   );
 }
 
 const styles = StyleSheet.create({
-  overlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.35)',
-    justifyContent: 'center',
+  wrapper: {
+    position: 'absolute',
+    left: 16,
+    right: 16,
     alignItems: 'center',
-    position: 'relative',
+    zIndex: 100,
   },
   pill: {
     flexDirection: 'row',

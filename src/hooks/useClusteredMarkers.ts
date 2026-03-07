@@ -3,7 +3,7 @@ import { UndiscoveredMessageMapMeta, Coordinates } from '@/types';
 import { calculateDistance } from '@/services/location';
 import { getMessageLocation } from '@/utils/mapUtils';
 
-export const CLUSTER_RADIUS_M = 30;
+export const CLUSTER_RADIUS_M = 50;
 
 export interface MessageCluster {
   id: string; // representative message id (= first message)

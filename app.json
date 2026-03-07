@@ -18,6 +18,7 @@
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.flagapp.app",
+      "buildNumber": "2",
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "Fläag utilise votre position pour afficher les messages autour de vous.",
         "NSLocationAlwaysAndWhenInUseUsageDescription": "Fläag utilise votre position en arrière-plan pour vous notifier quand vous êtes proche d'un message.",
@@ -40,14 +41,12 @@
               "scheme": "flag"
             }
           ],
-          "category": ["BROWSABLE", "DEFAULT"]
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
         }
       ],
-      "config": {
-        "googleMaps": {
-          "apiKey": "AIzaSyDrlGiPT_Wt94CvbjeHRn_CzKIp1Pw9OeY"
-        }
-      },
       "permissions": [
         "ACCESS_COARSE_LOCATION",
         "ACCESS_FINE_LOCATION",
@@ -63,7 +62,8 @@
         "android.permission.FOREGROUND_SERVICE_LOCATION",
         "android.permission.CAMERA",
         "android.permission.RECORD_AUDIO"
-      ]
+      ],
+      "versionCode": 6
     },
     "plugins": [
       [
@@ -90,8 +90,6 @@
       "expo-web-browser"
     ],
     "extra": {
-      "supabaseUrl": "https://svhrpzlhqauyarcffpii.supabase.co",
-      "supabaseAnonKey": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN2aHJwemxocWF1eWFyY2ZmcGlpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk4OTUwMTcsImV4cCI6MjA4NTQ3MTAxN30.XqKUpriPey1lhIpsmjF4Zcgjfeml2DtjGHlL7N-Jfqk",
       "eas": {
         "projectId": "c8cb48ce-1c64-4314-a6ad-ada1e82efca8"
       }

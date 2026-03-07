@@ -402,12 +402,35 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           return { error: sessionError };
         }
 
-        // Tokens not in URL, let deep link listener handle it
-        log('AuthContext', 'No tokens in result URL, checking deep link listener...');
+        // No tokens in hash — try PKCE code exchange from query params
+        const queryIndex = result.url.indexOf('?');
+        if (queryIndex !== -1) {
+          const queryString = result.url.substring(queryIndex + 1).split('#')[0];
+          const queryParams = new URLSearchParams(queryString);
+          const code = queryParams.get('code');
+          if (code) {
+            log('AuthContext', 'Exchanging PKCE code from openAuthSessionAsync result');
+            const { error: codeError } = await supabase.auth.exchangeCodeForSession(code);
+            if (codeError) {
+              log('AuthContext', 'Error exchanging PKCE code:', codeError.message);
+              return { error: codeError as Error };
+            }
+            return { error: null };
+          }
+        }
+
+        log('AuthContext', 'No tokens or code in result URL');
       }
 
-      if (result.type === 'cancel') {
-        log('AuthContext', 'User cancelled authentication');
+      if (result.type === 'cancel' || result.type === 'dismiss') {
+        log('AuthContext', 'Auth browser dismissed, checking for existing session...');
+        // On Android, openAuthSessionAsync may dismiss while the deep link is
+        // processed separately. Check if a session was already established.
+        const { data: sessionData } = await supabase.auth.getSession();
+        if (sessionData.session) {
+          log('AuthContext', 'Session found after dismiss, auth succeeded via deep link');
+          return { error: null };
+        }
       }
 
       return { error: null };

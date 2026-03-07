@@ -15,6 +15,7 @@ import { colors, spacing, radius, shadows, typography } from '@/theme-redesign';
 import { formatTime, formatDateSeparator } from '@/utils/date';
 import GlassCard from '@/components/redesign/GlassCard';
 import ReactionBadge from './ReactionBadge';
+import QuotedMessage from './QuotedMessage';
 
 // Module-level interpolation config — never declared inside render
 const ANIM_INPUT_RANGE = [0, 1] as const;
@@ -33,8 +34,10 @@ interface MessageBubbleProps {
   onPlayAudio: (message: MessageWithUsers) => void;
   onViewImage: (message: MessageWithUsers) => void;
   onNavigateToMap: (location: MessageWithUsers['location']) => void;
-  onLongPress: () => void;
+  onLongPress: (pageY: number) => void;
   onReactionPress: (emoji: string) => void;
+  onScrollToMessage?: (messageId: string) => void;
+  showSenderNameInReply?: boolean;
 }
 
 export default function MessageBubble({
@@ -52,6 +55,8 @@ export default function MessageBubble({
   onNavigateToMap,
   onLongPress,
   onReactionPress,
+  onScrollToMessage,
+  showSenderNameInReply = true,
 }: MessageBubbleProps) {
   const isUndiscovered = !isFromMe && !message.is_read && message.location;
   const isDeleted = isFromMe ? !!message.deleted_by_sender : !!message.deleted_by_recipient;
@@ -86,7 +91,7 @@ export default function MessageBubble({
         {isUndiscovered ? (
           <Pressable
             onPress={() => onNavigateToMap(message.location)}
-            onLongPress={onLongPress}
+            onLongPress={(e) => onLongPress(e.nativeEvent.pageY)}
             delayLongPress={400}
           >
             <GlassCard style={styles.undiscoveredBubble}>
@@ -102,13 +107,12 @@ export default function MessageBubble({
           <View style={styles.bubbleWrapper}>
             <Pressable
               onPress={onPress}
-              onLongPress={!isDeleted ? onLongPress : undefined}
+              onLongPress={!isDeleted ? (e) => onLongPress(e.nativeEvent.pageY) : undefined}
               delayLongPress={400}
               style={[
                 styles.messageBubble,
                 isFromMe ? styles.messageBubbleRight : styles.messageBubbleLeft,
                 hasReactions && styles.messageBubbleWithReactions,
-                isSelected && styles.messageBubbleSelected,
                 isDeleted && styles.messageBubbleDeleted,
               ]}
             >
@@ -116,6 +120,16 @@ export default function MessageBubble({
                 <Text style={styles.deletedText}>Message supprimé</Text>
               ) : (
                 <>
+                  {message.reply_to?.id && (
+                    <QuotedMessage
+                      reply={message.reply_to}
+                      isFromMe={isFromMe}
+                      showSenderName={showSenderNameInReply}
+                      onPress={onScrollToMessage && message.reply_to.id
+                        ? () => onScrollToMessage(message.reply_to!.id!)
+                        : undefined}
+                    />
+                  )}
                   {message.content_type === 'photo' && message.media_url && (
                     <TouchableOpacity activeOpacity={0.9} onPress={() => onViewImage(message)}>
                       <Image source={{ uri: message.media_url }} style={styles.messageImage} />
@@ -223,6 +237,7 @@ const styles = StyleSheet.create({
   },
   bubbleWrapper: {
     position: 'relative',
+    minWidth: '50%',
     maxWidth: '75%',
   },
   messageBubble: {

@@ -249,9 +249,9 @@ export default function ProfileScreen({ navigation }: Props) {
               variant="gradient"
               icon="location"
               onPress={() => {
-                const loc = viewingMessage.location;
+                const id = viewingMessage.id;
                 setViewingMessage(null);
-                navigation.navigate('Map', { focusLocation: loc });
+                navigation.navigate('Map', { messageId: id, mine: true });
               }}
               style={[styles.photoViewerLocationButton, { bottom: 60 + insets.bottom }]}
               withGlow

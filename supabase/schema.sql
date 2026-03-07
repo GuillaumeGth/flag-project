@@ -703,6 +703,41 @@ CREATE POLICY "Users can delete own reactions" ON public.message_reactions
 CREATE INDEX IF NOT EXISTS message_reactions_message_id_idx ON public.message_reactions(message_id);
 CREATE INDEX IF NOT EXISTS message_reactions_user_id_idx ON public.message_reactions(user_id);
 
+-- ============================================================
+-- User blocks table
+-- Stores unidirectional blocks: blocker_id does not see blocked_id anywhere.
+-- Insertable by admins (service_role) on behalf of a user, or by the user themselves.
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS public.user_blocks (
+    id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    blocker_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+    blocked_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    CONSTRAINT user_blocks_unique UNIQUE (blocker_id, blocked_id),
+    CONSTRAINT user_blocks_no_self CHECK (blocker_id != blocked_id)
+);
+
+ALTER TABLE public.user_blocks ENABLE ROW LEVEL SECURITY;
+
+-- Blocker can see their own blocks
+DROP POLICY IF EXISTS "Users can view own blocks" ON public.user_blocks;
+CREATE POLICY "Users can view own blocks" ON public.user_blocks
+    FOR SELECT USING (auth.uid() = blocker_id);
+
+-- Users can block others (blocker_id must be themselves)
+DROP POLICY IF EXISTS "Users can block others" ON public.user_blocks;
+CREATE POLICY "Users can block others" ON public.user_blocks
+    FOR INSERT WITH CHECK (auth.uid() = blocker_id);
+
+-- Users can unblock others
+DROP POLICY IF EXISTS "Users can unblock others" ON public.user_blocks;
+CREATE POLICY "Users can unblock others" ON public.user_blocks
+    FOR DELETE USING (auth.uid() = blocker_id);
+
+CREATE INDEX IF NOT EXISTS user_blocks_blocker_idx ON public.user_blocks(blocker_id);
+CREATE INDEX IF NOT EXISTS user_blocks_blocked_idx ON public.user_blocks(blocked_id);
+
 -- Function to send push notification to message author when someone reacts
 CREATE OR REPLACE FUNCTION public.send_push_on_reaction()
 RETURNS TRIGGER AS $$

@@ -10,6 +10,7 @@ import {
 } from './cache';
 import { reportError } from './errorReporting';
 import { log } from '@/utils/debug';
+import { fetchBlockedIds } from './blocks';
 
 // Default Fläag Bot user ID (created via seed.sql)
 export const FLAG_BOT_ID = '00000000-0000-0000-0000-000000000001';
@@ -132,7 +133,8 @@ export async function fetchFollowedUsers(): Promise<User[]> {
 }
 
 // Build conversations from a list of messages (with user joins)
-function buildConversations(messages: RawMessageWithUsers[], currentUserId: string): Conversation[] {
+// blockedSet: IDs of users whose conversations should be hidden from the current user
+function buildConversations(messages: RawMessageWithUsers[], currentUserId: string, blockedSet: Set<string> = new Set()): Conversation[] {
   const conversationsMap = new Map<string, Conversation>();
 
   // Sort by created_at descending to ensure first entry per user is the latest message
@@ -146,6 +148,7 @@ function buildConversations(messages: RawMessageWithUsers[], currentUserId: stri
     const otherUser = isFromMe ? msg.recipient : msg.sender;
 
     if (!otherUser || !otherUserId) continue;
+    if (blockedSet.has(otherUserId)) continue;
 
     if (!conversationsMap.has(otherUserId)) {
       const unreadCount = sorted.filter(
@@ -204,13 +207,17 @@ export async function fetchConversations(): Promise<Conversation[]> {
     query = query.gt('created_at', lastSync);
   }
 
-  const { data: newMessages, error } = await query;
+  const [{ data: newMessages, error }, blockedIds] = await Promise.all([
+    query,
+    fetchBlockedIds(),
+  ]);
+  const blockedSet = new Set(blockedIds);
 
   log('messages', 'fetchConversations: query done, error =', error, 'new count =', newMessages?.length, 'cached count =', cachedMessages.length);
   if (error) {
     reportError(error, 'messages.fetchConversations');
     if (cachedMessages.length > 0) {
-      return buildConversations(cachedMessages, currentUserId);
+      return buildConversations(cachedMessages, currentUserId, blockedSet);
     }
     return [];
   }
@@ -230,7 +237,7 @@ export async function fetchConversations(): Promise<Conversation[]> {
   await setCachedData(cacheKey, allMessages);
   await setLastSyncTimestamp(cacheKey, syncTimestamp);
 
-  return buildConversations(allMessages, currentUserId);
+  return buildConversations(allMessages, currentUserId, blockedSet);
 }
 
 /**
@@ -241,10 +248,13 @@ export async function getCachedConversations(): Promise<Conversation[] | null> {
   const currentUserId = getCurrentUserId();
   if (!currentUserId) return null;
 
-  const cachedMessages = await getCachedData<RawMessageWithUsers[]>(CACHE_KEYS.CONVERSATIONS_MESSAGES);
+  const [cachedMessages, blockedIds] = await Promise.all([
+    getCachedData<RawMessageWithUsers[]>(CACHE_KEYS.CONVERSATIONS_MESSAGES),
+    fetchBlockedIds(),
+  ]);
   if (!cachedMessages || cachedMessages.length === 0) return null;
 
-  return buildConversations(cachedMessages, currentUserId);
+  return buildConversations(cachedMessages, currentUserId, new Set(blockedIds));
 }
 
 // Fetch all messages for a specific conversation (with local cache + incremental sync)

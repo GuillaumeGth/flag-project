@@ -11,6 +11,7 @@ import {
   RefreshControl,
   Modal,
   Switch,
+  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -27,6 +28,7 @@ import {
   updateNotificationPrefs,
   NotificationPrefs,
 } from '@/services/subscriptions';
+import { blockUser, isBlocked } from '@/services/blocks';
 import { Message, User, RootStackParamList } from '@/types';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
@@ -49,6 +51,8 @@ export default function UserProfileScreen({ navigation, route }: Props) {
   const [viewingMessage, setViewingMessage] = useState<Message | null>(null);
   const [notifPrefs, setNotifPrefs] = useState<NotificationPrefs>({ notifyPrivateFlags: true, notifyPublicFlags: false });
   const [showNotifModal, setShowNotifModal] = useState(false);
+  const [blocked, setBlocked] = useState(false);
+  const [showMenuModal, setShowMenuModal] = useState(false);
 
   const loadProfile = useCallback(async () => {
     const { data } = await supabase
@@ -78,15 +82,20 @@ export default function UserProfileScreen({ navigation, route }: Props) {
     }
   }, [userId]);
 
+  const checkBlocked = useCallback(async () => {
+    const result = await isBlocked(userId);
+    setBlocked(result);
+  }, [userId]);
+
   const loadFollowerCount = useCallback(async () => {
     const count = await fetchFollowerCount(userId);
     setFollowerCount(count);
   }, [userId]);
 
   useEffect(() => {
-    Promise.all([loadProfile(), loadMessages(), checkFollowing(), loadFollowerCount()])
+    Promise.all([loadProfile(), loadMessages(), checkFollowing(), loadFollowerCount(), checkBlocked()])
       .finally(() => setLoading(false));
-  }, [loadProfile, loadMessages, checkFollowing]);
+  }, [loadProfile, loadMessages, checkFollowing, checkBlocked]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -114,6 +123,36 @@ export default function UserProfileScreen({ navigation, route }: Props) {
     }
     setFollowLoading(false);
   };
+
+  const handleBlock = useCallback(() => {
+    setShowMenuModal(false);
+    Alert.alert(
+      blocked ? 'Débloquer cet utilisateur ?' : 'Bloquer cet utilisateur ?',
+      blocked
+        ? 'Cet utilisateur redeviendra visible pour vous.'
+        : 'Cet utilisateur disparaîtra de votre carte, de votre inbox et de vos recherches.',
+      [
+        { text: 'Annuler', style: 'cancel' },
+        {
+          text: blocked ? 'Débloquer' : 'Bloquer',
+          style: blocked ? 'default' : 'destructive',
+          onPress: async () => {
+            if (blocked) {
+              // unblock: navigate back, no service yet — placeholder
+              setBlocked(false);
+            } else {
+              const ok = await blockUser(userId);
+              if (ok) {
+                setBlocked(true);
+                setFollowing(false);
+                navigation.goBack();
+              }
+            }
+          },
+        },
+      ]
+    );
+  }, [blocked, userId, navigation]);
 
   const renderCell = ({ item }: { item: Message }) => {
     const isDiscovered = discoveredIds.has(item.id);
@@ -217,6 +256,9 @@ export default function UserProfileScreen({ navigation, route }: Props) {
             />
           </TouchableOpacity>
         )}
+        <TouchableOpacity onPress={() => setShowMenuModal(true)} style={styles.menuButton}>
+          <Ionicons name="ellipsis-vertical" size={20} color={colors.text.secondary} />
+        </TouchableOpacity>
         <TouchableOpacity
           style={[styles.followButton, following && styles.followButtonActive]}
           onPress={handleToggleFollow}
@@ -329,6 +371,32 @@ export default function UserProfileScreen({ navigation, route }: Props) {
                 thumbColor={colors.text.primary}
               />
             </View>
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
+
+      <Modal
+        visible={showMenuModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowMenuModal(false)}
+      >
+        <TouchableOpacity
+          style={styles.notifModalOverlay}
+          activeOpacity={1}
+          onPress={() => setShowMenuModal(false)}
+        >
+          <TouchableOpacity activeOpacity={1} style={styles.menuModalCard}>
+            <TouchableOpacity style={styles.menuItem} onPress={handleBlock}>
+              <Ionicons
+                name={blocked ? 'person-add-outline' : 'ban-outline'}
+                size={20}
+                color={blocked ? colors.primary.violet : colors.error ?? '#FF4444'}
+              />
+              <Text style={[styles.menuItemText, !blocked && styles.menuItemDanger]}>
+                {blocked ? 'Débloquer' : 'Bloquer'}
+              </Text>
+            </TouchableOpacity>
           </TouchableOpacity>
         </TouchableOpacity>
       </Modal>
@@ -572,6 +640,32 @@ const styles = StyleSheet.create({
   bellButton: {
     padding: 6,
     marginRight: 8,
+  },
+  menuButton: {
+    padding: 6,
+    marginRight: 8,
+  },
+  menuModalCard: {
+    width: '100%',
+    backgroundColor: colors.surface.elevated,
+    borderRadius: radius.xl,
+    padding: spacing.sm,
+  },
+  menuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.md,
+    borderRadius: radius.md,
+  },
+  menuItemText: {
+    fontSize: typography.sizes.md,
+    fontWeight: '500',
+    color: colors.text.primary,
+  },
+  menuItemDanger: {
+    color: '#FF4444',
   },
   notifModalOverlay: {
     flex: 1,

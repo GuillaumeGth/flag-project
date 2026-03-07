@@ -15,6 +15,7 @@ import { BottomTabNavigationProp, BottomTabScreenProps } from '@react-navigation
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { supabase, getCachedUserId } from '@/services/supabase';
+import { fetchBlockedIds } from '@/services/blocks';
 import { colors } from '@/theme-redesign';
 import { User, MainTabParamList, RootStackParamList } from '@/types';
 
@@ -35,14 +36,18 @@ export default function SearchUsersScreen({ navigation }: Props) {
   const currentUserId = getCachedUserId();
 
   useEffect(() => {
-    supabase
-      .rpc('get_top_users_by_followers', {
+    Promise.all([
+      supabase.rpc('get_top_users_by_followers', {
         limit_count: 10,
         exclude_user_id: currentUserId || undefined,
-      })
-      .then(({ data }) => {
-        if (data) setTopUsers(data);
-      });
+      }),
+      fetchBlockedIds(),
+    ]).then(([{ data }, blockedIds]) => {
+      if (data) {
+        const blockedSet = new Set(blockedIds);
+        setTopUsers((data as User[]).filter(u => !blockedSet.has(u.id)));
+      }
+    });
   }, [currentUserId]);
 
   const search = useCallback(async (text: string) => {
@@ -52,16 +57,20 @@ export default function SearchUsersScreen({ navigation }: Props) {
     }
 
     setLoading(true);
-    const { data, error } = await supabase
-      .from('users')
-      .select('*')
-      .ilike('display_name', `%${text.trim()}%`)
-      .neq('id', currentUserId || '')
-      .limit(20)
-      .order('display_name', { ascending: true });
+    const [{ data, error }, blockedIds] = await Promise.all([
+      supabase
+        .from('users')
+        .select('*')
+        .ilike('display_name', `%${text.trim()}%`)
+        .neq('id', currentUserId || '')
+        .limit(20)
+        .order('display_name', { ascending: true }),
+      fetchBlockedIds(),
+    ]);
 
     if (!error && data) {
-      setResults(data);
+      const blockedSet = new Set(blockedIds);
+      setResults((data as User[]).filter(u => !blockedSet.has(u.id)));
     }
     setLoading(false);
   }, [currentUserId]);

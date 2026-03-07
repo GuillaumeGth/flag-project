@@ -106,6 +106,7 @@ export interface AuthState {
 
 export * from './navigation';
 export * from './reactions';
+export * from './blocks';
 
 // Location state
 export interface LocationState {

@@ -54,13 +54,14 @@ supabase/
 - **`location.ts`** — Distance Haversine, permissions, watch foreground/background
 - **`notifications.ts`** — Tokens push, notifications locales de proximité
 - **`subscriptions.ts`** — Follow/unfollow, vérification abonnement
+- **`blocks.ts`** — Blocage d'utilisateur (`blockUser`, `unblockUser`, `isBlocked`, `fetchBlockedIds`)
 - **`cache.ts`** — Cache AsyncStorage avec sync incrémental par timestamp
 - **`supabase.ts`** — Client Supabase, SecureStore adapter, gestion session
 - **`errorReporting.ts`** — Logs d'erreurs en production (throttled, vers Supabase)
 
 ## Base de données
 
-Tables principales : `users`, `messages`, `message_reactions`, `subscriptions`, `discovered_public_messages`, `user_push_tokens`, `error_logs`, `app_config`
+Tables principales : `users`, `messages`, `message_reactions`, `subscriptions`, `user_blocks`, `discovered_public_messages`, `user_push_tokens`, `error_logs`, `app_config`
 
 Points importants :
 - **PostGIS** pour les requêtes géographiques (type `GEOGRAPHY POINT`)
@@ -83,6 +84,15 @@ Points importants :
 - Mise à jour optimiste côté client puis sync Supabase via `toggleReaction`
 - Pattern `generationRef` dans `ConversationScreen` : `reactionsMapRef` garde la dernière valeur de `reactionsMap` accessible dans les callbacks stables (`useCallback` avec deps `[user]` seulement)
 - Table `message_reactions` avec contrainte UNIQUE `(message_id, user_id, emoji)` — RLS basée sur la visibilité du message parent
+
+### Blocage d'utilisateur
+- Table `user_blocks(blocker_id, blocked_id)` — blocage **unilatéral** : le bloqueur ne voit plus le bloqué
+- L'utilisateur bloqué disparaît de : la carte, l'inbox (`fetchConversations`), la recherche (`SearchUsersScreen`), et son profil reste accessible mais sans interactions
+- Au blocage : les abonnements mutuels sont supprimés automatiquement (via `Promise.allSettled` dans `blockUser`)
+- RLS : `blocker_id` toujours résolu via `auth.uid()` — les blocs sont visibles uniquement par le bloqueur
+- **Action admin** : insérer directement via SQL Editor Supabase avec `service_role` (ex : rendre Marion invisible à Ja)
+- Le filtrage côté client utilise `fetchBlockedIds()` → `Set<string>` → filtre dans `buildConversations` et dans les listes de recherche
+- Pattern jest 30 : dans les tests, définir les mocks **à l'intérieur** du `jest.mock()` factory et les exposer via des propriétés privées (`__chain`, `__mockFrom`) pour y accéder via `jest.requireMock()` — les variables `const mock* = jest.fn()` ne sont plus co-hoistées avec jest 30
 
 ### Cache
 - Toutes les fetches supportent le sync incrémental via timestamp

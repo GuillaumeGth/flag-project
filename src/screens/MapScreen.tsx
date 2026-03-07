@@ -46,6 +46,12 @@ type Props = Omit<BottomTabScreenProps<MainTabParamList, 'Map'>, 'navigation'> &
 const LAT_DELTA = 0.009;
 const LNG_DELTA = 0.009;
 
+// 1° latitude ≈ 111 000m → at LAT_DELTA=0.009 this gives 50m (the base cluster radius)
+const LAT_DEG_TO_METERS = 111_000;
+const CLUSTER_RATIO = 0.10; // fraction of visible height used as cluster radius
+const MIN_CLUSTER_RADIUS = 20;
+const MAX_CLUSTER_RADIUS = 15_000;
+
 const GRADIENT_START = { x: 0, y: 0 } as const;
 const FAB_GRADIENT_END = { x: 1, y: 1 } as const;
 const PERMISSION_GRADIENT_END = { x: 1, y: 0 } as const;
@@ -57,15 +63,22 @@ export default function MapScreen({ navigation, route }: Props) {
   const { current: userLocation, loading: locationLoading, refreshLocation, requestPermission, permission } = useLocation();
   const mapRef = useRef<MapView>(null);
 
+  // --- Zoom-aware clustering ---
+  const [latDelta, setLatDelta] = useState(LAT_DELTA);
+  const clusterRadius = useMemo(
+    () => Math.max(MIN_CLUSTER_RADIUS, Math.min(MAX_CLUSTER_RADIUS, latDelta * LAT_DEG_TO_METERS * CLUSTER_RATIO)),
+    [latDelta],
+  );
+
   // --- Explore mode ---
   const { messages, loading, loadMessages } = useMapMessages();
-  const { avatarImages, avatarRefs, captureAvatar, clearAvatarImages, canReadMessage, formatDistance } = useMapMarkers(userLocation, messages);
+  const { avatarImages, avatarRefs, captureAvatar, canReadMessage, formatDistance } = useMapMarkers(userLocation, messages);
 
   const otherMessages = useMemo(
     () => messages.filter(msg => msg.sender?.id !== user?.id),
     [messages, user?.id],
   );
-  const clusters = useClusteredMarkers(otherMessages);
+  const clusters = useClusteredMarkers(otherMessages, clusterRadius, false);
 
   // --- Mine mode ---
   const { flags: myFlags, loadFlags } = useMyFlags();
@@ -89,14 +102,7 @@ export default function MapScreen({ navigation, route }: Props) {
     })),
     [myFlags, user],
   );
-  const ownClusters = useClusteredMarkers(myFlagsAsMapMeta);
-
-  // When own flags reload, invalidate cached avatars so new recipient avatars are captured
-  useEffect(() => {
-    if (myFlags.length > 0) {
-      clearAvatarImages(myFlags.map(f => f.id));
-    }
-  }, [myFlags]);
+  const ownClusters = useClusteredMarkers(myFlagsAsMapMeta, clusterRadius, true);
 
   const ownFlagLabelMap = useMemo(() => {
     const map: Record<string, string> = {};
@@ -448,14 +454,15 @@ export default function MapScreen({ navigation, route }: Props) {
 
       {/* Off-screen avatar captures */}
       <View style={styles.captureContainer} pointerEvents="none">
-        {/* Explore mode: one capture per cluster */}
+        {/* Explore mode: one capture per cluster (key includes count so badge stays fresh on zoom) */}
         {mapMode === 'explore' && clusters.map((cluster) => {
-          if (avatarImages[cluster.id]) return null;
+          const captureKey = `${cluster.id}:${cluster.messages.length}`;
+          if (avatarImages[captureKey]) return null;
           const count = cluster.messages.length;
           return (
             <View
-              key={cluster.id}
-              ref={(ref) => { avatarRefs.current[cluster.id] = ref; }}
+              key={captureKey}
+              ref={(ref) => { avatarRefs.current[captureKey] = ref; }}
               collapsable={false}
               style={styles.captureAvatarWrapper}
             >
@@ -463,7 +470,7 @@ export default function MapScreen({ navigation, route }: Props) {
                 <Image
                   source={{ uri: cluster.senderAvatarUrl }}
                   style={styles.captureAvatarImage}
-                  onLoad={() => { setTimeout(() => captureAvatar(cluster.id), 100); }}
+                  onLoad={() => { setTimeout(() => captureAvatar(captureKey), 100); }}
                 />
               </View>
               {count > 1 && (
@@ -480,13 +487,14 @@ export default function MapScreen({ navigation, route }: Props) {
           );
         })}
 
-        {/* Mine mode: one capture per own-flag cluster (same avatar URL for all) */}
+        {/* Mine mode: one capture per own-flag cluster (key includes count so badge stays fresh on zoom) */}
         {mapMode === 'mine' && ownClusters.map((cluster) => {
-          if (avatarImages[cluster.id]) return null;
+          const captureKey = `${cluster.id}:${cluster.messages.length}`;
+          if (avatarImages[captureKey]) return null;
           return (
             <View
-              key={cluster.id}
-              ref={(ref) => { avatarRefs.current[cluster.id] = ref; }}
+              key={captureKey}
+              ref={(ref) => { avatarRefs.current[captureKey] = ref; }}
               collapsable={false}
               style={styles.captureAvatarWrapper}
             >
@@ -494,7 +502,7 @@ export default function MapScreen({ navigation, route }: Props) {
                 <Image
                   source={{ uri: cluster.senderAvatarUrl }}
                   style={styles.captureAvatarImage}
-                  onLoad={() => { setTimeout(() => captureAvatar(cluster.id), 100); }}
+                  onLoad={() => { setTimeout(() => captureAvatar(captureKey), 100); }}
                 />
               </View>
               {cluster.messages.length > 1 && (
@@ -518,14 +526,16 @@ export default function MapScreen({ navigation, route }: Props) {
         rotateEnabled={false}
         pitchEnabled={false}
         moveOnMarkerPress={false}
+        onRegionChangeComplete={(region) => setLatDelta(region.latitudeDelta)}
       >
         {/* Explore mode markers */}
         {mapMode === 'explore' && clusters.map((cluster) => {
-          const capturedImage = avatarImages[cluster.id];
+          const captureKey = `${cluster.id}:${cluster.messages.length}`;
+          const capturedImage = avatarImages[captureKey];
           if (!capturedImage) return null;
           return (
             <MessageMarker
-              key={cluster.id}
+              key={captureKey}
               markerId={cluster.id}
               location={cluster.location}
               avatarUri={capturedImage}
@@ -542,11 +552,12 @@ export default function MapScreen({ navigation, route }: Props) {
 
         {/* Mine mode markers */}
         {mapMode === 'mine' && ownClusters.map((cluster) => {
-          const capturedImage = avatarImages[cluster.id];
+          const captureKey = `${cluster.id}:${cluster.messages.length}`;
+          const capturedImage = avatarImages[captureKey];
           if (!capturedImage) return null;
           return (
             <MessageMarker
-              key={cluster.id}
+              key={captureKey}
               markerId={cluster.id}
               location={cluster.location}
               avatarUri={capturedImage}

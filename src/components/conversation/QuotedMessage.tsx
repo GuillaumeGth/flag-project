@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, Image, Pressable, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { MessageReply } from '@/types/index';
+import { MessageReply } from '@/types';
 import { colors, spacing, radius, typography } from '@/theme-redesign';
 
 interface QuotedMessageProps {

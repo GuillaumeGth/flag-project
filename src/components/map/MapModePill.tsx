@@ -39,7 +39,7 @@ export default function MapModePill({ mode, onChange, style }: MapModePillProps)
               </LinearGradient>
             ) : (
               <View style={styles.segmentInactive}>
-                <Ionicons name="compass-outline" size={14} color={colors.text.secondary} />
+                <Ionicons name="compass-outline" size={14} color="#fff" />
                 <Text style={styles.labelInactive}>Explorer</Text>
               </View>
             )}
@@ -62,7 +62,7 @@ export default function MapModePill({ mode, onChange, style }: MapModePillProps)
               </LinearGradient>
             ) : (
               <View style={styles.segmentInactive}>
-                <Ionicons name="flag-outline" size={14} color={colors.text.secondary} />
+                <Ionicons name="flag-outline" size={14} color="#fff" />
                 <Text style={styles.labelInactive}>Mes Flaags</Text>
               </View>
             )}
@@ -119,9 +119,9 @@ const styles = StyleSheet.create({
     letterSpacing: 0.3,
   },
   labelInactive: {
-    color: colors.text.secondary,
+    color: '#fff',
     fontSize: typography.sizes.xs,
-    fontWeight: '600',
+    fontWeight: '500',
     letterSpacing: 0.3,
   },
 });

@@ -9,17 +9,17 @@ import {
   Animated,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { MessageWithUsers } from '@/types';
+import { MessageWithUsers, MessageReply } from '@/types';
 import { ReactionSummary } from '@/types/reactions';
+import QuotedMessage from './QuotedMessage';
 import { colors, spacing, radius, shadows, typography } from '@/theme-redesign';
 import { formatTime, formatDateSeparator } from '@/utils/date';
 import GlassCard from '@/components/redesign/GlassCard';
 import ReactionBadge from './ReactionBadge';
-import QuotedMessage from './QuotedMessage';
 
 // Module-level interpolation config — never declared inside render
-const ANIM_INPUT_RANGE = [0, 1] as const;
-const ANIM_OUTPUT_RANGE = [20, 0] as const;
+const ANIM_INPUT_RANGE: number[] = [0, 1];
+const ANIM_OUTPUT_RANGE: number[] = [20, 0];
 
 interface MessageBubbleProps {
   message: MessageWithUsers;
@@ -29,6 +29,8 @@ interface MessageBubbleProps {
   isPlaying: boolean;
   playingMessageId: string | null;
   reactions: ReactionSummary[];
+  reply?: MessageReply;
+  onQuotedPress?: () => void;
   isSelected: boolean;
   onPress: () => void;
   onPlayAudio: (message: MessageWithUsers) => void;
@@ -48,6 +50,8 @@ export default function MessageBubble({
   isPlaying,
   playingMessageId,
   reactions,
+  reply,
+  onQuotedPress,
   isSelected,
   onPress,
   onPlayAudio,
@@ -116,6 +120,7 @@ export default function MessageBubble({
                 isDeleted && styles.messageBubbleDeleted,
               ]}
             >
+              {reply && <QuotedMessage reply={reply} isFromMe={isFromMe} onPress={onQuotedPress} />}
               {isDeleted ? (
                 <Text style={styles.deletedText}>Message supprimé</Text>
               ) : (

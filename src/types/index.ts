@@ -37,7 +37,7 @@ export interface Message {
   text_content?: string;
   media_url?: string;
   location: Coordinates;
-created_at: string;
+  created_at: string;
   read_at?: string;
   is_read: boolean;
   is_public?: boolean;

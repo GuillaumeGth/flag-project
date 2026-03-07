@@ -13,9 +13,9 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Audio } from 'expo-av';
 import { MessageContentType, MessageWithUsers } from '@/types';
 import { colors, spacing, radius, shadows } from '@/theme-redesign';
+import ReplyPreview from './ReplyPreview';
 import GlassCard from '@/components/redesign/GlassCard';
 import { reportError } from '@/services/errorReporting';
-import ReplyPreview from './ReplyPreview';
 
 interface MessageInputProps {
   sending: boolean;

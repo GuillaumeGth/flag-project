@@ -34,12 +34,12 @@ export default function MapModePill({ mode, onChange, style }: MapModePillProps)
                 end={GRADIENT_END}
                 style={styles.segmentActive}
               >
-                <Ionicons name="compass" size={14} color="#fff" />
+                <Ionicons name="compass" size={18} color="#fff" />
                 <Text style={styles.labelActive}>Explorer</Text>
               </LinearGradient>
             ) : (
               <View style={styles.segmentInactive}>
-                <Ionicons name="compass-outline" size={14} color="#fff" />
+                <Ionicons name="compass-outline" size={18} color="#fff" />
                 <Text style={styles.labelInactive}>Explorer</Text>
               </View>
             )}
@@ -96,18 +96,23 @@ const styles = StyleSheet.create({
   segment: {
     borderRadius: radius.full,
     overflow: 'hidden',
+    alignSelf: 'stretch',
   },
   segmentActive: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     gap: spacing.xs,
     paddingVertical: 7,
     paddingHorizontal: spacing.md,
     borderRadius: radius.full,
   },
   segmentInactive: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     gap: spacing.xs,
     paddingVertical: 7,
     paddingHorizontal: spacing.md,

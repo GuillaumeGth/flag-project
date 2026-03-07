@@ -48,7 +48,7 @@ const LNG_DELTA = 0.009;
 
 // 1° latitude ≈ 111 000m → at LAT_DELTA=0.009 this gives 50m (the base cluster radius)
 const LAT_DEG_TO_METERS = 111_000;
-const CLUSTER_RATIO = 0.10; // fraction of visible height used as cluster radius
+const CLUSTER_RATIO = 0.06; // fraction of visible height used as cluster radius
 const MIN_CLUSTER_RADIUS = 20;
 const MAX_CLUSTER_RADIUS = 15_000;
 

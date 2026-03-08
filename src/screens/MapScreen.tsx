@@ -2,6 +2,8 @@ import React, { useEffect, useState, useRef, useCallback, useMemo } from 'react'
 import {
   View,
   StyleSheet,
+  StyleProp,
+  ViewStyle,
   TouchableOpacity,
   Text,
   Image,
@@ -32,7 +34,7 @@ import { useMapMessages } from '@/hooks/useMapMessages';
 import { useMapMarkers } from '@/hooks/useMapMarkers';
 import { useMyFlags } from '@/hooks/useMyFlags';
 import { useClusteredMarkers, MessageCluster } from '@/hooks/useClusteredMarkers';
-import { getMessageLocation } from '@/utils/mapUtils';
+import { getMessageLocation, colorForUserId, initialsForName } from '@/utils/mapUtils';
 import { log } from '@/utils/debug';
 
 type MapNavigationProp = CompositeNavigationProp<
@@ -74,6 +76,7 @@ export default function MapScreen({ navigation, route }: Props) {
   const { messages, loading, loadMessages } = useMapMessages();
   const { avatarImages, avatarRefs, captureAvatar, canReadMessage, formatDistance } = useMapMarkers(userLocation, messages);
 
+
   const otherMessages = useMemo(
     () => messages.filter(msg => msg.sender?.id !== user?.id),
     [messages, user?.id],
@@ -91,10 +94,13 @@ export default function MapScreen({ navigation, route }: Props) {
       location: flag.location,
       created_at: flag.created_at,
       is_public: flag.is_public,
-      // Same id for all → one cluster group. Avatar = recipient's (private) or own (public).
+      // For private flags, show the recipient's identity (id + name) so the marker
+      // displays their initials/color. For public flags, show the sender's own identity.
       sender: {
-        id: user?.id ?? '',
-        display_name: user?.display_name,
+        id: (!flag.is_public && flag.recipient?.id) ? flag.recipient.id : user?.id ?? '',
+        display_name: (!flag.is_public && flag.recipient?.display_name)
+          ? flag.recipient.display_name
+          : user?.display_name,
         avatar_url: (!flag.is_public && flag.recipient?.avatar_url)
           ? flag.recipient.avatar_url
           : user?.avatar_url,
@@ -452,68 +458,6 @@ export default function MapScreen({ navigation, route }: Props) {
         style={{ top: insets.top + 12 }}
       />
 
-      {/* Off-screen avatar captures */}
-      <View style={styles.captureContainer} pointerEvents="none">
-        {/* Explore mode: one capture per cluster (key includes count so badge stays fresh on zoom) */}
-        {mapMode === 'explore' && clusters.map((cluster) => {
-          const captureKey = `${cluster.id}:${cluster.messages.length}`;
-          if (avatarImages[captureKey]) return null;
-          const count = cluster.messages.length;
-          return (
-            <View
-              key={captureKey}
-              ref={(ref) => { avatarRefs.current[captureKey] = ref; }}
-              collapsable={false}
-              style={styles.captureAvatarWrapper}
-            >
-              <View style={[styles.captureAvatar, cluster.isPublic && styles.captureAvatarPublic]}>
-                <Image
-                  source={{ uri: cluster.senderAvatarUrl }}
-                  style={styles.captureAvatarImage}
-                  onLoad={() => { setTimeout(() => captureAvatar(captureKey), 100); }}
-                />
-              </View>
-              {count > 1 && (
-                <LinearGradient
-                  colors={colors.gradients.button}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                  style={styles.clusterBadge}
-                >
-                  <Text style={styles.clusterBadgeText}>{count}</Text>
-                </LinearGradient>
-              )}
-            </View>
-          );
-        })}
-
-        {/* Mine mode: one capture per own-flag cluster (key includes count so badge stays fresh on zoom) */}
-        {mapMode === 'mine' && ownClusters.map((cluster) => {
-          const captureKey = `${cluster.id}:${cluster.messages.length}`;
-          if (avatarImages[captureKey]) return null;
-          return (
-            <View
-              key={captureKey}
-              ref={(ref) => { avatarRefs.current[captureKey] = ref; }}
-              collapsable={false}
-              style={styles.captureAvatarWrapper}
-            >
-              <View style={[styles.captureAvatar, styles.captureAvatarOwn]}>
-                <Image
-                  source={{ uri: cluster.senderAvatarUrl }}
-                  style={styles.captureAvatarImage}
-                  onLoad={() => { setTimeout(() => captureAvatar(captureKey), 100); }}
-                />
-              </View>
-              {cluster.messages.length > 1 && (
-                <View style={styles.clusterBadgeSolid}>
-                  <Text style={styles.clusterBadgeText}>{cluster.messages.length}</Text>
-                </View>
-              )}
-            </View>
-          );
-        })}
-      </View>
 
       <MapView
         ref={mapRef}
@@ -580,6 +524,61 @@ export default function MapScreen({ navigation, route }: Props) {
         )}
 
       </MapView>
+
+      {/* Capture container AFTER MapView so it sits above the SurfaceView on Android */}
+      <View style={styles.captureContainer} pointerEvents="none">
+        {(mapMode === 'explore' ? clusters : ownClusters).map((cluster) => {
+          const captureKey = `${cluster.id}:${cluster.messages.length}`;
+          if (avatarImages[captureKey]) return null;
+          const count = cluster.messages.length;
+          const avatarBorderStyle: StyleProp<ViewStyle> = mapMode === 'mine'
+            ? styles.captureAvatarOwn
+            : (cluster.isPublic ? styles.captureAvatarPublic : undefined);
+          return (
+            <View
+              key={captureKey}
+              ref={(ref) => { avatarRefs.current[captureKey] = ref; }}
+              collapsable={false}
+              style={styles.captureAvatarWrapper}
+              onLayout={cluster.senderAvatarUrl ? undefined : () => {
+                requestAnimationFrame(() => requestAnimationFrame(() => captureAvatar(captureKey)));
+              }}
+            >
+              <View style={[styles.captureAvatar, avatarBorderStyle]}>
+                {cluster.senderAvatarUrl ? (
+                  <Image
+                    source={{ uri: cluster.senderAvatarUrl }}
+                    style={styles.captureAvatarImage}
+                    onLoad={() => {
+                      requestAnimationFrame(() => requestAnimationFrame(() => captureAvatar(captureKey)));
+                    }}
+                  />
+                ) : (
+                  <View style={[styles.captureAvatarBg, { backgroundColor: colorForUserId(cluster.senderId) }]}>
+                    <Text style={styles.captureAvatarInitials}>{initialsForName(cluster.senderDisplayName)}</Text>
+                  </View>
+                )}
+              </View>
+              {count > 1 && (
+                mapMode === 'mine' ? (
+                  <View style={styles.clusterBadgeSolid}>
+                    <Text style={styles.clusterBadgeText}>{count}</Text>
+                  </View>
+                ) : (
+                  <LinearGradient
+                    colors={colors.gradients.button}
+                    start={GRADIENT_START}
+                    end={FAB_GRADIENT_END}
+                    style={styles.clusterBadge}
+                  >
+                    <Text style={styles.clusterBadgeText}>{count}</Text>
+                  </LinearGradient>
+                )
+              )}
+            </View>
+          );
+        })}
+      </View>
 
       {routeCoordinates && (
         <View style={[styles.floatingButtonsContainer, { top: insets.top + 16 }]}>
@@ -742,15 +741,19 @@ const styles = StyleSheet.create({
   },
   captureContainer: {
     position: 'absolute',
-    top: 0,
-    left: 0,
+    top: -200,
+    left: -200,
   },
+  // Wrapper circulaire : élimine les coins transparents qui deviennent blancs
+  // dans le renderer natif de la map (GMSMarker/MKAnnotationView).
+  // Le badge (top:7, right:7, 26x26) reste dans le cercle (distance au centre ≈ 34px < rayon 35).
   captureAvatarWrapper: {
     width: 70,
     height: 70,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'transparent',
+    borderRadius: 35,
+    overflow: 'hidden',
   },
   captureAvatar: {
     width: 56,
@@ -808,6 +811,18 @@ const styles = StyleSheet.create({
     width: 52,
     height: 52,
     borderRadius: 26,
+  },
+  captureAvatarBg: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  captureAvatarInitials: {
+    color: '#fff',
+    fontSize: 20,
+    fontWeight: '800',
   },
   insetSpacer: {
     backgroundColor: 'transparent',

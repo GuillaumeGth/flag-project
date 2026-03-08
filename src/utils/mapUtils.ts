@@ -1,5 +1,30 @@
 import { UndiscoveredMessageMapMeta, Coordinates } from '@/types';
 
+/** Deterministic palette for avatar background colors. */
+const AVATAR_COLORS = [
+  '#6366F1', '#8B5CF6', '#EC4899', '#14B8A6',
+  '#F59E0B', '#10B981', '#3B82F6', '#EF4444',
+];
+
+/** Returns a stable color from a user ID string. */
+export function colorForUserId(userId: string): string {
+  let hash = 0;
+  for (let i = 0; i < userId.length; i++) {
+    hash = (hash * 31 + userId.charCodeAt(i)) >>> 0;
+  }
+  return AVATAR_COLORS[hash % AVATAR_COLORS.length];
+}
+
+/** Returns 1-2 uppercase initials from a display name. */
+export function initialsForName(name: string | null | undefined): string {
+  if (!name) return '?';
+  const parts = name.trim().split(' ');
+  if (parts.length >= 2) {
+    return (parts[0][0] + parts[1][0]).toUpperCase();
+  }
+  return name.substring(0, 2).toUpperCase();
+}
+
 const parseWKBHex = (wkbHex: string): Coordinates | null => {
   try {
     if (wkbHex.length < 42) return null;

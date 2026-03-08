@@ -11,6 +11,8 @@ buildscript {
     classpath('org.jetbrains.kotlin:kotlin-gradle-plugin')
     // Required for Firebase / FCM (Expo push notifications on Android)
     classpath('com.google.gms:google-services:4.4.1')
+    // Firebase Crashlytics
+    classpath('com.google.firebase:firebase-crashlytics-gradle:3.0.3')
   }
 }
 

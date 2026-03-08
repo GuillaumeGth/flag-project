@@ -440,6 +440,8 @@ export async function fetchUndiscoveredMessagesForMap(): Promise<UndiscoveredMes
     `)
     .eq('recipient_id', currentUserId)
     .eq('is_read', false)
+    .eq('deleted_by_recipient', false)
+    .eq('deleted_by_sender', false)
     .order('created_at', { ascending: false });
 
   if (lastSync) {
@@ -663,6 +665,7 @@ export async function fetchMyFlagsForMap(): Promise<OwnFlagMapMeta[]> {
       recipient:users!recipient_id (id, display_name, avatar_url)
     `)
     .eq('sender_id', currentUserId)
+    .eq('deleted_by_sender', false)
     .not('location', 'is', null)
     .order('created_at', { ascending: false });
 
@@ -782,6 +785,12 @@ export async function deleteMessage(messageId: string, otherUserId: string, isSe
       m.id === messageId ? { ...m, [field]: true } : m
     );
     await setCachedData(CACHE_KEYS.CONVERSATION(otherUserId), updated);
+  }
+
+  // Remove from map cache so the marker disappears immediately
+  const mapCached = await getCachedData<UndiscoveredMessageMapMeta[]>(CACHE_KEYS.MAP_MESSAGES);
+  if (mapCached) {
+    await setCachedData(CACHE_KEYS.MAP_MESSAGES, mapCached.filter(m => m.id !== messageId));
   }
 
   return true;

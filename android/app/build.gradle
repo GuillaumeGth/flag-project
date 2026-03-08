@@ -3,6 +3,8 @@ apply plugin: "org.jetbrains.kotlin.android"
 apply plugin: "com.facebook.react"
 // Google Services plugin to initialize FirebaseApp using google-services.json
 apply plugin: "com.google.gms.google-services"
+// Firebase Crashlytics — uploads mapping files for deobfuscated stack traces
+apply plugin: "com.google.firebase.crashlytics"
 
 def projectRoot = rootDir.getAbsoluteFile().getParentFile().getAbsolutePath()
 
@@ -94,7 +96,7 @@ android {
         applicationId 'com.flagapp.app'
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 7
+        versionCode 28
         versionName "1.0.0"
 
         buildConfigField "String", "REACT_NATIVE_RELEASE_LEVEL", "\"${findProperty('reactNativeReleaseLevel') ?: 'stable'}\""
@@ -131,6 +133,13 @@ android {
     }
     androidResources {
         ignoreAssetsPattern '!.svn:!.git:!.ds_store:!*.scc:!CVS:!thumbs.db:!picasa.ini:!*~'
+    }
+    firebaseCrashlytics {
+        // Upload unstripped native symbols automatically on every release build
+        nativeSymbolUploadEnabled true
+        unstrippedNativeLibsDir 'build/intermediates/merged_native_libs/release/mergeReleaseNativeLibs/out/lib'
+        // Upload JS source maps for Hermes stack trace symbolication
+        mappingFileUploadEnabled true
     }
 }
 

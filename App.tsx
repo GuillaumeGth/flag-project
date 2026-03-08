@@ -15,6 +15,10 @@ import { LocationProvider } from '@/contexts/LocationContext';
 import ScreenLoader from '@/components/ScreenLoader';
 import { addNotificationResponseListener } from '@/services/notifications';
 import { checkForAppUpdate } from '@/services/appUpdater';
+import { setupGlobalErrorHandler } from '@/services/errorReporting';
+
+// Catch unhandled JS errors and forward them to Crashlytics
+setupGlobalErrorHandler();
 
 import PermissionsScreen from '@/screens/PermissionsScreen';
 import AuthScreen from '@/screens/AuthScreen';

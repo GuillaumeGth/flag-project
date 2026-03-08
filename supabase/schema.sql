@@ -6,8 +6,10 @@ CREATE TABLE IF NOT EXISTS public.users (
     id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
     display_name TEXT,
     avatar_url TEXT,
+    marker_avatar_url TEXT,
     phone TEXT,
     email TEXT,
+    is_admin BOOLEAN NOT NULL DEFAULT FALSE,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -599,17 +601,23 @@ CREATE TABLE IF NOT EXISTS public.error_logs (
 
 ALTER TABLE public.error_logs ENABLE ROW LEVEL SECURITY;
 
--- Allow authenticated users to insert their own error logs
+-- Allow authenticated users to insert their own error logs (or with null user_id if not yet logged in)
 DROP POLICY IF EXISTS "Users can insert error logs" ON public.error_logs;
 CREATE POLICY "Users can insert error logs" ON public.error_logs
-    FOR INSERT WITH CHECK (auth.uid() = user_id);
+    FOR INSERT WITH CHECK (user_id = auth.uid() OR user_id IS NULL);
 
--- Only service_role can read error logs (no client access)
+-- Only service_role can read/manage error logs (no client read access)
 DROP POLICY IF EXISTS "Service role can read error logs" ON public.error_logs;
 CREATE POLICY "Service role can read error logs" ON public.error_logs
     FOR SELECT USING (false);
 
+DROP POLICY IF EXISTS "Service role can manage error_logs" ON public.error_logs;
+CREATE POLICY "Service role can manage error_logs" ON public.error_logs
+    FOR ALL TO service_role USING (true) WITH CHECK (true);
+
 CREATE INDEX IF NOT EXISTS error_logs_created_at_idx ON public.error_logs(created_at DESC);
+CREATE INDEX IF NOT EXISTS error_logs_user_id_idx ON public.error_logs(user_id);
+CREATE INDEX IF NOT EXISTS error_logs_context_idx ON public.error_logs(error_context);
 
 -- Function to send email alert via Resend API when an error is logged
 -- Configure via the app_config table:

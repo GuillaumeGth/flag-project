@@ -19,7 +19,8 @@ export interface MessageCluster {
   id: string;
   messages: UndiscoveredMessageMapMeta[];
   location: Coordinates;
-  senderAvatarUrl: string;
+  senderAvatarUrl: string | null;
+  senderDisplayName: string | null;
   senderId: string;
   isPublic: boolean;
 }
@@ -53,7 +54,7 @@ export function clusterMessages(
   groupBySender: boolean = false,
 ): MessageCluster[] {
   const clusters: MessageCluster[] = [];
-  const valid = messages.filter(m => m.sender?.id && m.sender?.avatar_url);
+  const valid = messages.filter(m => m.sender?.id);
 
   if (groupBySender) {
     const bySender = new Map<string, UndiscoveredMessageMapMeta[]>();
@@ -118,7 +119,8 @@ function spatialCluster(
       messages: clusterMessages,
       location: seedLocation,
       senderId: seed.sender!.id,
-      senderAvatarUrl: seed.sender!.avatar_url ?? '',
+      senderAvatarUrl: seed.sender!.avatar_url ?? null,
+      senderDisplayName: seed.sender!.display_name ?? null,
       isPublic: clusterMessages.some(m => m.is_public),
     });
   }

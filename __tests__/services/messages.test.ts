@@ -75,6 +75,7 @@ import {
   getCachedMapMessages,
   markPublicMessageDiscovered,
   fetchDiscoveredPublicMessageIds,
+  fetchUndiscoveredMessagesForMap,
 } from '@/services/messages';
 
 const mockGetCachedUserId = getCachedUserId as jest.Mock;
@@ -564,5 +565,93 @@ describe('fetchDiscoveredPublicMessageIds', () => {
 
     const result = await fetchDiscoveredPublicMessageIds(['msg-1']);
     expect(result.size).toBe(0);
+  });
+});
+
+// ─── fetchUndiscoveredMessagesForMap — admin flag placement ──────────────────
+
+describe('fetchUndiscoveredMessagesForMap', () => {
+  const makeMapMsg = (id: string, isAdmin = false) => ({
+    id,
+    location: 'POINT(2.3522 48.8566)',
+    created_at: new Date().toISOString(),
+    is_public: false,
+    sender: {
+      id: `sender-${id}`,
+      display_name: 'Test',
+      avatar_url: 'https://example.com/avatar.jpg',
+      is_admin: isAdmin,
+    },
+  });
+
+  it('returns empty array when no user ID', async () => {
+    mockGetCachedUserId.mockReturnValue(null);
+    const result = await fetchUndiscoveredMessagesForMap();
+    expect(result).toEqual([]);
+  });
+
+  it('returns messages including sender.is_admin field', async () => {
+    const messages = [makeMapMsg('msg-1', true), makeMapMsg('msg-2', false)];
+    // First call: main messages query
+    const mainChain = makeChain({ data: messages, error: null });
+    // Second call: read IDs pruning query
+    const readChain = makeChain({ data: [], error: null });
+    mockFrom.mockReturnValueOnce(mainChain).mockReturnValueOnce(readChain);
+
+    const result = await fetchUndiscoveredMessagesForMap();
+    expect(result).toHaveLength(2);
+    const adminMsg = result.find(m => m.id === 'msg-1');
+    const regularMsg = result.find(m => m.id === 'msg-2');
+    expect(adminMsg?.sender?.is_admin).toBe(true);
+    expect(regularMsg?.sender?.is_admin).toBe(false);
+  });
+
+  it('preserves sender.is_admin = true for admin-placed messages', async () => {
+    const messages = [makeMapMsg('admin-flag', true)];
+    const mainChain = makeChain({ data: messages, error: null });
+    const readChain = makeChain({ data: [], error: null });
+    mockFrom.mockReturnValueOnce(mainChain).mockReturnValueOnce(readChain);
+
+    const result = await fetchUndiscoveredMessagesForMap();
+    expect(result[0].sender?.is_admin).toBe(true);
+  });
+
+  it('prunes read messages from results', async () => {
+    const messages = [makeMapMsg('msg-1'), makeMapMsg('msg-2')];
+    const mainChain = makeChain({ data: messages, error: null });
+    // msg-1 has been read → should be pruned
+    const readChain = makeChain({ data: [{ id: 'msg-1' }], error: null });
+    mockFrom.mockReturnValueOnce(mainChain).mockReturnValueOnce(readChain);
+
+    const result = await fetchUndiscoveredMessagesForMap();
+    expect(result.find(m => m.id === 'msg-1')).toBeUndefined();
+    expect(result.find(m => m.id === 'msg-2')).toBeDefined();
+  });
+
+  it('falls back to cache on Supabase error', async () => {
+    const cached = [makeMapMsg('cached-msg', true)];
+    mockGetCachedData.mockResolvedValue(cached);
+
+    const errorChain = makeChain({ data: null, error: { message: 'DB error' } });
+    mockFrom.mockReturnValue(errorChain);
+
+    const result = await fetchUndiscoveredMessagesForMap();
+    expect(result).toHaveLength(1);
+    expect(result[0].id).toBe('cached-msg');
+  });
+
+  it('merges new admin messages with cache preserving is_admin field', async () => {
+    const cached = [makeMapMsg('old-msg', false)];
+    mockGetCachedData.mockResolvedValue(cached);
+
+    const newMessages = [makeMapMsg('new-admin-msg', true)];
+    const mainChain = makeChain({ data: newMessages, error: null });
+    const readChain = makeChain({ data: [], error: null });
+    mockFrom.mockReturnValueOnce(mainChain).mockReturnValueOnce(readChain);
+
+    const result = await fetchUndiscoveredMessagesForMap();
+    expect(result).toHaveLength(2);
+    const adminMsg = result.find(m => m.id === 'new-admin-msg');
+    expect(adminMsg?.sender?.is_admin).toBe(true);
   });
 });

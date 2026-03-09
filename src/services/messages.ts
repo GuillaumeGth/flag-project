@@ -436,7 +436,7 @@ export async function fetchUndiscoveredMessagesForMap(): Promise<UndiscoveredMes
       location,
       created_at,
       is_public,
-      sender:users!sender_id (id, display_name, avatar_url)
+      sender:users!sender_id (id, display_name, avatar_url, is_admin)
     `)
     .eq('recipient_id', currentUserId)
     .eq('is_read', false)
@@ -659,6 +659,7 @@ export async function fetchMyFlagsForMap(): Promise<OwnFlagMapMeta[]> {
       created_at,
       is_public,
       is_read,
+      is_admin_placed,
       content_type,
       text_content,
       media_url,
@@ -668,7 +669,6 @@ export async function fetchMyFlagsForMap(): Promise<OwnFlagMapMeta[]> {
     .eq('sender_id', currentUserId)
     .eq('deleted_by_sender', false)
     .not('location', 'is', null)
-    .is('recipient_id', null)
     .order('created_at', { ascending: false });
 
   if (error) {
@@ -687,7 +687,8 @@ export async function sendMessage(
   textContent?: string,
   mediaUrl?: string,
   isPublic?: boolean,
-  replyToMessageId?: string | null
+  replyToMessageId?: string | null,
+  isAdminPlaced?: boolean
 ): Promise<Message | null> {
   const currentUserId = getCurrentUserId();
   if (!currentUserId) return null;
@@ -706,6 +707,7 @@ export async function sendMessage(
       location: location ? `POINT(${location.longitude} ${location.latitude})` : null,
 is_read: location ? false : true, // Messages without location are immediately readable
       is_public: isPublic || false,
+      is_admin_placed: isAdminPlaced || false,
       ...(replyToMessageId ? { reply_to_id: replyToMessageId } : {}),
     })
     .select()

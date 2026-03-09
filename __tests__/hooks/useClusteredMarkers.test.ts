@@ -222,3 +222,83 @@ describe('cluster location', () => {
     expect(clusters[0].location).toEqual({ latitude: PARIS.lat, longitude: PARIS.lng });
   });
 });
+
+// ---------------------------------------------------------------------------
+// isAdminPlaced — admin flag placement feature
+// ---------------------------------------------------------------------------
+
+function makeAdminMsg(
+  lat: number,
+  lng: number,
+  senderId = 'admin-1',
+): UndiscoveredMessageMapMeta {
+  return {
+    id: `msg-${++idCounter}`,
+    location: { latitude: lat, longitude: lng },
+    created_at: new Date().toISOString(),
+    is_public: false,
+    sender: {
+      id: senderId,
+      display_name: 'Admin',
+      avatar_url: 'https://example.com/admin.jpg',
+      is_admin: true,
+    },
+  } as unknown as UndiscoveredMessageMapMeta;
+}
+
+describe('isAdminPlaced', () => {
+  it('is false for a regular (non-admin) sender', () => {
+    const msg = makeMsg(PARIS.lat, PARIS.lng);
+    const clusters = clusterMessages([msg]);
+    expect(clusters[0].isAdminPlaced).toBe(false);
+  });
+
+  it('is true when the seed sender is admin', () => {
+    const msg = makeAdminMsg(PARIS.lat, PARIS.lng);
+    const clusters = clusterMessages([msg]);
+    expect(clusters[0].isAdminPlaced).toBe(true);
+  });
+
+  it('is true when the seed is admin even if merged messages are not', () => {
+    const admin = makeAdminMsg(PARIS.lat, PARIS.lng, 'admin-1');
+    const regular = makeMsg(PARIS_NEAR.lat, PARIS_NEAR.lng, 'user-1');
+    // admin is processed first → becomes the seed
+    const clusters = clusterMessages([admin, regular], CLUSTER_RADIUS_M, false);
+    expect(clusters).toHaveLength(1);
+    expect(clusters[0].isAdminPlaced).toBe(true);
+  });
+
+  it('is false when the seed is non-admin even if merged messages are admin', () => {
+    const regular = makeMsg(PARIS.lat, PARIS.lng, 'user-1');
+    const admin = makeAdminMsg(PARIS_NEAR.lat, PARIS_NEAR.lng, 'admin-1');
+    // regular is processed first → becomes the seed
+    const clusters = clusterMessages([regular, admin], CLUSTER_RADIUS_M, false);
+    expect(clusters).toHaveLength(1);
+    expect(clusters[0].isAdminPlaced).toBe(false);
+  });
+
+  it('produces two clusters with distinct isAdminPlaced values for far-apart admin/non-admin messages', () => {
+    const admin = makeAdminMsg(PARIS.lat, PARIS.lng, 'admin-1');
+    const regular = makeMsg(SENLIS.lat, SENLIS.lng, 'user-1');
+    const clusters = clusterMessages([admin, regular], CLUSTER_RADIUS_M, false);
+    expect(clusters).toHaveLength(2);
+    const adminCluster = clusters.find(c => c.isAdminPlaced);
+    const regularCluster = clusters.find(c => !c.isAdminPlaced);
+    expect(adminCluster).toBeDefined();
+    expect(regularCluster).toBeDefined();
+  });
+
+  it('is false when sender has is_admin: false explicitly', () => {
+    const msg = makeMsg(PARIS.lat, PARIS.lng);
+    (msg as any).sender.is_admin = false;
+    const clusters = clusterMessages([msg]);
+    expect(clusters[0].isAdminPlaced).toBe(false);
+  });
+
+  it('is false when sender.is_admin is undefined (legacy data)', () => {
+    const msg = makeMsg(PARIS.lat, PARIS.lng);
+    (msg as any).sender.is_admin = undefined;
+    const clusters = clusterMessages([msg]);
+    expect(clusters[0].isAdminPlaced).toBe(false);
+  });
+});

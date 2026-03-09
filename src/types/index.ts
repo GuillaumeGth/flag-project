@@ -46,6 +46,7 @@ export interface Message {
   deleted_by_recipient?: boolean;
   reply_to_message_id?: string | null;
   reply_to?: MessageReply | null;
+  is_admin_placed?: boolean;
 }
 
 // Message with sender info for display
@@ -66,7 +67,8 @@ export interface UndiscoveredMessageMapMeta {
   location: string | Coordinates; // PostGIS POINT or Coordinates
   created_at: string;
   is_public?: boolean;
-  sender?: Pick<User, 'id' | 'display_name' | 'avatar_url'>;
+  sender?: Pick<User, 'id' | 'display_name' | 'avatar_url' | 'is_admin'>;
+  is_admin_placed?: boolean;
 }
 
 // Metadata for the current user's own sent flags on the map
@@ -76,6 +78,7 @@ export interface OwnFlagMapMeta {
   created_at: string;
   is_public: boolean;
   is_read: boolean;
+  is_admin_placed: boolean;
   content_type: MessageContentType;
   text_content?: string | null;
   media_url?: string | null;

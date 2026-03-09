@@ -18,8 +18,9 @@ import * as ImagePicker from 'expo-image-picker';
 import { Audio } from 'expo-av';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocation } from '@/contexts/LocationContext';
+import { useAuth } from '@/contexts/AuthContext';
 import { sendMessage, uploadMedia } from '@/services/messages';
-import { MessageContentType, RootStackParamList } from '@/types';
+import { Coordinates, MessageContentType, RootStackParamList } from '@/types';
 import { colors, shadows, radius, spacing, typography } from '@/theme-redesign';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'CreateMessage'>;
@@ -28,7 +29,16 @@ type Recipient = { id: string; name: string };
 
 export default function CreateMessageScreen({ navigation, route }: Props) {
   const insets = useSafeAreaInsets();
+  const { user } = useAuth();
   const { current: userLocation } = useLocation();
+
+  // Admin can provide a custom location (bypasses GPS restriction).
+  // Captured once at mount via useState — immune to route.params being overwritten
+  // when SelectRecipientScreen navigates back with { recipients } only.
+  const [adminLocation] = useState<Coordinates | null>(
+    () => (user?.is_admin && route.params?.adminLocation ? route.params.adminLocation : null)
+  );
+  const effectiveLocation = adminLocation ?? userLocation;
 
   const [recipients, setRecipients] = useState<Recipient[]>(route.params?.recipients ?? []);
   const [isPublic, setIsPublic] = useState((route.params?.recipients ?? []).length === 0);
@@ -177,7 +187,7 @@ export default function CreateMessageScreen({ navigation, route }: Props) {
   };
 
   const handleSend = async () => {
-    if (!userLocation) {
+    if (!effectiveLocation) {
       showToast('Position GPS non disponible', 'error');
       return;
     }
@@ -215,20 +225,22 @@ export default function CreateMessageScreen({ navigation, route }: Props) {
         uploadedMediaUrl = url;
       }
 
+      const isAdminPlaced = !!adminLocation;
+
       if (isPublic) {
-        const result = await sendMessage(null, contentType, userLocation, textContent || undefined, uploadedMediaUrl, true);
+        const result = await sendMessage(null, contentType, effectiveLocation, textContent || undefined, uploadedMediaUrl, true, null, isAdminPlaced);
         if (result) {
-          navigation.navigate('Main', { screen: 'Map', params: { toast: { message: 'Flag déposé !', type: 'success' } } });
+          navigation.navigate('Main', { screen: 'Map', params: { toast: { message: 'Flag déposé !', type: 'success' }, ...(isAdminPlaced ? { mine: true } : {}) } });
           return;
         }
       } else {
         const results = await Promise.all(
-          recipients.map((r) => sendMessage(r.id, contentType, userLocation, textContent || undefined, uploadedMediaUrl, false))
+          recipients.map((r) => sendMessage(r.id, contentType, effectiveLocation, textContent || undefined, uploadedMediaUrl, false, null, isAdminPlaced))
         );
         const successCount = results.filter(Boolean).length;
         if (successCount > 0) {
           const msg = successCount === recipients.length ? 'Flag privé envoyé !' : `Envoyé à ${successCount}/${recipients.length}`;
-          navigation.navigate('Main', { screen: 'Map', params: { toast: { message: msg, type: successCount === recipients.length ? 'success' : 'warning' } } });
+          navigation.navigate('Main', { screen: 'Map', params: { toast: { message: msg, type: successCount === recipients.length ? 'success' : 'warning' }, ...(isAdminPlaced ? { mine: true } : {}) } });
           return;
         }
       }
@@ -258,6 +270,16 @@ export default function CreateMessageScreen({ navigation, route }: Props) {
           <Text style={styles.title}>Nouveau flag</Text>
           <View style={{ width: 24 }} />
         </View>
+
+        {/* Admin placement badge */}
+        {adminLocation && (
+          <View style={styles.adminBadge}>
+            <Text style={styles.adminBadgeText}>★ Position admin</Text>
+            <Text style={styles.adminBadgeCoords}>
+              {adminLocation.latitude.toFixed(5)}, {adminLocation.longitude.toFixed(5)}
+            </Text>
+          </View>
+        )}
 
         {/* Public / Privé toggle */}
         <View style={styles.publicToggleRow}>
@@ -515,5 +537,26 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.md,
     fontWeight: '600',
     color: '#FFFFFF',
+  },
+  adminBadge: {
+    flexDirection: 'column',
+    backgroundColor: 'rgba(255, 215, 0, 0.15)',
+    borderWidth: 1,
+    borderColor: '#FFD700',
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    marginBottom: spacing.md,
+    gap: 2,
+  },
+  adminBadgeText: {
+    fontSize: typography.sizes.sm,
+    fontWeight: '700',
+    color: '#FFD700',
+  },
+  adminBadgeCoords: {
+    fontSize: typography.sizes.xs,
+    color: colors.text.secondary,
+    fontFamily: 'monospace',
   },
 });

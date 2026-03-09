@@ -122,25 +122,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  // Fetch avatar from public.users table (takes priority over Google avatar)
-  const fetchUserAvatar = async (userId: string): Promise<string | null> => {
+  // Fetch profile fields from public.users table (takes priority over auth metadata)
+  const fetchUserProfile = async (userId: string): Promise<{ avatar_url: string | null; is_admin: boolean }> => {
     const { data } = await supabase
       .from('users')
-      .select('avatar_url')
+      .select('avatar_url, is_admin')
       .eq('id', userId)
       .single();
-    return data?.avatar_url || null;
+    return { avatar_url: data?.avatar_url || null, is_admin: data?.is_admin ?? false };
   };
 
-  // Update state with avatar from database
-  const updateUserWithDbAvatar = async (userId: string) => {
-    const dbAvatar = await fetchUserAvatar(userId);
-    if (dbAvatar) {
-      setState((prev) => ({
-        ...prev,
-        user: prev.user ? { ...prev.user, avatar_url: dbAvatar } : null,
-      }));
-    }
+  // Update state with profile fields from database (avatar + is_admin)
+  const updateUserWithDbProfile = async (userId: string) => {
+    const { avatar_url, is_admin } = await fetchUserProfile(userId);
+    setState((prev) => ({
+      ...prev,
+      user: prev.user
+        ? { ...prev.user, ...(avatar_url ? { avatar_url } : {}), is_admin }
+        : null,
+    }));
   };
 
   // Sync user profile with Google data if display_name is missing
@@ -302,7 +302,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           // if awaited inside onAuthStateChange (the auth lock is held).
           ensureUserInDatabase(session.user).catch((e) => log('AuthContext', 'ensureUserInDatabase error:', e));
           syncUserProfile(session.user).catch((e) => log('AuthContext', 'Sync profile error:', e));
-          updateUserWithDbAvatar(mappedUser.id).catch((e) => log('AuthContext', 'Update avatar error:', e));
+          updateUserWithDbProfile(mappedUser.id).catch((e) => log('AuthContext', 'Update profile error:', e));
           registerPushToken(mappedUser.id).catch((e) => log('AuthContext', 'Register push token error:', e));
         }
         return;

@@ -315,6 +315,7 @@ export default function ConversationScreen({ navigation, route }: Props) {
         onReactionPress={(emoji) => handleReactionToggle(item.id, emoji)}
         onScrollToMessage={handleScrollToMessage}
         showSenderNameInReply={false}
+        isAdminUser={user?.is_admin}
         onNavigateToMap={(location) => {
           navigation.navigate('Main', {
             screen: 'Map',

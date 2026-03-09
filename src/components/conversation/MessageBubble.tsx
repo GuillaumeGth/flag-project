@@ -21,6 +21,8 @@ import ReactionBadge from './ReactionBadge';
 const ANIM_INPUT_RANGE: number[] = [0, 1];
 const ANIM_OUTPUT_RANGE: number[] = [20, 0];
 
+const ADMIN_GOLD_BORDER = '#FFD700';
+
 interface MessageBubbleProps {
   message: MessageWithUsers;
   isFromMe: boolean;
@@ -38,6 +40,7 @@ interface MessageBubbleProps {
   onReactionPress: (emoji: string) => void;
   onScrollToMessage?: (messageId: string) => void;
   showSenderNameInReply?: boolean;
+  isAdminUser?: boolean;
 }
 
 export default function MessageBubble({
@@ -57,8 +60,10 @@ export default function MessageBubble({
   onReactionPress,
   onScrollToMessage,
   showSenderNameInReply = true,
+  isAdminUser = false,
 }: MessageBubbleProps) {
   const isUndiscovered = !isFromMe && !message.is_read && message.location;
+  const showAdminBorder = isAdminUser && !!message.is_admin_placed;
   const isDeleted = isFromMe ? !!message.deleted_by_sender : !!message.deleted_by_recipient;
   const hasReactions = reactions.length > 0;
 
@@ -114,6 +119,7 @@ export default function MessageBubble({
                 isFromMe ? styles.messageBubbleRight : styles.messageBubbleLeft,
                 hasReactions && styles.messageBubbleWithReactions,
                 isDeleted && styles.messageBubbleDeleted,
+                showAdminBorder && styles.messageBubbleAdmin,
               ]}
             >
               {isDeleted ? (
@@ -267,6 +273,10 @@ const styles = StyleSheet.create({
   },
   messageBubbleDeleted: {
     opacity: 0.5,
+  },
+  messageBubbleAdmin: {
+    borderWidth: 1.5,
+    borderColor: ADMIN_GOLD_BORDER,
   },
   deletedText: {
     fontSize: typography.sizes.sm,

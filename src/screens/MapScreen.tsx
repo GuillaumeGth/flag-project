@@ -22,7 +22,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useLocation } from '@/contexts/LocationContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { UndiscoveredMessageMapMeta, OwnFlagMapMeta, Coordinates, MainTabParamList, RootStackParamList } from '@/types';
-import { colors, shadows, radius, spacing } from '@/theme-redesign';
+import { colors, shadows, radius, spacing, typography } from '@/theme-redesign';
 import Toast from '@/components/Toast';
 import SelectedMessageCard from '@/components/map/SelectedMessageCard';
 import OwnFlagCard from '@/components/map/OwnFlagCard';
@@ -57,6 +57,12 @@ const MAX_CLUSTER_RADIUS = 15_000;
 const GRADIENT_START = { x: 0, y: 0 } as const;
 const FAB_GRADIENT_END = { x: 1, y: 1 } as const;
 const PERMISSION_GRADIENT_END = { x: 1, y: 0 } as const;
+
+// Golden gradient for admin-placed message markers
+const ADMIN_GOLD_GRADIENT = ['#FFF9C4', '#FFD700', '#F5A623', '#FFD700'] as const;
+// Golden gradient for the admin placement FAB
+const ADMIN_FAB_GRADIENT_ACTIVE = ['#F5A623', '#FFD700', '#FFF0A0'] as const;
+const ADMIN_FAB_GRADIENT_IDLE = ['#3D2B00', '#7A5700', '#4A3500'] as const;
 
 
 export default function MapScreen({ navigation, route }: Props) {
@@ -96,6 +102,7 @@ export default function MapScreen({ navigation, route }: Props) {
       is_public: flag.is_public,
       // For private flags, show the recipient's identity (id + name) so the marker
       // displays their initials/color. For public flags, show the sender's own identity.
+      is_admin_placed: flag.is_admin_placed,
       sender: {
         id: (!flag.is_public && flag.recipient?.id) ? flag.recipient.id : user?.id ?? '',
         display_name: (!flag.is_public && flag.recipient?.display_name)
@@ -104,6 +111,7 @@ export default function MapScreen({ navigation, route }: Props) {
         avatar_url: (!flag.is_public && flag.recipient?.avatar_url)
           ? flag.recipient.avatar_url
           : user?.avatar_url,
+        is_admin: flag.is_admin_placed, // drives golden border in capture container
       },
     })),
     [myFlags, user],
@@ -138,6 +146,11 @@ export default function MapScreen({ navigation, route }: Props) {
   const [centeredOwnFlagId, setCenteredOwnFlagId] = useState<string | null>(null);
   const [focusLocation, setFocusLocation] = useState<unknown>(null);
   const [focusMarkerCoords, setFocusMarkerCoords] = useState<Coordinates | null>(null);
+
+  // --- Admin placement mode (map-picker UX: pin fixed at center, map moves underneath) ---
+  const [isAdminPlacementMode, setIsAdminPlacementMode] = useState(false);
+  // Tracks the geographic center of the visible map region (updated by onRegionChangeComplete)
+  const [mapCenterCoords, setMapCenterCoords] = useState<Coordinates | null>(null);
 
   // --- Toast & route ---
   const [toastData, setToastData] = useState<{ visible: boolean; message: string; type: 'success' | 'warning' | 'error' }>({ visible: false, message: '', type: 'success' });
@@ -344,6 +357,27 @@ export default function MapScreen({ navigation, route }: Props) {
 
   const navigateToCreate = useCallback(() => navigation.navigate('CreateMessage'), [navigation]);
 
+  const toggleAdminPlacement = useCallback(() => {
+    setIsAdminPlacementMode((prev) => !prev);
+    setSelectedMessage(null);
+    setSelectedOwnFlag(null);
+  }, []);
+
+  // Keep mapCenterCoords seeded with userLocation so admin send works without dragging
+  useEffect(() => {
+    if (userLocation) {
+      setMapCenterCoords((prev) => prev ?? userLocation);
+    }
+  }, [userLocation]);
+
+  // Main FAB in admin mode: navigate to CreateMessage with current map center
+  const handleAdminSend = useCallback(() => {
+    const coords = mapCenterCoords ?? userLocation;
+    if (!coords) return;
+    setIsAdminPlacementMode(false);
+    navigation.navigate('CreateMessage', { adminLocation: coords });
+  }, [mapCenterCoords, userLocation, navigation]);
+
   const handleRead = useCallback(() => {
     if (selectedMessage) navigation.navigate('ReadMessage', { messageId: selectedMessage.id });
   }, [selectedMessage, navigation]);
@@ -468,6 +502,7 @@ export default function MapScreen({ navigation, route }: Props) {
       />
 
 
+
       <MapView
         ref={mapRef}
         style={styles.map}
@@ -479,7 +514,10 @@ export default function MapScreen({ navigation, route }: Props) {
         rotateEnabled={false}
         pitchEnabled={false}
         moveOnMarkerPress={false}
-        onRegionChangeComplete={(region) => setLatDelta(region.latitudeDelta)}
+        onRegionChangeComplete={(region) => {
+          setLatDelta(region.latitudeDelta);
+          setMapCenterCoords({ latitude: region.latitude, longitude: region.longitude });
+        }}
       >
         {/* Explore mode markers */}
         {mapMode === 'explore' && clusters.map((cluster) => {
@@ -547,6 +585,25 @@ export default function MapScreen({ navigation, route }: Props) {
           const avatarBorderStyle: StyleProp<ViewStyle> = mapMode === 'mine'
             ? (cluster.isPublic ? styles.captureAvatarPublic : (isClusterOpened ? styles.captureAvatarOwnOpened : styles.captureAvatarOwnClosed))
             : (cluster.isPublic ? styles.captureAvatarPublic : undefined);
+
+          // Admin-placed markers: golden border — driven by is_admin_placed from DB in both modes
+          const isAdminCluster = cluster.isAdminPlaced;
+
+          // Inner avatar shared between all border styles
+          const avatarContent = cluster.senderAvatarUrl ? (
+            <Image
+              source={{ uri: cluster.senderAvatarUrl }}
+              style={styles.captureAvatarImage}
+              onLoad={() => {
+                requestAnimationFrame(() => requestAnimationFrame(() => captureAvatar(captureKey)));
+              }}
+            />
+          ) : (
+            <View style={[styles.captureAvatarBg, { backgroundColor: colorForUserId(cluster.senderId) }]}>
+              <Text style={styles.captureAvatarInitials}>{initialsForName(cluster.senderDisplayName)}</Text>
+            </View>
+          );
+
           return (
             <View
               key={captureKey}
@@ -557,7 +614,18 @@ export default function MapScreen({ navigation, route }: Props) {
                 requestAnimationFrame(() => requestAnimationFrame(() => captureAvatar(captureKey)));
               }}
             >
-              {cluster.isPublic ? (
+              {isAdminCluster ? (
+                <LinearGradient
+                  colors={ADMIN_GOLD_GRADIENT}
+                  start={GRADIENT_START}
+                  end={FAB_GRADIENT_END}
+                  style={styles.captureAvatarAdminBorder}
+                >
+                  <View style={styles.captureAvatarGradientInner}>
+                    {avatarContent}
+                  </View>
+                </LinearGradient>
+              ) : cluster.isPublic ? (
                 <LinearGradient
                   colors={['#6D28D9', '#3B82F6']}
                   start={{ x: 0, y: 0 }}
@@ -565,36 +633,19 @@ export default function MapScreen({ navigation, route }: Props) {
                   style={styles.captureAvatarGradientBorder}
                 >
                   <View style={styles.captureAvatarGradientInner}>
-                    {cluster.senderAvatarUrl ? (
-                      <Image
-                        source={{ uri: cluster.senderAvatarUrl }}
-                        style={styles.captureAvatarImage}
-                        onLoad={() => {
-                          requestAnimationFrame(() => requestAnimationFrame(() => captureAvatar(captureKey)));
-                        }}
-                      />
-                    ) : (
-                      <View style={[styles.captureAvatarBg, { backgroundColor: colorForUserId(cluster.senderId) }]}>
-                        <Text style={styles.captureAvatarInitials}>{initialsForName(cluster.senderDisplayName)}</Text>
-                      </View>
-                    )}
+                    {avatarContent}
                   </View>
                 </LinearGradient>
               ) : (
                 <View style={[styles.captureAvatar, avatarBorderStyle]}>
-                  {cluster.senderAvatarUrl ? (
-                    <Image
-                      source={{ uri: cluster.senderAvatarUrl }}
-                      style={styles.captureAvatarImage}
-                      onLoad={() => {
-                        requestAnimationFrame(() => requestAnimationFrame(() => captureAvatar(captureKey)));
-                      }}
-                    />
-                  ) : (
-                    <View style={[styles.captureAvatarBg, { backgroundColor: colorForUserId(cluster.senderId) }]}>
-                      <Text style={styles.captureAvatarInitials}>{initialsForName(cluster.senderDisplayName)}</Text>
-                    </View>
-                  )}
+                  {avatarContent}
+                </View>
+              )}
+
+              {/* Admin star badge */}
+              {isAdminCluster && count === 1 && (
+                <View style={styles.adminStarBadge}>
+                  <Text style={styles.adminStarText}>★</Text>
                 </View>
               )}
               {count > 1 && (
@@ -644,21 +695,38 @@ export default function MapScreen({ navigation, route }: Props) {
         </View>
       )}
 
+      {/* Fixed center pin — visible in admin placement mode (map moves, pin stays) */}
+      {isAdminPlacementMode && (
+        <View style={styles.adminCenterPinContainer} pointerEvents="none">
+          <View style={styles.adminCenterPinInner}>
+            <LinearGradient
+              colors={ADMIN_GOLD_GRADIENT}
+              start={GRADIENT_START}
+              end={FAB_GRADIENT_END}
+              style={styles.adminCenterPin}
+            >
+              <Text style={styles.adminCenterPinText}>★</Text>
+            </LinearGradient>
+            <View style={styles.adminCenterPinTail} />
+          </View>
+        </View>
+      )}
+
       <View style={[styles.bottomRightContainer, { bottom: 24 + insets.bottom }]}>
-        <View style={[styles.createFABGlowContainer]}>
+        <View style={[styles.createFABGlowContainer, isAdminPlacementMode && styles.createFABGlowAdmin]}>
           <TouchableOpacity
             style={styles.createFABContainer}
-            onPress={navigateToCreate}
+            onPress={isAdminPlacementMode ? handleAdminSend : navigateToCreate}
             activeOpacity={0.8}
           >
             <LinearGradient
-              colors={colors.gradients.button}
+              colors={isAdminPlacementMode ? ADMIN_FAB_GRADIENT_ACTIVE : colors.gradients.button}
               start={GRADIENT_START}
               end={FAB_GRADIENT_END}
-              style={styles.createFAB}
+              style={[styles.createFAB, isAdminPlacementMode && styles.createFABAdmin]}
             >
               <View style={styles.createFABInner}>
-                <FontAwesome name="paper-plane" size={32} color="#FFFFFF" style={styles.fabIcon} />
+                <FontAwesome name="paper-plane" size={32} color={isAdminPlacementMode ? '#5A3A00' : '#FFFFFF'} style={styles.fabIcon} />
               </View>
             </LinearGradient>
           </TouchableOpacity>
@@ -668,6 +736,30 @@ export default function MapScreen({ navigation, route }: Props) {
           <Ionicons name="locate" size={22} color={colors.primary.cyan} />
         </TouchableOpacity>
       </View>
+
+      {/* Admin placement FAB (bottom-left, admin only) */}
+      {user?.is_admin && (
+        <View style={[styles.adminFABContainer, { bottom: 24 + insets.bottom }]}>
+          <View style={isAdminPlacementMode ? styles.adminFABGlowActive : styles.adminFABGlow}>
+            <TouchableOpacity
+              style={styles.adminFABTouchable}
+              onPress={toggleAdminPlacement}
+              activeOpacity={0.8}
+            >
+              <LinearGradient
+                colors={isAdminPlacementMode ? ADMIN_FAB_GRADIENT_ACTIVE : ADMIN_FAB_GRADIENT_IDLE}
+                start={GRADIENT_START}
+                end={FAB_GRADIENT_END}
+                style={styles.adminFAB}
+              >
+                <Text style={[styles.adminFABIcon, isAdminPlacementMode && styles.adminFABIconActive]}>
+                  {isAdminPlacementMode ? '✕' : '★'}
+                </Text>
+              </LinearGradient>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
 
       {/* Explore: selected message card */}
       {selectedMessage && mapMode === 'explore' && (
@@ -860,6 +952,34 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  // Admin-placed message marker — golden gradient border (slightly wider for visibility)
+  captureAvatarAdminBorder: {
+    width: 66,
+    height: 66,
+    borderRadius: 33,
+    padding: 3.5,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  adminStarBadge: {
+    position: 'absolute',
+    top: 2,
+    right: 2,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: '#FFD700',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1.5,
+    borderColor: '#fff',
+  },
+  adminStarText: {
+    fontSize: 11,
+    color: '#5A3A00',
+    fontWeight: '800',
+    lineHeight: 13,
+  },
   captureAvatarGradientInner: {
     width: 56,
     height: 56,
@@ -901,5 +1021,125 @@ const styles = StyleSheet.create({
     textShadowColor: 'rgba(0,0,0,0.3)',
     textShadowOffset: { width: 0, height: 2 },
     textShadowRadius: 4,
+  },
+  // Fixed center pin — floats above the map, tip points to the exact map center
+  // translateY: -(pinRadius + tailHeight) moves the tip to screen center
+  adminCenterPinContainer: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  adminCenterPinInner: {
+    alignItems: 'center',
+    transform: [{ translateY: -38 }], // (48/2 + 14) = 38 → tip aligns with screen center
+  },
+  adminCenterPin: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 3,
+    borderColor: '#5A3A00',
+    shadowColor: '#FFD700',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 1,
+    shadowRadius: 20,
+    elevation: 20,
+  },
+  adminCenterPinText: {
+    fontSize: 26,
+    color: '#5A3A00',
+    fontWeight: '900',
+  },
+  adminCenterPinTail: {
+    width: 0,
+    height: 0,
+    borderLeftWidth: 9,
+    borderRightWidth: 9,
+    borderTopWidth: 14,
+    borderLeftColor: 'transparent',
+    borderRightColor: 'transparent',
+    borderTopColor: '#5A3A00',
+    marginTop: -2,
+  },
+  // Main FAB in admin mode — golden
+  createFABGlowAdmin: {
+    shadowColor: '#FFD700',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 1,
+    shadowRadius: 36,
+    elevation: 28,
+  },
+  createFABAdmin: {
+    borderColor: 'rgba(255, 215, 0, 0.8)',
+  },
+  createFABAdminText: {
+    fontSize: 36,
+    color: '#5A3A00',
+    fontWeight: '900',
+  },
+  // Admin placement FAB (bottom-left)
+  adminFABContainer: {
+    position: 'absolute',
+    left: spacing.lg,
+    alignItems: 'center',
+  },
+  adminFABGlow: {
+    shadowColor: '#7A5700',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.6,
+    shadowRadius: 10,
+    elevation: 8,
+    borderRadius: radius.full,
+  },
+  adminFABGlowActive: {
+    shadowColor: '#FFD700',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 1,
+    shadowRadius: 24,
+    elevation: 20,
+    borderRadius: radius.full,
+  },
+  adminFABTouchable: {
+    borderRadius: radius.full,
+  },
+  adminFAB: {
+    width: 56,
+    height: 56,
+    borderRadius: radius.full,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: 'rgba(255, 215, 0, 0.6)',
+  },
+  adminFABIcon: {
+    fontSize: 22,
+    color: '#B8860B',
+    fontWeight: '800',
+  },
+  adminFABIconActive: {
+    color: '#5A3A00',
+    fontSize: 20,
+  },
+  // Admin placement mode banner (below mode pill)
+  adminPlacementBanner: {
+    position: 'absolute',
+    alignSelf: 'center',
+    left: spacing.xl,
+    right: spacing.xl,
+    backgroundColor: 'rgba(255, 215, 0, 0.18)',
+    borderWidth: 1,
+    borderColor: '#FFD700',
+    borderRadius: radius.lg,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    zIndex: 10,
+  },
+  adminPlacementBannerText: {
+    color: '#FFD700',
+    fontSize: 13,
+    fontWeight: '700',
+    textAlign: 'center',
   },
 });

@@ -23,6 +23,7 @@ export interface MessageCluster {
   senderDisplayName: string | null;
   senderId: string;
   isPublic: boolean;
+  isAdminPlaced: boolean;
 }
 
 /**
@@ -122,6 +123,7 @@ function spatialCluster(
       senderAvatarUrl: seed.sender!.avatar_url ?? null,
       senderDisplayName: seed.sender!.display_name ?? null,
       isPublic: clusterMessages.some(m => m.is_public),
+      isAdminPlaced: seed.sender?.is_admin === true,
     });
   }
 }

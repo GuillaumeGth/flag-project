@@ -118,6 +118,15 @@ export default function MapScreen({ navigation, route }: Props) {
     return map;
   }, [myFlags]);
 
+  // Map flagId -> is_read to compute per-cluster open/closed state
+  const ownFlagReadMap = useMemo(() => {
+    const map: Record<string, boolean> = {};
+    for (const flag of myFlags) {
+      map[flag.id] = flag.is_read;
+    }
+    return map;
+  }, [myFlags]);
+
   // --- Selection state ---
   const [selectedMessage, setSelectedMessage] = useState<UndiscoveredMessageMapMeta | null>(null);
   const [selectedCluster, setSelectedCluster] = useState<MessageCluster | null>(null);
@@ -531,8 +540,12 @@ export default function MapScreen({ navigation, route }: Props) {
           const captureKey = `${cluster.id}:${cluster.messages.length}`;
           if (avatarImages[captureKey]) return null;
           const count = cluster.messages.length;
+          // In mine mode: violet for public, blue if any private message is unread, green if all read
+          const isClusterOpened = mapMode === 'mine' && !cluster.isPublic
+            ? cluster.messages.every(m => ownFlagReadMap[m.id])
+            : false;
           const avatarBorderStyle: StyleProp<ViewStyle> = mapMode === 'mine'
-            ? styles.captureAvatarOwn
+            ? (cluster.isPublic ? styles.captureAvatarPublic : (isClusterOpened ? styles.captureAvatarOwnOpened : styles.captureAvatarOwnClosed))
             : (cluster.isPublic ? styles.captureAvatarPublic : undefined);
           return (
             <View
@@ -544,26 +557,62 @@ export default function MapScreen({ navigation, route }: Props) {
                 requestAnimationFrame(() => requestAnimationFrame(() => captureAvatar(captureKey)));
               }}
             >
-              <View style={[styles.captureAvatar, avatarBorderStyle]}>
-                {cluster.senderAvatarUrl ? (
-                  <Image
-                    source={{ uri: cluster.senderAvatarUrl }}
-                    style={styles.captureAvatarImage}
-                    onLoad={() => {
-                      requestAnimationFrame(() => requestAnimationFrame(() => captureAvatar(captureKey)));
-                    }}
-                  />
-                ) : (
-                  <View style={[styles.captureAvatarBg, { backgroundColor: colorForUserId(cluster.senderId) }]}>
-                    <Text style={styles.captureAvatarInitials}>{initialsForName(cluster.senderDisplayName)}</Text>
+              {cluster.isPublic ? (
+                <LinearGradient
+                  colors={['#6D28D9', '#3B82F6']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.captureAvatarGradientBorder}
+                >
+                  <View style={styles.captureAvatarGradientInner}>
+                    {cluster.senderAvatarUrl ? (
+                      <Image
+                        source={{ uri: cluster.senderAvatarUrl }}
+                        style={styles.captureAvatarImage}
+                        onLoad={() => {
+                          requestAnimationFrame(() => requestAnimationFrame(() => captureAvatar(captureKey)));
+                        }}
+                      />
+                    ) : (
+                      <View style={[styles.captureAvatarBg, { backgroundColor: colorForUserId(cluster.senderId) }]}>
+                        <Text style={styles.captureAvatarInitials}>{initialsForName(cluster.senderDisplayName)}</Text>
+                      </View>
+                    )}
                   </View>
-                )}
-              </View>
+                </LinearGradient>
+              ) : (
+                <View style={[styles.captureAvatar, avatarBorderStyle]}>
+                  {cluster.senderAvatarUrl ? (
+                    <Image
+                      source={{ uri: cluster.senderAvatarUrl }}
+                      style={styles.captureAvatarImage}
+                      onLoad={() => {
+                        requestAnimationFrame(() => requestAnimationFrame(() => captureAvatar(captureKey)));
+                      }}
+                    />
+                  ) : (
+                    <View style={[styles.captureAvatarBg, { backgroundColor: colorForUserId(cluster.senderId) }]}>
+                      <Text style={styles.captureAvatarInitials}>{initialsForName(cluster.senderDisplayName)}</Text>
+                    </View>
+                  )}
+                </View>
+              )}
               {count > 1 && (
                 mapMode === 'mine' ? (
-                  <View style={styles.clusterBadgeSolid}>
-                    <Text style={styles.clusterBadgeText}>{count}</Text>
-                  </View>
+                  cluster.isPublic ? (
+                    <LinearGradient
+                      colors={['#6D28D9', '#3B82F6']}
+                      start={GRADIENT_START}
+                      end={FAB_GRADIENT_END}
+                      style={styles.clusterBadge}
+                    >
+                      <Text style={styles.clusterBadgeText}>{count}</Text>
+                    </LinearGradient>
+                  ) : (
+                    <View style={[styles.clusterBadgeSolid, { backgroundColor: isClusterOpened ? '#22C55E' : '#3B82F6' }]}>
+                      <Text style={styles.clusterBadgeText}>{count}</Text>
+                    </View>
+                  )
                 ) : (
                   <LinearGradient
                     colors={colors.gradients.button}
@@ -803,9 +852,30 @@ const styles = StyleSheet.create({
     borderWidth: 3,
     borderColor: colors.primary.violet,
   },
-  captureAvatarOwn: {
+  captureAvatarGradientBorder: {
+    width: 62,
+    height: 62,
+    borderRadius: 31,
+    padding: 3,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  captureAvatarGradientInner: {
+    width: 56,
+    height: 56,
+    backgroundColor: '#fff',
+    borderRadius: 28,
+    justifyContent: 'center',
+    alignItems: 'center',
+    overflow: 'hidden',
+  },
+  captureAvatarOwnOpened: {
     borderWidth: 3,
-    borderColor: '#F59E0B',
+    borderColor: '#22C55E',
+  },
+  captureAvatarOwnClosed: {
+    borderWidth: 3,
+    borderColor: '#3B82F6',
   },
   captureAvatarImage: {
     width: 52,

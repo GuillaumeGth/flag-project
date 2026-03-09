@@ -658,6 +658,7 @@ export async function fetchMyFlagsForMap(): Promise<OwnFlagMapMeta[]> {
       location,
       created_at,
       is_public,
+      is_read,
       content_type,
       text_content,
       media_url,

@@ -75,6 +75,7 @@ export interface OwnFlagMapMeta {
   location: string | Coordinates;
   created_at: string;
   is_public: boolean;
+  is_read: boolean;
   content_type: MessageContentType;
   text_content?: string | null;
   media_url?: string | null;

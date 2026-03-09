@@ -2,9 +2,19 @@ import { createClient } from '@supabase/supabase-js';
 import * as SecureStore from 'expo-secure-store';
 import Constants from 'expo-constants';
 
-// Get Supabase config from Constants (app.json extra) or env vars
-const supabaseUrl = Constants.expoConfig?.extra?.supabaseUrl || process.env.EXPO_PUBLIC_SUPABASE_URL || '';
-const supabaseAnonKey = Constants.expoConfig?.extra?.supabaseAnonKey || process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || '';
+// Hardcoded fallbacks — last resort if Constants.expoConfig or process.env are unavailable
+// (can happen in production bare workflow builds when the native ExponentConstants module
+// fails to load the embedded app.config asset)
+const _SUPABASE_URL = 'https://svhrpzlhqauyarcffpii.supabase.co';
+const _SUPABASE_ANON_KEY =
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN2aHJwemxocWF1eWFyY2ZmcGlpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk4OTUwMTcsImV4cCI6MjA4NTQ3MTAxN30.XqKUpriPey1lhIpsmjF4Zcgjfeml2DtjGHlL7N-Jfqk';
+
+const supabaseUrl =
+  Constants.expoConfig?.extra?.supabaseUrl || process.env.EXPO_PUBLIC_SUPABASE_URL || _SUPABASE_URL;
+const supabaseAnonKey =
+  Constants.expoConfig?.extra?.supabaseAnonKey ||
+  process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ||
+  _SUPABASE_ANON_KEY;
 
 // Custom storage using SecureStore for sensitive data
 const ExpoSecureStoreAdapter = {

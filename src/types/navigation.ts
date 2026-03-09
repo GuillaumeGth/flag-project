@@ -10,13 +10,9 @@ export type RootStackParamList = {
   Auth: undefined;
   Main: { screen: keyof MainTabParamList; params?: object } | undefined;
   Conversation: { otherUserId: string; otherUserName: string; otherUserAvatarUrl?: string; scrollToMessageId?: string };
-  CreateMessage: {
-    recipientId?: string;
-    recipientName?: string;
-    recipients?: { id: string; name: string }[];
-  } | undefined;
+  CreateMessage: { recipients?: { id: string; name: string }[] } | undefined;
   ReadMessage: { messageId: string };
-  SelectRecipient: undefined;
+  SelectRecipient: { mode: 'chat' | 'flag' };
   UserProfile: { userId: string };
   Settings: undefined;
 };

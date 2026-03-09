@@ -169,9 +169,10 @@ export default function ReadMessageScreen({ navigation, route }: Props) {
         <TouchableOpacity
           style={styles.replyButton}
           onPress={() =>
-            navigation.navigate('CreateMessage', {
-              recipientId: message.sender_id,
-              recipientName: message.sender?.display_name,
+            navigation.navigate('Conversation', {
+              otherUserId: message.sender_id,
+              otherUserName: message.sender?.display_name ?? '',
+              otherUserAvatarUrl: message.sender?.avatar_url ?? undefined,
             })
           }
         >

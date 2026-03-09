@@ -207,7 +207,7 @@ export default function InboxScreen({ navigation }: Props) {
     setRefreshing(false);
   }, []);
 
-  const navigateToSelectRecipient = useCallback(() => navigation.navigate('SelectRecipient'), [navigation]);
+  const navigateToSelectRecipient = useCallback(() => navigation.navigate('SelectRecipient', { mode: 'chat' }), [navigation]);
 
   const containerStyle = useMemo(() => [styles.container, { paddingTop: insets.top }], [insets.top]);
 

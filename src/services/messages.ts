@@ -261,7 +261,7 @@ export async function fetchConversationMessages(otherUserId: string): Promise<Me
       *,
       sender:users!sender_id (id, display_name, avatar_url),
       recipient:users!recipient_id (id, display_name, avatar_url),
-      reply_to:messages!reply_to_message_id (id, content_type, text_content, media_url, deleted_by_sender, deleted_by_recipient, sender:users!sender_id (display_name))
+      reply_to:messages!reply_to_id (id, content_type, text_content, media_url, deleted_by_sender, deleted_by_recipient, sender:users!sender_id (display_name))
     `)
     .or(`and(sender_id.eq.${currentUserId},recipient_id.eq.${otherUserId}),and(sender_id.eq.${otherUserId},recipient_id.eq.${currentUserId})`)
     .order('created_at', { ascending: true });
@@ -668,6 +668,7 @@ export async function fetchMyFlagsForMap(): Promise<OwnFlagMapMeta[]> {
     .eq('sender_id', currentUserId)
     .eq('deleted_by_sender', false)
     .not('location', 'is', null)
+    .is('recipient_id', null)
     .order('created_at', { ascending: false });
 
   if (error) {
@@ -705,7 +706,7 @@ export async function sendMessage(
       location: location ? `POINT(${location.longitude} ${location.latitude})` : null,
 is_read: location ? false : true, // Messages without location are immediately readable
       is_public: isPublic || false,
-      ...(replyToMessageId ? { reply_to_message_id: replyToMessageId } : {}),
+      ...(replyToMessageId ? { reply_to_id: replyToMessageId } : {}),
     })
     .select()
     .single();

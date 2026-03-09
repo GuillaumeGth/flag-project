@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -8,9 +8,9 @@ import {
   Image,
   ActivityIndicator,
   ScrollView,
+  Switch,
 } from 'react-native';
 import Toast from '@/components/Toast';
-import { Switch } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -30,17 +30,16 @@ export default function CreateMessageScreen({ navigation, route }: Props) {
   const insets = useSafeAreaInsets();
   const { current: userLocation } = useLocation();
 
-  // Support both old format (single recipient) and new format (multiple recipients)
-  const recipients: Recipient[] = route.params?.recipients ||
-    (route.params?.recipientId
-      ? [{ id: route.params.recipientId, name: route.params.recipientName || 'Destinataire' }]
-      : []);
+  const [recipients, setRecipients] = useState<Recipient[]>(route.params?.recipients ?? []);
+  const [isPublic, setIsPublic] = useState((route.params?.recipients ?? []).length === 0);
 
-  const recipientsDisplay = recipients.length > 0
-    ? recipients.map(r => r.name).join(', ')
-    : 'Sélectionner';
+  useEffect(() => {
+    if (route.params?.recipients) {
+      setRecipients(route.params.recipients);
+      setIsPublic(false);
+    }
+  }, [route.params?.recipients]);
 
-  const [isPublic, setIsPublic] = useState(true);
   const [contentType, setContentType] = useState<MessageContentType>('text');
   const [textContent, setTextContent] = useState('');
   const [mediaUri, setMediaUri] = useState<string | null>(null);
@@ -83,9 +82,7 @@ export default function CreateMessageScreen({ navigation, route }: Props) {
       return;
     }
 
-    const result = await ImagePicker.launchCameraAsync({
-      quality: 0.8,
-    });
+    const result = await ImagePicker.launchCameraAsync({ quality: 0.8 });
 
     if (!result.canceled && result.assets[0]) {
       setMediaUri(result.assets[0].uri);
@@ -188,7 +185,7 @@ export default function CreateMessageScreen({ navigation, route }: Props) {
     if (!isPublic && recipients.length === 0) {
       showToast('Sélectionnez au moins un destinataire', 'error', {
         label: 'Choisir',
-        onPress: () => navigation.navigate('SelectRecipient'),
+        onPress: () => navigation.navigate('SelectRecipient', { mode: 'flag' }),
       });
       return;
     }
@@ -211,10 +208,7 @@ export default function CreateMessageScreen({ navigation, route }: Props) {
       if (mediaUri && contentType !== 'text') {
         const url = await uploadMedia(mediaUri, contentType as 'photo' | 'audio');
         if (!url) {
-          showToast('Échec de l\'upload du média', 'error', {
-            label: 'Réessayer',
-            onPress: handleSend,
-          });
+          showToast('Échec de l\'upload du média', 'error', { label: 'Réessayer', onPress: handleSend });
           setLoading(false);
           return;
         }
@@ -222,71 +216,26 @@ export default function CreateMessageScreen({ navigation, route }: Props) {
       }
 
       if (isPublic) {
-        // Send a single public message without recipient
-        const result = await sendMessage(
-          null,
-          contentType,
-          userLocation,
-          textContent || undefined,
-          uploadedMediaUrl,
-          true
-        );
-
+        const result = await sendMessage(null, contentType, userLocation, textContent || undefined, uploadedMediaUrl, true);
         if (result) {
-          navigation.navigate('Main', {
-            screen: 'Map',
-            params: { toast: { message: 'Message public envoyé !', type: 'success' } },
-          });
+          navigation.navigate('Main', { screen: 'Map', params: { toast: { message: 'Flag déposé !', type: 'success' } } });
           return;
-        } else {
-          showToast('Échec de l\'envoi', 'error', {
-            label: 'Réessayer',
-            onPress: handleSend,
-          });
         }
       } else {
-        // Send message to all recipients
-        const sendPromises = recipients.map((recipient) =>
-          sendMessage(
-            recipient.id,
-            contentType,
-            userLocation,
-            textContent || undefined,
-            uploadedMediaUrl
-          )
+        const results = await Promise.all(
+          recipients.map((r) => sendMessage(r.id, contentType, userLocation, textContent || undefined, uploadedMediaUrl, false))
         );
-
-        const results = await Promise.all(sendPromises);
-        // results logged implicitly via successCount check below
         const successCount = results.filter(Boolean).length;
-
-        if (successCount === recipients.length) {
-          const msg = recipients.length > 1
-            ? `Message envoyé à ${recipients.length} destinataires !`
-            : 'Message envoyé !';
-          navigation.navigate('Main', {
-            screen: 'Map',
-            params: { toast: { message: msg, type: 'success' } },
-          });
+        if (successCount > 0) {
+          const msg = successCount === recipients.length ? 'Flag privé envoyé !' : `Envoyé à ${successCount}/${recipients.length}`;
+          navigation.navigate('Main', { screen: 'Map', params: { toast: { message: msg, type: successCount === recipients.length ? 'success' : 'warning' } } });
           return;
-        } else if (successCount > 0) {
-          navigation.navigate('Main', {
-            screen: 'Map',
-            params: { toast: { message: `Message envoyé à ${successCount}/${recipients.length} destinataires`, type: 'warning' } },
-          });
-          return;
-        } else {
-          showToast('Échec de l\'envoi', 'error', {
-            label: 'Réessayer',
-            onPress: handleSend,
-          });
         }
       }
-    } catch (error) {
-      showToast('Une erreur est survenue', 'error', {
-        label: 'Réessayer',
-        onPress: handleSend,
-      });
+
+      showToast('Échec de l\'envoi', 'error', { label: 'Réessayer', onPress: handleSend });
+    } catch {
+      showToast('Une erreur est survenue', 'error', { label: 'Réessayer', onPress: handleSend });
     }
 
     setLoading(false);
@@ -294,141 +243,137 @@ export default function CreateMessageScreen({ navigation, route }: Props) {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background.primary }}>
-    <Toast
-      visible={toast.visible}
-      message={toast.message}
-      type={toast.type}
-      action={toast.action}
-      onHide={hideToast}
-    />
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <View style={[styles.header, { marginTop: insets.top }]}>
-        <TouchableOpacity onPress={() => navigation.goBack()}>
-          <Ionicons name="arrow-back" size={24} color={colors.text.primary} />
-        </TouchableOpacity>
-        <Text style={styles.title}>Nouveau message</Text>
-        <View style={{ width: 24 }} />
-      </View>
-
-      <View style={[styles.recipientRow, isPublic && { opacity: 0.4 }]}>
-        <Text style={styles.recipientLabel}>À :</Text>
-        <TouchableOpacity
-          style={styles.recipientButton}
-          onPress={() => navigation.navigate('SelectRecipient')}
-          disabled={isPublic}
-        >
-          <Text style={styles.recipientName} numberOfLines={2}>
-            {recipientsDisplay}
-          </Text>
-          <Ionicons name="chevron-forward" size={20} color={colors.text.secondary} />
-        </TouchableOpacity>
-      </View>
-
-      <View style={styles.publicToggleRow}>
-        <Ionicons name="globe-outline" size={18} color={isPublic ? colors.primary.cyan : colors.text.secondary} />
-        <Text style={[styles.publicToggleLabel, isPublic && { color: colors.primary.cyan }]}>Public</Text>
-        <Switch
-          value={isPublic}
-          onValueChange={setIsPublic}
-          trackColor={{ false: colors.border.default, true: colors.primary.cyan }}
-          thumbColor={colors.text.primary}
-        />
-      </View>
-
-      {/* Media preview */}
-      {mediaUri && contentType === 'photo' && (
-        <View style={styles.mediaPreview}>
-          <Image source={{ uri: mediaUri }} style={styles.previewImage} />
-          <TouchableOpacity style={styles.clearMedia} onPress={clearMedia}>
-            <Ionicons name="close-circle" size={28} color={colors.text.primary} />
-          </TouchableOpacity>
-        </View>
-      )}
-
-      {mediaUri && contentType === 'audio' && (
-        <View style={styles.audioPreview}>
-          <TouchableOpacity onPress={playAudio} style={styles.playButton}>
-            <Ionicons
-              name={isPlaying ? 'pause' : 'play'}
-              size={24}
-              color={colors.text.primary}
-            />
-          </TouchableOpacity>
-          <Text style={styles.audioText}>
-            {isPlaying ? 'Lecture en cours...' : 'Audio enregistré'}
-          </Text>
-          <TouchableOpacity onPress={clearMedia}>
-            <Ionicons name="close-circle" size={24} color={colors.text.secondary} />
-          </TouchableOpacity>
-        </View>
-      )}
-
-      {/* Text input */}
-      <TextInput
-        style={styles.textInput}
-        placeholder="Votre message..."
-        placeholderTextColor={colors.text.tertiary}
-        multiline
-        value={textContent}
-        onChangeText={setTextContent}
+      <Toast
+        visible={toast.visible}
+        message={toast.message}
+        type={toast.type}
+        action={toast.action}
+        onHide={hideToast}
       />
+      <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+        <View style={[styles.header, { marginTop: insets.top }]}>
+          <TouchableOpacity onPress={() => navigation.goBack()}>
+            <Ionicons name="arrow-back" size={24} color={colors.text.primary} />
+          </TouchableOpacity>
+          <Text style={styles.title}>Nouveau flag</Text>
+          <View style={{ width: 24 }} />
+        </View>
 
-      {/* Media buttons */}
-      <View style={styles.mediaButtons}>
-        <TouchableOpacity style={styles.mediaButton} onPress={pickImage}>
-          <Ionicons name="image" size={24} color={colors.primary.cyan} />
-          <Text style={styles.mediaButtonText}>Galerie</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.mediaButton} onPress={takePhoto}>
-          <Ionicons name="camera" size={24} color={colors.primary.cyan} />
-          <Text style={styles.mediaButtonText}>Photo</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[styles.mediaButton, isRecording && styles.recordingButton]}
-          onPress={isRecording ? stopRecording : startRecording}
-        >
-          <Ionicons
-            name={isRecording ? 'stop' : 'mic'}
-            size={24}
-            color={isRecording ? colors.error : colors.primary.cyan}
+        {/* Public / Privé toggle */}
+        <View style={styles.publicToggleRow}>
+          <Ionicons name="globe-outline" size={18} color={isPublic ? colors.primary.cyan : colors.text.secondary} />
+          <Text style={[styles.publicToggleLabel, isPublic && { color: colors.primary.cyan }]}>Public</Text>
+          <Switch
+            value={isPublic}
+            onValueChange={setIsPublic}
+            trackColor={{ false: colors.border.default, true: colors.primary.cyan }}
+            thumbColor={colors.text.primary}
           />
-          <Text
-            style={[
-              styles.mediaButtonText,
-              isRecording && styles.recordingText,
-            ]}
-          >
-            {isRecording ? 'Stop' : 'Audio'}
-          </Text>
-        </TouchableOpacity>
-      </View>
+        </View>
 
-      {/* Send button */}
-      <TouchableOpacity
-        style={[styles.sendButtonContainer, loading && styles.sendButtonDisabled]}
-        onPress={handleSend}
-        disabled={loading}
-        activeOpacity={0.8}
-      >
-        <LinearGradient
-          colors={colors.gradients.button}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 0 }}
-          style={styles.sendButton}
+        {/* Destinataire (mode privé) */}
+        {!isPublic && (
+          <TouchableOpacity
+            style={styles.recipientRow}
+            onPress={() => navigation.navigate('SelectRecipient', { mode: 'flag' })}
+          >
+            <Text style={styles.recipientLabel}>À :</Text>
+            <Text style={styles.recipientName} numberOfLines={1}>
+              {recipients.length > 0 ? recipients.map((r) => r.name).join(', ') : 'Sélectionner'}
+            </Text>
+            <Ionicons name="chevron-forward" size={20} color={colors.text.secondary} />
+          </TouchableOpacity>
+        )}
+
+        {/* Media preview */}
+        {mediaUri && contentType === 'photo' && (
+          <View style={styles.mediaPreview}>
+            <Image source={{ uri: mediaUri }} style={styles.previewImage} />
+            <TouchableOpacity style={styles.clearMedia} onPress={clearMedia}>
+              <Ionicons name="close-circle" size={28} color={colors.text.primary} />
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {mediaUri && contentType === 'audio' && (
+          <View style={styles.audioPreview}>
+            <TouchableOpacity onPress={playAudio} style={styles.playButton}>
+              <Ionicons
+                name={isPlaying ? 'pause' : 'play'}
+                size={24}
+                color={colors.text.primary}
+              />
+            </TouchableOpacity>
+            <Text style={styles.audioText}>
+              {isPlaying ? 'Lecture en cours...' : 'Audio enregistré'}
+            </Text>
+            <TouchableOpacity onPress={clearMedia}>
+              <Ionicons name="close-circle" size={24} color={colors.text.secondary} />
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {/* Text input */}
+        <TextInput
+          style={styles.textInput}
+          placeholder="Votre message..."
+          placeholderTextColor={colors.text.tertiary}
+          multiline
+          value={textContent}
+          onChangeText={setTextContent}
+        />
+
+        {/* Media buttons */}
+        <View style={styles.mediaButtons}>
+          <TouchableOpacity style={styles.mediaButton} onPress={pickImage}>
+            <Ionicons name="image" size={24} color={colors.primary.cyan} />
+            <Text style={styles.mediaButtonText}>Galerie</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.mediaButton} onPress={takePhoto}>
+            <Ionicons name="camera" size={24} color={colors.primary.cyan} />
+            <Text style={styles.mediaButtonText}>Photo</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.mediaButton, isRecording && styles.recordingButton]}
+            onPress={isRecording ? stopRecording : startRecording}
+          >
+            <Ionicons
+              name={isRecording ? 'stop' : 'mic'}
+              size={24}
+              color={isRecording ? colors.error : colors.primary.cyan}
+            />
+            <Text style={[styles.mediaButtonText, isRecording && styles.recordingText]}>
+              {isRecording ? 'Stop' : 'Audio'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Send button */}
+        <TouchableOpacity
+          style={[styles.sendButtonContainer, loading && styles.sendButtonDisabled]}
+          onPress={handleSend}
+          disabled={loading}
+          activeOpacity={0.8}
         >
-          {loading ? (
-            <ActivityIndicator color="#FFFFFF" />
-          ) : (
-            <>
-              <Ionicons name="send" size={20} color="#FFFFFF" />
-              <Text style={styles.sendButtonText}>Envoyer</Text>
-            </>
-          )}
-        </LinearGradient>
-      </TouchableOpacity>
-    </ScrollView>
+          <LinearGradient
+            colors={colors.gradients.button}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={styles.sendButton}
+          >
+            {loading ? (
+              <ActivityIndicator color="#FFFFFF" />
+            ) : (
+              <>
+                <Ionicons name="send" size={20} color="#FFFFFF" />
+                <Text style={styles.sendButtonText}>Envoyer</Text>
+              </>
+            )}
+          </LinearGradient>
+        </TouchableOpacity>
+      </ScrollView>
     </View>
   );
 }
@@ -452,29 +397,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: colors.text.primary,
   },
-  recipientRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: spacing.md,
-  },
-  recipientLabel: {
-    fontSize: typography.sizes.md,
-    color: colors.text.secondary,
-    marginRight: spacing.sm,
-  },
-  recipientButton: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: colors.surface.glass,
-    borderRadius: radius.md,
-    padding: spacing.md,
-  },
-  recipientName: {
-    fontSize: typography.sizes.md,
-    color: colors.text.primary,
-  },
   publicToggleRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -485,18 +407,23 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.sm,
     color: colors.text.secondary,
   },
-  locationInfo: {
+  recipientRow: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: colors.surface.glass,
     borderRadius: radius.md,
     padding: spacing.md,
     marginBottom: spacing.md,
+    gap: spacing.sm,
   },
-  locationText: {
-    marginLeft: spacing.sm,
-    fontSize: typography.sizes.sm,
-    color: colors.primary.cyan,
+  recipientLabel: {
+    fontSize: typography.sizes.md,
+    color: colors.text.secondary,
+  },
+  recipientName: {
+    flex: 1,
+    fontSize: typography.sizes.md,
+    color: colors.text.primary,
   },
   mediaPreview: {
     marginBottom: spacing.md,

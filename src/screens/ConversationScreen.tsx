@@ -297,8 +297,6 @@ export default function ConversationScreen({ navigation, route }: Props) {
         isPlaying={isPlayingAudio}
         playingMessageId={playingMessageId}
         reactions={reactionsMap[item.id] ?? EMPTY_REACTIONS}
-        reply={item.reply_to ?? undefined}
-        onQuotedPress={item.reply_to ? () => handleScrollToMessage(item.reply_to!.id) : undefined}
         isSelected={selectedMessageId === item.id}
         onPress={() => {
             if (pickerMessageId) { setPickerMessageId(null); return; }

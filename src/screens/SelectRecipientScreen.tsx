@@ -17,8 +17,9 @@ import { colors } from '@/theme-redesign';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'SelectRecipient'>;
 
-export default function SelectRecipientScreen({ navigation }: Props) {
+export default function SelectRecipientScreen({ navigation, route }: Props) {
   const insets = useSafeAreaInsets();
+  const mode = route.params.mode;
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedUsers, setSelectedUsers] = useState<User[]>([]);
@@ -34,26 +35,33 @@ export default function SelectRecipientScreen({ navigation }: Props) {
     setLoading(false);
   };
 
-  const toggleUserSelection = (user: User) => {
-    setSelectedUsers((prev) => {
-      const isSelected = prev.some((u) => u.id === user.id);
-      if (isSelected) {
-        return prev.filter((u) => u.id !== user.id);
-      } else {
-        return [...prev, user];
-      }
-    });
+  const toggleUser = (user: User) => {
+    setSelectedUsers((prev) =>
+      prev.some((u) => u.id === user.id)
+        ? prev.filter((u) => u.id !== user.id)
+        : [...prev, user]
+    );
   };
 
   const confirmSelection = () => {
-    if (selectedUsers.length === 0) return;
-
-    const recipients = selectedUsers.map((user) => ({
-      id: user.id,
-      name: user.display_name || user.email || user.phone || 'Utilisateur',
+    const recipients = selectedUsers.map((u) => ({
+      id: u.id,
+      name: u.display_name || u.email || u.phone || 'Utilisateur',
     }));
-
     navigation.navigate('CreateMessage', { recipients });
+  };
+
+  const handlePress = (user: User) => {
+    if (mode === 'flag') {
+      toggleUser(user);
+    } else {
+      const displayName = user.display_name || user.email || user.phone || 'Utilisateur';
+      navigation.navigate('Conversation', {
+        otherUserId: user.id,
+        otherUserName: displayName,
+        otherUserAvatarUrl: user.avatar_url ?? undefined,
+      });
+    }
   };
 
   const renderUser = ({ item }: { item: User }) => {
@@ -64,11 +72,13 @@ export default function SelectRecipientScreen({ navigation }: Props) {
     return (
       <TouchableOpacity
         style={[styles.userItem, isSelected && styles.userItemSelected]}
-        onPress={() => toggleUserSelection(item)}
+        onPress={() => handlePress(item)}
       >
-        <View style={[styles.checkbox, isSelected && styles.checkboxSelected]}>
-          {isSelected && <Ionicons name="checkmark" size={16} color="#fff" />}
-        </View>
+        {mode === 'flag' && (
+          <View style={[styles.checkbox, isSelected && styles.checkboxSelected]}>
+            {isSelected && <Ionicons name="checkmark" size={16} color="#fff" />}
+          </View>
+        )}
         {item.avatar_url ? (
           <Image source={{ uri: item.avatar_url }} style={styles.avatarImage} />
         ) : (
@@ -82,9 +92,7 @@ export default function SelectRecipientScreen({ navigation }: Props) {
         )}
         <View style={styles.userInfo}>
           <Text style={styles.userName}>{displayName}</Text>
-          {isBot && (
-            <Text style={styles.botLabel}>Bot officiel Fläag</Text>
-          )}
+          {isBot && <Text style={styles.botLabel}>Bot officiel Fläag</Text>}
         </View>
       </TouchableOpacity>
     );
@@ -96,20 +104,16 @@ export default function SelectRecipientScreen({ navigation }: Props) {
         <TouchableOpacity onPress={() => navigation.goBack()}>
           <Ionicons name="arrow-back" size={24} color={colors.text.primary} />
         </TouchableOpacity>
-        <Text style={styles.title}>Choisir les destinataires</Text>
-        <TouchableOpacity
-          onPress={confirmSelection}
-          disabled={selectedUsers.length === 0}
-        >
-          <Text
-            style={[
-              styles.confirmButton,
-              selectedUsers.length === 0 && styles.confirmButtonDisabled,
-            ]}
-          >
-            OK ({selectedUsers.length})
-          </Text>
-        </TouchableOpacity>
+        <Text style={styles.title}>{mode === 'flag' ? 'Choisir les destinataires' : 'Nouvelle conversation'}</Text>
+        {mode === 'flag' ? (
+          <TouchableOpacity onPress={confirmSelection} disabled={selectedUsers.length === 0}>
+            <Text style={[styles.confirmButton, selectedUsers.length === 0 && styles.confirmButtonDisabled]}>
+              OK ({selectedUsers.length})
+            </Text>
+          </TouchableOpacity>
+        ) : (
+          <View style={{ width: 40 }} />
+        )}
       </View>
 
       {loading ? (

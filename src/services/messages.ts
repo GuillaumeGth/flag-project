@@ -46,7 +46,7 @@ type RawReplyRow = {
 };
 
 // Fetch the reply-to message content for a set of IDs (avoids self-referential join issue in PostgREST)
-async function fetchReplyMessages(ids: string[], currentUserId: string): Promise<Map<string, MessageReply>> {
+async function fetchReplyMessages(ids: string[]): Promise<Map<string, MessageReply>> {
   const map = new Map<string, MessageReply>();
   if (ids.length === 0) return map;
 
@@ -285,7 +285,7 @@ export async function fetchConversationMessages(otherUserId: string): Promise<Me
   // Collect reply_to_id values that need to be resolved
   const rawList = (newMessages || []) as RawMessageWithUsers[];
   const replyIds = [...new Set(rawList.map(m => m.reply_to_id).filter((id): id is string => !!id))];
-  const replyMap = await fetchReplyMessages(replyIds, currentUserId);
+  const replyMap = await fetchReplyMessages(replyIds);
 
   for (const raw of rawList) {
     mergedMap.set(raw.id, mapRawMessage(raw, replyMap));
@@ -308,7 +308,6 @@ export async function fetchConversationMessages(otherUserId: string): Promise<Me
  * Get cached conversation messages immediately (for instant UI display).
  */
 export async function getCachedConversationMessages(otherUserId: string): Promise<MessageWithUsers[] | null> {
-  const currentUserId = getCurrentUserId();
   const cached = await getCachedData<MessageWithUsers[]>(CACHE_KEYS.CONVERSATION(otherUserId));
   if (!cached || cached.length === 0) return null;
   return cached.map(stripInvalidReply);
@@ -705,7 +704,7 @@ export async function sendMessage(
       text_content: textContent,
       media_url: mediaUrl,
       location: location ? `POINT(${location.longitude} ${location.latitude})` : null,
-is_read: location ? false : true, // Messages without location are immediately readable
+      is_read: location ? false : true, // Messages without location are immediately readable
       is_public: isPublic || false,
       is_admin_placed: isAdminPlaced || false,
       ...(replyToMessageId ? { reply_to_id: replyToMessageId } : {}),

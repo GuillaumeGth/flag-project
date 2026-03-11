@@ -147,6 +147,20 @@ export default function MapScreen({ navigation, route }: Props) {
   const [focusLocation, setFocusLocation] = useState<unknown>(null);
   const [focusMarkerCoords, setFocusMarkerCoords] = useState<Coordinates | null>(null);
 
+  // --- Tracking mode: map follows user position until they manually move the map ---
+  const [isTracking, setIsTracking] = useState(true);
+  const isProgrammaticMove = useRef(false);
+  const programmaticMoveTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+
+  const triggerProgrammaticMove = useCallback((fn: () => void) => {
+    isProgrammaticMove.current = true;
+    clearTimeout(programmaticMoveTimer.current);
+    fn();
+    programmaticMoveTimer.current = setTimeout(() => {
+      isProgrammaticMove.current = false;
+    }, 1500);
+  }, []);
+
   // --- Admin placement mode (map-picker UX: pin fixed at center, map moves underneath) ---
   const [isAdminPlacementMode, setIsAdminPlacementMode] = useState(false);
   // Tracks the geographic center of the visible map region (updated by onRegionChangeComplete)
@@ -163,6 +177,10 @@ export default function MapScreen({ navigation, route }: Props) {
   const [cardOpacityAnim] = useState(new Animated.Value(0));
   const [ownFlagSlideAnim] = useState(new Animated.Value(200));
   const [ownFlagOpacityAnim] = useState(new Animated.Value(0));
+
+  // Radar ping animation for tracking button
+  const pingAnim1 = useRef(new Animated.Value(0)).current;
+  const pingAnim2 = useRef(new Animated.Value(0)).current;
 
   const selectedMsgLocation = useMemo(
     () => (selectedMessage ? getMessageLocation(selectedMessage) : null),
@@ -250,17 +268,19 @@ export default function MapScreen({ navigation, route }: Props) {
     }
   }, [route?.params]);
 
-  // Center on user location (initial)
+  // Center on user location — only when tracking is active
   useEffect(() => {
-    if (userLocation && mapRef.current && !centeredMessageId && !centeredOwnFlagId && !focusLocation) {
-      mapRef.current.animateToRegion({
-        latitude: userLocation.latitude,
-        longitude: userLocation.longitude,
-        latitudeDelta: LAT_DELTA,
-        longitudeDelta: LNG_DELTA,
-      }, 500);
+    if (isTracking && userLocation && mapRef.current && !centeredMessageId && !centeredOwnFlagId && !focusLocation) {
+      triggerProgrammaticMove(() => {
+        mapRef.current?.animateToRegion({
+          latitude: userLocation.latitude,
+          longitude: userLocation.longitude,
+          latitudeDelta: LAT_DELTA,
+          longitudeDelta: LNG_DELTA,
+        }, 500);
+      });
     }
-  }, [userLocation, centeredMessageId, centeredOwnFlagId, focusLocation]);
+  }, [isTracking, userLocation, centeredMessageId, centeredOwnFlagId, focusLocation, triggerProgrammaticMove]);
 
   // Animate explore card
   useEffect(() => {
@@ -288,6 +308,34 @@ export default function MapScreen({ navigation, route }: Props) {
     }
   }, [selectedOwnFlag]);
 
+  // Radar ping animation — two rings staggered, loop while tracking
+  useEffect(() => {
+    if (!isTracking) {
+      pingAnim1.setValue(0);
+      pingAnim2.setValue(0);
+      return;
+    }
+    const ring1 = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pingAnim1, { toValue: 1, duration: 2800, useNativeDriver: true }),
+        Animated.timing(pingAnim1, { toValue: 0, duration: 0, useNativeDriver: true }),
+      ]),
+    );
+    const ring2 = Animated.loop(
+      Animated.sequence([
+        Animated.delay(1400),
+        Animated.timing(pingAnim2, { toValue: 1, duration: 2800, useNativeDriver: true }),
+        Animated.timing(pingAnim2, { toValue: 0, duration: 0, useNativeDriver: true }),
+      ]),
+    );
+    ring1.start();
+    ring2.start();
+    return () => {
+      ring1.stop();
+      ring2.stop();
+    };
+  }, [isTracking, pingAnim1, pingAnim2]);
+
   // Center on explore message
   useEffect(() => {
     if (!centeredMessageId || !mapRef.current || messages.length === 0) return;
@@ -297,8 +345,10 @@ export default function MapScreen({ navigation, route }: Props) {
     if (!location) return;
     setCenterLocation(location);
     setSelectedMessage(targetMessage);
-    mapRef.current.animateToRegion({ latitude: location.latitude, longitude: location.longitude, latitudeDelta: 0.02, longitudeDelta: 0.02 }, 500);
-  }, [centeredMessageId, messages, userLocation]);
+    triggerProgrammaticMove(() => {
+      mapRef.current?.animateToRegion({ latitude: location.latitude, longitude: location.longitude, latitudeDelta: 0.02, longitudeDelta: 0.02 }, 500);
+    });
+  }, [centeredMessageId, messages, userLocation, triggerProgrammaticMove]);
 
   // Center on own flag
   useEffect(() => {
@@ -309,27 +359,33 @@ export default function MapScreen({ navigation, route }: Props) {
     if (!location) return;
     setSelectedOwnFlag(targetFlag);
     setCenteredOwnFlagId(null);
-    mapRef.current.animateToRegion({ latitude: location.latitude, longitude: location.longitude, latitudeDelta: 0.02, longitudeDelta: 0.02 }, 500);
-  }, [centeredOwnFlagId, myFlags]);
+    triggerProgrammaticMove(() => {
+      mapRef.current?.animateToRegion({ latitude: location.latitude, longitude: location.longitude, latitudeDelta: 0.02, longitudeDelta: 0.02 }, 500);
+    });
+  }, [centeredOwnFlagId, myFlags, triggerProgrammaticMove]);
 
   useEffect(() => {
     if (!focusLocation || !mapRef.current) return;
     const coords = getMessageLocation({ location: focusLocation } as UndiscoveredMessageMapMeta);
     if (!coords) return;
     setFocusMarkerCoords(coords);
-    mapRef.current.animateToRegion({ latitude: coords.latitude, longitude: coords.longitude, latitudeDelta: 0.01, longitudeDelta: 0.01 }, 500);
-  }, [focusLocation, userLocation]);
+    triggerProgrammaticMove(() => {
+      mapRef.current?.animateToRegion({ latitude: coords.latitude, longitude: coords.longitude, latitudeDelta: 0.01, longitudeDelta: 0.01 }, 500);
+    });
+  }, [focusLocation, userLocation, triggerProgrammaticMove]);
 
   useEffect(() => {
     if (!routeCoordinates || !mapRef.current) return;
     const timeout = setTimeout(() => {
-      mapRef.current?.fitToCoordinates(routeCoordinates, {
-        edgePadding: { top: 120, right: 60, bottom: 280, left: 60 },
-        animated: true,
+      triggerProgrammaticMove(() => {
+        mapRef.current?.fitToCoordinates(routeCoordinates, {
+          edgePadding: { top: 120, right: 60, bottom: 280, left: 60 },
+          animated: true,
+        });
       });
     }, 100);
     return () => clearTimeout(timeout);
-  }, [routeCoordinates]);
+  }, [routeCoordinates, triggerProgrammaticMove]);
 
   const handleModeSwitch = useCallback((mode: MapMode) => {
     setMapMode(mode);
@@ -344,9 +400,12 @@ export default function MapScreen({ navigation, route }: Props) {
 
   const centerOnUser = useCallback(() => {
     if (userLocation && mapRef.current) {
-      mapRef.current.animateToRegion({ latitude: userLocation.latitude, longitude: userLocation.longitude, latitudeDelta: LAT_DELTA, longitudeDelta: LNG_DELTA }, 300);
+      triggerProgrammaticMove(() => {
+        mapRef.current?.animateToRegion({ latitude: userLocation.latitude, longitude: userLocation.longitude, latitudeDelta: LAT_DELTA, longitudeDelta: LNG_DELTA }, 300);
+      });
+      setIsTracking(true);
     }
-  }, [userLocation]);
+  }, [userLocation, triggerProgrammaticMove]);
 
   const hideToast = useCallback(() => setToastData((prev) => ({ ...prev, visible: false })), []);
 
@@ -517,6 +576,9 @@ export default function MapScreen({ navigation, route }: Props) {
         onRegionChangeComplete={(region) => {
           setLatDelta(region.latitudeDelta);
           setMapCenterCoords({ latitude: region.latitude, longitude: region.longitude });
+          if (!isProgrammaticMove.current) {
+            setIsTracking(false);
+          }
         }}
       >
         {/* Explore mode markers */}
@@ -732,9 +794,39 @@ export default function MapScreen({ navigation, route }: Props) {
           </TouchableOpacity>
         </View>
 
-        <TouchableOpacity onPress={centerOnUser} activeOpacity={0.9} style={styles.floatingButton}>
-          <Ionicons name="locate" size={22} color={colors.primary.cyan} />
-        </TouchableOpacity>
+        {isTracking ? (
+          <View style={styles.trackingButtonWrapper}>
+            <Animated.View style={[
+              styles.trackingPing,
+              {
+                transform: [{ scale: pingAnim1.interpolate({ inputRange: [0, 1], outputRange: [1, 1.6] }) }],
+                opacity: pingAnim1.interpolate({ inputRange: [0, 0.3, 1], outputRange: [0, 0.3, 0] }),
+              },
+            ]} />
+            <Animated.View style={[
+              styles.trackingPing,
+              {
+                transform: [{ scale: pingAnim2.interpolate({ inputRange: [0, 1], outputRange: [1, 1.6] }) }],
+                opacity: pingAnim2.interpolate({ inputRange: [0, 0.3, 1], outputRange: [0, 0.3, 0] }),
+              },
+            ]} />
+            <TouchableOpacity
+              onPress={centerOnUser}
+              activeOpacity={0.9}
+              style={[styles.floatingButton, styles.floatingButtonTracking]}
+            >
+              <Ionicons name="locate" size={22} color="#FFFFFF" />
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <TouchableOpacity
+            onPress={centerOnUser}
+            activeOpacity={0.9}
+            style={styles.floatingButton}
+          >
+            <Ionicons name="locate" size={22} color={colors.primary.cyan} />
+          </TouchableOpacity>
+        )}
       </View>
 
       {/* Admin placement FAB (bottom-left, admin only) */}
@@ -833,8 +925,32 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: colors.surface.glass,
-    borderRadius: radius.lg,
+    borderRadius: radius.full,
     ...shadows.small,
+  },
+  floatingButtonTracking: {
+    backgroundColor: 'rgba(167, 139, 250, 0.9)',
+    borderWidth: 1.5,
+    borderColor: 'rgba(196, 181, 253, 0.7)',
+    shadowColor: colors.primary.violet,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.5,
+    shadowRadius: 10,
+    elevation: 8,
+  },
+  trackingButtonWrapper: {
+    width: 48,
+    height: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  trackingPing: {
+    position: 'absolute',
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    borderWidth: 2,
+    borderColor: colors.primary.violet,
   },
   floatingButtonDanger: {
     borderWidth: 1,

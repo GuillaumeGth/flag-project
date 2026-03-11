@@ -55,7 +55,7 @@ export function clusterMessages(
   groupBySender: boolean = false,
 ): MessageCluster[] {
   const clusters: MessageCluster[] = [];
-  const valid = messages.filter(m => m.sender?.id);
+  const valid = messages.filter(m => m.sender?.id && m.sender?.avatar_url);
 
   if (groupBySender) {
     const bySender = new Map<string, UndiscoveredMessageMapMeta[]>();

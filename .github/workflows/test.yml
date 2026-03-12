@@ -1,26 +1,44 @@
-name: Unit Tests
+name: CI
 
 on:
   pull_request:
-    branches:
-      - '**'
+    branches: ['**']
+  push:
+    branches: [main]
 
 jobs:
-  test:
-    name: Run unit tests
+  typecheck:
+    name: TypeScript
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: npm
+      - run: npm ci --legacy-peer-deps
+      - run: npx tsc --noEmit
 
-      - name: Install dependencies
-        run: npm ci --legacy-peer-deps
+  lint:
+    name: ESLint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci --legacy-peer-deps
+      - run: npm run lint
 
-      - name: Run tests
-        run: npm test -- --ci --passWithNoTests
+  test:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci --legacy-peer-deps
+      - run: npm test -- --ci --passWithNoTests --coverage --coverageReporters=text-summary

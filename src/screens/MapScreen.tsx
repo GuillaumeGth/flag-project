@@ -656,6 +656,7 @@ export default function MapScreen({ navigation, route }: Props) {
             <Image
               source={{ uri: cluster.senderAvatarUrl }}
               style={styles.captureAvatarImage}
+              fadeDuration={0}
               onLoad={() => {
                 requestAnimationFrame(() => requestAnimationFrame(() => captureAvatar(captureKey)));
               }}

@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
+import { AppState } from 'react-native';
 import * as WebBrowser from 'expo-web-browser';
 import * as Linking from 'expo-linking';
 import { File } from 'expo-file-system/next';
@@ -363,8 +364,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       log('AuthContext', 'OAuth URL:', data.url);
 
+      // On Android, the Chrome Custom Tab may close (via deep link redirect) without
+      // openAuthSessionAsync ever resolving. Detect when the app returns to foreground
+      // and dismiss the auth session so the promise resolves.
+      let wentToBackground = false;
+      const appStateSub = AppState.addEventListener('change', (nextState) => {
+        if (nextState === 'background' || nextState === 'inactive') {
+          wentToBackground = true;
+        } else if (nextState === 'active' && wentToBackground) {
+          WebBrowser.dismissAuthSession();
+        }
+      });
+
       // Use openAuthSessionAsync with flag:// prefix to capture any flag:// redirect
       const result = await WebBrowser.openAuthSessionAsync(data.url, 'flag://');
+      appStateSub.remove();
 
       log('AuthContext', '=== AUTH DEBUG ===');
       log('AuthContext', 'Result type:', result.type);
@@ -425,11 +439,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (result.type === 'cancel' || result.type === 'dismiss') {
         log('AuthContext', 'Auth browser dismissed, checking for existing session...');
         // On Android, openAuthSessionAsync may dismiss while the deep link is
-        // processed separately. Check if a session was already established.
-        const { data: sessionData } = await supabase.auth.getSession();
-        if (sessionData.session) {
-          log('AuthContext', 'Session found after dismiss, auth succeeded via deep link');
-          return { error: null };
+        // processed separately. Poll every 200ms (up to 3s) for the deep link
+        // handler to establish a session.
+        for (let i = 0; i < 15; i++) {
+          await new Promise((r) => setTimeout(r, 200));
+          const { data: sessionData } = await supabase.auth.getSession();
+          if (sessionData.session) {
+            log('AuthContext', `Session found after dismiss (attempt ${i + 1}), auth succeeded via deep link`);
+            return { error: null };
+          }
         }
       }
 

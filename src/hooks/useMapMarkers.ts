@@ -19,6 +19,8 @@ export function useMapMarkers(
   messages: UndiscoveredMessageMapMeta[]
 ): UseMapMarkersResult {
   const [avatarImages, setAvatarImages] = useState<Record<string, string>>({});
+  const avatarImagesRef = useRef(avatarImages);
+  avatarImagesRef.current = avatarImages;
   const avatarRefs = useRef<Record<string, View | null>>({});
 
   const clearAvatarImages = useCallback((ids: string[]) => {
@@ -31,7 +33,7 @@ export function useMapMarkers(
 
   const captureAvatar = useCallback(async (messageId: string) => {
     const ref = avatarRefs.current[messageId];
-    if (!ref || avatarImages[messageId]) return;
+    if (!ref || avatarImagesRef.current[messageId]) return;
 
     try {
       const uri = await captureRef(ref, {
@@ -43,7 +45,7 @@ export function useMapMarkers(
     } catch (e) {
       log('useMapMarkers', 'Failed to capture avatar:', e);
     }
-  }, [avatarImages]);
+  }, []);
 
   const canReadMessage = useCallback((messageLocation: Coordinates | null): boolean => {
     if (!userLocation || !messageLocation) return false;

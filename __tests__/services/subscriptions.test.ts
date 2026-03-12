@@ -12,46 +12,36 @@ import {
 // --- Supabase mock setup ---
 const mockMaybeSingle = jest.fn();
 const mockSingle = jest.fn();
-const mockSelect = jest.fn();
-const mockEq = jest.fn();
-const mockDelete = jest.fn();
 const mockInsert = jest.fn();
-const mockUpdate = jest.fn();
-const mockIn = jest.fn();
 
 // Chain builder — each method returns `this`-like object
-function buildChain(terminalMock: jest.Mock) {
+function buildChain() {
   const chain: Record<string, jest.Mock> = {};
-  const chainMethods = ['select', 'eq', 'in', 'delete', 'insert', 'update', 'maybeSingle', 'single', 'upsert'];
+  const chainMethods = ['select', 'eq', 'in', 'delete', 'update', 'upsert'];
   chainMethods.forEach(method => {
     chain[method] = jest.fn().mockReturnValue(chain);
   });
   chain.maybeSingle = mockMaybeSingle;
   chain.single = mockSingle;
-  chain.select = jest.fn().mockImplementation(() => chain);
-  chain.eq = jest.fn().mockImplementation(() => chain);
-  chain.in = jest.fn().mockImplementation(() => chain);
-  chain.delete = jest.fn().mockImplementation(() => chain);
   chain.insert = mockInsert;
-  chain.update = jest.fn().mockImplementation(() => chain);
   return chain;
 }
 
 let queryChain: ReturnType<typeof buildChain>;
-const mockFrom = jest.fn();
 
 jest.mock('@/services/supabase', () => ({
-  supabase: { from: mockFrom },
+  supabase: { from: jest.fn() },
   getCachedUserId: jest.fn(),
 }));
 jest.mock('@/services/errorReporting', () => ({ reportError: jest.fn() }));
 
-import { getCachedUserId } from '@/services/supabase';
+import { supabase, getCachedUserId } from '@/services/supabase';
+const mockFrom = supabase.from as jest.Mock;
 const mockGetCachedUserId = getCachedUserId as jest.Mock;
 
 beforeEach(() => {
   jest.clearAllMocks();
-  queryChain = buildChain(mockMaybeSingle);
+  queryChain = buildChain();
   mockFrom.mockReturnValue(queryChain);
   mockGetCachedUserId.mockReturnValue('current-user-id');
 });

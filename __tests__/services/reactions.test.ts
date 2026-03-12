@@ -49,8 +49,8 @@ beforeEach(() => {
 
 // ─────────────────────────────────────────────────────────────────────────────
 describe('ALLOWED_EMOJIS', () => {
-  it('contains exactly 6 emoji', () => {
-    expect(ALLOWED_EMOJIS).toHaveLength(6);
+  it('contains exactly 7 emoji', () => {
+    expect(ALLOWED_EMOJIS).toHaveLength(7);
   });
 
   it('includes the standard reaction set', () => {

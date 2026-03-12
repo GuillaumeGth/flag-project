@@ -12,9 +12,6 @@
 import { FLAG_BOT_ID } from '@/services/messages';
 
 // ─── Supabase query chain mock ───────────────────────────────────────────────
-const mockSingle = jest.fn();
-const mockMaybeSingle = jest.fn();
-
 function makeChain(resolveWith: any) {
   const chain: any = {};
   const methods = ['select', 'eq', 'in', 'or', 'order', 'gt', 'not', 'upsert', 'update', 'insert'];
@@ -26,15 +23,10 @@ function makeChain(resolveWith: any) {
   return chain;
 }
 
-const mockFrom = jest.fn();
-const mockStorageFrom = jest.fn();
-const mockUpload = jest.fn();
-const mockGetPublicUrl = jest.fn();
-
 jest.mock('@/services/supabase', () => ({
   supabase: {
-    from: mockFrom,
-    storage: { from: mockStorageFrom },
+    from: jest.fn(),
+    storage: { from: jest.fn() },
   },
   getCachedUserId: jest.fn(),
 }));
@@ -54,7 +46,8 @@ jest.mock('@/services/cache', () => ({
 
 jest.mock('@/services/errorReporting', () => ({ reportError: jest.fn() }));
 
-import { getCachedUserId } from '@/services/supabase';
+import { supabase, getCachedUserId } from '@/services/supabase';
+const mockFrom = supabase.from as jest.Mock;
 import {
   getCachedData,
   setCachedData,

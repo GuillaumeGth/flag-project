@@ -145,10 +145,12 @@ describe('stopRecording', () => {
 
     const { result } = renderHook(() => useAudioRecorder());
 
-    // Start recording first
+    // startRecording must complete and flush state before stopRecording
     await act(async () => {
       await result.current.startRecording();
     });
+
+    expect(result.current.isRecording).toBe(true);
 
     let returnedUri: string | null = null;
     await act(async () => {
@@ -190,8 +192,12 @@ describe('clearRecording', () => {
 
     const { result } = renderHook(() => useAudioRecorder());
 
+    // Must flush state between start and stop so `recording` ref is set
     await act(async () => {
       await result.current.startRecording();
+    });
+
+    await act(async () => {
       await result.current.stopRecording();
     });
 

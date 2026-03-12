@@ -176,9 +176,14 @@ describe('captureAvatar', () => {
 
     result.current.avatarRefs.current['msg-1'] = {} as any;
 
+    // First capture — must complete and flush state before second call
     await act(async () => {
       await result.current.captureAvatar('msg-1');
-      await result.current.captureAvatar('msg-1'); // second call
+    });
+
+    // Second capture — ref now reflects stored image, should be skipped
+    await act(async () => {
+      await result.current.captureAvatar('msg-1');
     });
 
     expect(mockCaptureRef).toHaveBeenCalledTimes(1);

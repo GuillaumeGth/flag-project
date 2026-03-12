@@ -7,6 +7,7 @@ import {
   Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import Constants from 'expo-constants';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '@/contexts/AuthContext';
@@ -53,7 +54,7 @@ export default function SettingsScreen({ navigation }: Props) {
           <Ionicons name="chevron-forward" size={20} color={colors.text.tertiary} />
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.menuItem}>
+        <TouchableOpacity style={styles.menuItem} onPress={() => navigation.navigate('Privacy')}>
           <Ionicons name="shield-outline" size={24} color={colors.text.primary} />
           <Text style={styles.menuText}>Confidentialité</Text>
           <Ionicons name="chevron-forward" size={20} color={colors.text.tertiary} />
@@ -71,7 +72,9 @@ export default function SettingsScreen({ navigation }: Props) {
         <Text style={styles.signOutText}>Se déconnecter</Text>
       </TouchableOpacity>
 
-      <Text style={styles.version}>Fläag v1.0.0</Text>
+      <Text style={[styles.version, { paddingBottom: Math.max(insets.bottom, 16) }]}>
+        Fläag v{Constants.expoConfig?.version ?? '—'}
+      </Text>
     </View>
   );
 }
@@ -132,6 +135,6 @@ const styles = StyleSheet.create({
     color: colors.text.tertiary,
     fontSize: 12,
     marginTop: 'auto',
-    paddingBottom: 32,
+    paddingBottom: 16,
   },
 });

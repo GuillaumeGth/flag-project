@@ -7,6 +7,8 @@ export interface User {
   avatar_url?: string;
   created_at: string;
   is_admin?: boolean;
+  is_private?: boolean;
+  is_searchable?: boolean;
 }
 
 // GPS Coordinates

@@ -10,6 +10,8 @@ CREATE TABLE IF NOT EXISTS public.users (
     phone TEXT,
     email TEXT,
     is_admin BOOLEAN NOT NULL DEFAULT FALSE,
+    is_private BOOLEAN NOT NULL DEFAULT FALSE,
+    is_searchable BOOLEAN NOT NULL DEFAULT TRUE,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -90,7 +92,23 @@ ALTER TABLE public.messages ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Users can view own messages" ON public.messages;
 CREATE POLICY "Users can view own messages" ON public.messages
     FOR SELECT USING (
-        auth.uid() = sender_id OR auth.uid() = recipient_id OR is_public = true
+        auth.uid() = sender_id
+        OR auth.uid() = recipient_id
+        OR (
+            is_public = true
+            AND (
+                -- sender is not private
+                NOT EXISTS (
+                    SELECT 1 FROM public.users
+                    WHERE id = sender_id AND is_private = true
+                )
+                -- OR current user follows the sender
+                OR EXISTS (
+                    SELECT 1 FROM public.subscriptions
+                    WHERE follower_id = auth.uid() AND following_id = sender_id
+                )
+            )
+        )
     );
 
 DROP POLICY IF EXISTS "Users can send messages" ON public.messages;
@@ -673,6 +691,84 @@ DROP TRIGGER IF EXISTS on_error_log_send_email ON public.error_logs;
 CREATE TRIGGER on_error_log_send_email
     AFTER INSERT ON public.error_logs
     FOR EACH ROW EXECUTE FUNCTION public.send_error_email_alert();
+
+-- Follow requests table (for private accounts)
+CREATE TABLE IF NOT EXISTS public.follow_requests (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    requester_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+    target_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+    status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'accepted', 'rejected')),
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    CONSTRAINT follow_requests_unique UNIQUE (requester_id, target_id),
+    CONSTRAINT follow_requests_no_self CHECK (requester_id != target_id)
+);
+
+ALTER TABLE public.follow_requests ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Requester can view own requests" ON public.follow_requests;
+CREATE POLICY "Requester can view own requests" ON public.follow_requests
+    FOR SELECT USING (auth.uid() = requester_id OR auth.uid() = target_id);
+
+DROP POLICY IF EXISTS "Users can send follow requests" ON public.follow_requests;
+CREATE POLICY "Users can send follow requests" ON public.follow_requests
+    FOR INSERT WITH CHECK (auth.uid() = requester_id);
+
+DROP POLICY IF EXISTS "Requester can cancel request" ON public.follow_requests;
+CREATE POLICY "Requester can cancel request" ON public.follow_requests
+    FOR DELETE USING (auth.uid() = requester_id);
+
+DROP POLICY IF EXISTS "Target can respond to request" ON public.follow_requests;
+CREATE POLICY "Target can respond to request" ON public.follow_requests
+    FOR UPDATE USING (auth.uid() = target_id);
+
+CREATE INDEX IF NOT EXISTS follow_requests_requester_idx ON public.follow_requests(requester_id);
+CREATE INDEX IF NOT EXISTS follow_requests_target_idx ON public.follow_requests(target_id);
+CREATE INDEX IF NOT EXISTS follow_requests_status_idx ON public.follow_requests(status);
+
+-- Push notification when a follow request is received
+CREATE OR REPLACE FUNCTION public.send_push_on_follow_request()
+RETURNS TRIGGER AS $$
+DECLARE
+    target_tokens TEXT[];
+    token TEXT;
+    requester_name TEXT;
+    expo_url TEXT := 'https://exp.host/--/api/v2/push/send';
+    payload JSONB;
+BEGIN
+    IF NEW.status != 'pending' THEN RETURN NEW; END IF;
+
+    SELECT array_agg(expo_push_token) INTO target_tokens
+    FROM public.user_push_tokens WHERE user_id = NEW.target_id;
+
+    IF target_tokens IS NULL OR array_length(target_tokens, 1) = 0 THEN RETURN NEW; END IF;
+
+    SELECT COALESCE(display_name, 'Quelqu''un') INTO requester_name
+    FROM public.users WHERE id = NEW.requester_id;
+
+    FOREACH token IN ARRAY target_tokens LOOP
+        payload := jsonb_build_object(
+            'to', token,
+            'sound', 'default',
+            'title', 'Demande d''abonnement',
+            'body', requester_name || ' souhaite s''abonner à vous',
+            'data', jsonb_build_object('requesterId', NEW.requester_id)
+        );
+        PERFORM http(('POST', expo_url,
+            ARRAY[http_header('Content-Type', 'application/json')],
+            'application/json', payload::text)::http_request);
+    END LOOP;
+
+    RETURN NEW;
+EXCEPTION WHEN OTHERS THEN
+    RAISE LOG 'send_push_on_follow_request error: % %', SQLERRM, SQLSTATE;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+DROP TRIGGER IF EXISTS on_follow_request_created_send_push ON public.follow_requests;
+CREATE TRIGGER on_follow_request_created_send_push
+    AFTER INSERT ON public.follow_requests
+    FOR EACH ROW EXECUTE FUNCTION public.send_push_on_follow_request();
 
 -- Message reactions table
 -- Stores emoji reactions (❤️ 😂 😮 😢 😡 👍) on messages.

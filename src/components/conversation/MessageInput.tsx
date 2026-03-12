@@ -272,7 +272,8 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
   },
   iconButton: {
-    padding: spacing.xs,
+    paddingVertical: spacing.xs,
+    paddingHorizontal: 1,
   },
   recordingButton: {
     backgroundColor: colors.error,

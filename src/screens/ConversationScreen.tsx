@@ -52,7 +52,7 @@ export default function ConversationScreen({ navigation, route }: Props) {
 
   const [keyboardVisible, setKeyboardVisible] = useState(false);
   useEffect(() => {
-    const show = Keyboard.addListener('keyboardWillShow', () => setKeyboardVisible(true));
+    const show = Keyboard.addListener('keyboardDidShow', () => setKeyboardVisible(true));
     const hide = Keyboard.addListener('keyboardDidHide', () => setKeyboardVisible(false));
     return () => { show.remove(); hide.remove(); };
   }, []);
@@ -125,6 +125,7 @@ export default function ConversationScreen({ navigation, route }: Props) {
     const msg = messages.find((m) => m.id === selectedMessageId);
     if (msg) setReplyToMessage(msg);
     setSelectedMessageId(null);
+    setPickerMessageId(null);
   }, [selectedMessageId, messages]);
 
   const handleDeleteSelected = async () => {
@@ -347,11 +348,7 @@ export default function ConversationScreen({ navigation, route }: Props) {
       {selectedMessageId && (
         <>
           <TouchableOpacity
-            onPress={() => {
-              const msg = messages.find((m) => m.id === selectedMessageId);
-              if (msg) setReplyToMessage(msg);
-              setSelectedMessageId(null);
-            }}
+            onPress={handleReplySelected}
             style={styles.deleteButton}
           >
             <Ionicons name="return-up-back-outline" size={22} color={colors.primary.cyan} />
@@ -381,7 +378,8 @@ export default function ConversationScreen({ navigation, route }: Props) {
 
       <KeyboardAvoidingView
         style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'padding'}
+        enabled={Platform.OS === 'ios' ? true : keyboardVisible}
         keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top + 60 : 0}
       >
         <FlatList
@@ -396,18 +394,16 @@ export default function ConversationScreen({ navigation, route }: Props) {
           removeClippedSubviews={false}
           onScrollBeginDrag={() => setPickerMessageId(null)}
           onScrollToIndexFailed={(info) => {
-            // Scroll to approximate position first (forces render), then retry exact index
             flatListRef.current?.scrollToOffset({ offset: info.averageItemLength * info.index, animated: false });
             setTimeout(() => {
               flatListRef.current?.scrollToIndex({ index: info.index, animated: true, viewPosition: 0.5 });
             }, 150);
           }}
         />
-
         <MessageInput
           sending={sending}
           canSendMessages={canSendMessages}
-          paddingBottom={insets.bottom}
+          paddingBottom={Platform.OS === 'ios' ? insets.bottom : keyboardVisible ? 0 : insets.bottom}
           replyTo={replyToMessage}
           onCancelReply={() => setReplyToMessage(null)}
           onSend={handleSend}

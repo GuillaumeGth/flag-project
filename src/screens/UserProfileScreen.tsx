@@ -27,6 +27,11 @@ import {
   updateNotificationPrefs,
   NotificationPrefs,
 } from '@/services/subscriptions';
+import {
+  sendFollowRequest,
+  cancelFollowRequest,
+  fetchSentRequestStatus,
+} from '@/services/followRequests';
 import { Message, User, RootStackParamList } from '@/types';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
@@ -41,6 +46,7 @@ export default function UserProfileScreen({ navigation, route }: Props) {
   const [userProfile, setUserProfile] = useState<User | null>(null);
   const [following, setFollowing] = useState(false);
   const [followLoading, setFollowLoading] = useState(false);
+  const [pendingRequestId, setPendingRequestId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [discoveredIds, setDiscoveredIds] = useState<Set<string>>(new Set());
   const [followerCount, setFollowerCount] = useState(0);
@@ -75,6 +81,9 @@ export default function UserProfileScreen({ navigation, route }: Props) {
     if (result) {
       const prefs = await fetchNotificationPrefs(userId);
       setNotifPrefs(prefs);
+    } else {
+      const req = await fetchSentRequestStatus(userId);
+      setPendingRequestId(req?.status === 'pending' ? req.id : null);
     }
   }, [userId]);
 
@@ -96,14 +105,25 @@ export default function UserProfileScreen({ navigation, route }: Props) {
 
   const handleToggleFollow = async () => {
     setFollowLoading(true);
+
     if (following) {
+      // Unfollow
       const ok = await unfollow(userId);
       if (ok) {
         setFollowing(false);
         setFollowerCount(c => Math.max(0, c - 1));
         setNotifPrefs({ notifyPrivateFlags: true, notifyPublicFlags: false });
       }
+    } else if (pendingRequestId) {
+      // Cancel pending request
+      const ok = await cancelFollowRequest(pendingRequestId);
+      if (ok) setPendingRequestId(null);
+    } else if (userProfile?.is_private) {
+      // Send follow request to private account
+      const id = await sendFollowRequest(userId);
+      if (id) setPendingRequestId(id);
     } else {
+      // Direct follow for public account
       const ok = await follow(userId);
       if (ok) {
         setFollowing(true);
@@ -112,6 +132,7 @@ export default function UserProfileScreen({ navigation, route }: Props) {
         setNotifPrefs(prefs);
       }
     }
+
     setFollowLoading(false);
   };
 
@@ -193,43 +214,71 @@ export default function UserProfileScreen({ navigation, route }: Props) {
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
           <Ionicons name="arrow-back" size={24} color={colors.text.primary} />
         </TouchableOpacity>
-        <View style={styles.avatar}>
-          {userProfile?.avatar_url ? (
-            <Image source={{ uri: userProfile.avatar_url }} style={styles.avatarImage} />
-          ) : (
-            <Ionicons name="person" size={24} color={colors.text.secondary} />
-          )}
-        </View>
         <View style={styles.profileInfo}>
-          <Text style={styles.displayName}>
-            {userProfile?.display_name || 'Utilisateur'}
-          </Text>
-          <Text style={styles.followerCount}>
-            {followerCount} abonné{followerCount !== 1 ? 's' : ''}
-          </Text>
-        </View>
-        {following && (
-          <TouchableOpacity onPress={() => setShowNotifModal(true)} style={styles.bellButton}>
-            <Ionicons
-              name={notifPrefs.notifyPrivateFlags || notifPrefs.notifyPublicFlags ? 'notifications' : 'notifications-off'}
-              size={22}
-              color={colors.primary.violet}
-            />
-          </TouchableOpacity>
-        )}
-        <TouchableOpacity
-          style={[styles.followButton, following && styles.followButtonActive]}
-          onPress={handleToggleFollow}
-          disabled={followLoading}
-        >
-          {followLoading ? (
-            <ActivityIndicator size="small" color={following ? colors.primary.violet : colors.text.primary} />
-          ) : (
-            <Text style={[styles.followButtonText, following && styles.followButtonTextActive]}>
-              {following ? 'Abonn\u00e9' : "S'abonner"}
+          <View style={styles.profileTopRow}>
+            <View style={styles.avatar}>
+              {userProfile?.avatar_url ? (
+                <Image source={{ uri: userProfile.avatar_url }} style={styles.avatarImage} />
+              ) : (
+                <Ionicons name="person" size={24} color={colors.text.secondary} />
+              )}
+            </View>
+            <Text style={styles.displayName}>
+              {userProfile?.display_name || 'Utilisateur'}
             </Text>
-          )}
-        </TouchableOpacity>
+          </View>
+          <View style={styles.profileActions}>
+            <TouchableOpacity
+              style={styles.messageButton}
+              onPress={() => navigation.navigate('Conversation', {
+                otherUserId: userId,
+                otherUserName: userProfile?.display_name || 'Utilisateur',
+                otherUserAvatarUrl: userProfile?.avatar_url,
+              })}
+            >
+              <Ionicons name="chatbubble-outline" size={18} color={colors.primary.violet} />
+            </TouchableOpacity>
+            {following && (
+              <TouchableOpacity onPress={() => setShowNotifModal(true)} style={styles.bellButton}>
+                <Ionicons
+                  name={notifPrefs.notifyPrivateFlags || notifPrefs.notifyPublicFlags ? 'notifications' : 'notifications-off'}
+                  size={20}
+                  color={colors.primary.violet}
+                />
+              </TouchableOpacity>
+            )}
+            <TouchableOpacity
+              style={[
+                styles.followButton,
+                (following || !!pendingRequestId) && styles.followButtonActive,
+              ]}
+              onPress={handleToggleFollow}
+              disabled={followLoading}
+            >
+              {followLoading ? (
+                <ActivityIndicator
+                  size="small"
+                  color={following || pendingRequestId ? colors.primary.violet : colors.text.primary}
+                />
+              ) : (
+                <Text
+                  style={[
+                    styles.followButtonText,
+                    (following || !!pendingRequestId) && styles.followButtonTextActive,
+                  ]}
+                >
+                  {following
+                    ? 'Abonné'
+                    : pendingRequestId
+                      ? 'Demande envoyée'
+                      : userProfile?.is_private
+                        ? 'Demander'
+                        : "S'abonner"}
+                </Text>
+              )}
+            </TouchableOpacity>
+          </View>
+        </View>
       </View>
 
       {/* Stats Row */}
@@ -386,14 +435,21 @@ const styles = StyleSheet.create({
   backButton: {
     padding: 4,
     marginRight: 4,
+    marginTop: 10,
   },
   profileSection: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderBottomWidth: 1,
     borderBottomColor: colors.border.default,
+  },
+  profileTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 10,
   },
   avatar: {
     width: 52,
@@ -409,7 +465,6 @@ const styles = StyleSheet.create({
     borderRadius: 26,
   },
   profileInfo: {
-    marginLeft: 12,
     flex: 1,
   },
   displayName: {
@@ -569,9 +624,32 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '600',
   },
+  nameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  profileActions: {
+    flexDirection: 'row',
+    gap: 8,
+  },
   bellButton: {
-    padding: 6,
-    marginRight: 8,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: colors.primary.violet,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  messageButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: colors.primary.violet,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   notifModalOverlay: {
     flex: 1,

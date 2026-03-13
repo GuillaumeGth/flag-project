@@ -11,7 +11,8 @@ export async function checkForAppUpdate(): Promise<void> {
 
   try {
     const { default: appDistribution } = await import('@react-native-firebase/app-distribution');
-    const release = await appDistribution().checkForUpdate();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const release = await (appDistribution() as any).checkForUpdate() as any;
 
     if (!release.isUpdateAvailable) return;
 
@@ -22,7 +23,8 @@ export async function checkForAppUpdate(): Promise<void> {
         { text: 'Plus tard', style: 'cancel' },
         {
           text: 'Mettre à jour',
-          onPress: () => appDistribution().updateApp(),
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          onPress: () => (appDistribution() as any).updateApp(),
         },
       ]
     );

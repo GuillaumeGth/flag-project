@@ -28,7 +28,7 @@ export default function ClusterPickerModal({ cluster, onSelect, onClose, labelMa
           <BlurView intensity={60} tint="dark" style={StyleSheet.absoluteFill} />
           <View style={[styles.content, { paddingBottom: spacing.xxl + insets.bottom }]}>
             <View style={styles.header}>
-              <Image source={{ uri: cluster.senderAvatarUrl }} style={styles.avatar} />
+              <Image source={{ uri: cluster.senderAvatarUrl ?? undefined }} style={styles.avatar} />
               <View style={styles.headerText}>
                 <Text style={styles.senderName}>{sender?.display_name ?? 'Utilisateur'}</Text>
                 <Text style={styles.subtitle}>{cluster.messages.length} Flaags au même endroit</Text>

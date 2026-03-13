@@ -30,6 +30,8 @@ import ReadMessageScreen from '@/screens/ReadMessageScreen';
 import SelectRecipientScreen from '@/screens/SelectRecipientScreen';
 import ConversationScreen from '@/screens/ConversationScreen';
 import SettingsScreen from '@/screens/SettingsScreen';
+import PrivacyScreen from '@/screens/PrivacyScreen';
+import FollowRequestsScreen from '@/screens/FollowRequestsScreen';
 import UserProfileScreen from '@/screens/UserProfileScreen';
 import SearchUsersScreen from '@/screens/SearchUsersScreen';
 
@@ -148,6 +150,16 @@ function AppNavigator() {
           <Stack.Screen
             name="Settings"
             component={SettingsScreen}
+            options={{ presentation: 'card' }}
+          />
+          <Stack.Screen
+            name="Privacy"
+            component={PrivacyScreen}
+            options={{ presentation: 'card' }}
+          />
+          <Stack.Screen
+            name="FollowRequests"
+            component={FollowRequestsScreen}
             options={{ presentation: 'card' }}
           />
           <Stack.Screen

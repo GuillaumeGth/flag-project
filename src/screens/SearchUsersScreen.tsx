@@ -57,6 +57,7 @@ export default function SearchUsersScreen({ navigation }: Props) {
       .select('*')
       .ilike('display_name', `%${text.trim()}%`)
       .neq('id', currentUserId || '')
+      .eq('is_searchable', true)
       .limit(20)
       .order('display_name', { ascending: true });
 

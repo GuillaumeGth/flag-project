@@ -117,7 +117,7 @@ const styles = StyleSheet.create({
     borderColor: colors.border.default,
     borderRadius: 12,
     paddingVertical: 16,
-    backgroundColor: colors.background.primary.tertiary,
+    backgroundColor: colors.background.tertiary,
     gap: 12,
   },
   googleIcon: {

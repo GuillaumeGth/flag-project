@@ -15,6 +15,8 @@ export type RootStackParamList = {
   SelectRecipient: { mode: 'chat' | 'flag' };
   UserProfile: { userId: string };
   Settings: undefined;
+  Privacy: undefined;
+  FollowRequests: undefined;
 };
 
 // Bottom tab navigator screens

@@ -24,6 +24,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { colors, shadows, radius, spacing, typography } from '@/theme-redesign';
 import { fetchMyPublicMessages } from '@/services/messages';
 import { fetchFollowerCount } from '@/services/subscriptions';
+import { fetchReceivedRequestsCount } from '@/services/followRequests';
 import { Message, MainTabParamList, RootStackParamList } from '@/types';
 import GlassCard from '@/components/redesign/GlassCard';
 import PremiumButton from '@/components/redesign/PremiumButton';
@@ -48,6 +49,7 @@ export default function ProfileScreen({ navigation }: Props) {
 
   const [messages, setMessages] = useState<Message[]>([]);
   const [followerCount, setFollowerCount] = useState(0);
+  const [pendingRequestsCount, setPendingRequestsCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [viewingMessage, setViewingMessage] = useState<Message | null>(null);
@@ -73,15 +75,20 @@ export default function ProfileScreen({ navigation }: Props) {
     setFollowerCount(count);
   }, [user?.id]);
 
+  const loadPendingRequests = useCallback(async () => {
+    const count = await fetchReceivedRequestsCount();
+    setPendingRequestsCount(count);
+  }, []);
+
   useEffect(() => {
-    Promise.all([loadMessages(), loadFollowerCount()]).finally(() => setLoading(false));
-  }, [loadMessages, loadFollowerCount]);
+    Promise.all([loadMessages(), loadFollowerCount(), loadPendingRequests()]).finally(() => setLoading(false));
+  }, [loadMessages, loadFollowerCount, loadPendingRequests]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    await Promise.all([loadMessages(), loadFollowerCount()]);
+    await Promise.all([loadMessages(), loadFollowerCount(), loadPendingRequests()]);
     setRefreshing(false);
-  }, [loadMessages, loadFollowerCount]);
+  }, [loadMessages, loadFollowerCount, loadPendingRequests]);
 
   const handleChangeAvatar = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -131,11 +138,26 @@ export default function ProfileScreen({ navigation }: Props) {
         style={styles.headerGradient}
       />
 
-      <TouchableOpacity style={styles.settingsButton} onPress={() => navigation.navigate('Settings')}>
-        <View style={styles.settingsButtonInner}>
-          <Ionicons name="settings-outline" size={22} color={colors.text.primary} />
-        </View>
-      </TouchableOpacity>
+      <View style={styles.topButtons}>
+        {pendingRequestsCount > 0 && (
+          <TouchableOpacity
+            style={styles.settingsButton}
+            onPress={() => navigation.navigate('FollowRequests')}
+          >
+            <View style={styles.settingsButtonInner}>
+              <Ionicons name="people-outline" size={22} color={colors.text.primary} />
+              <View style={styles.badge}>
+                <Text style={styles.badgeText}>{pendingRequestsCount}</Text>
+              </View>
+            </View>
+          </TouchableOpacity>
+        )}
+        <TouchableOpacity style={styles.settingsButton} onPress={() => navigation.navigate('Settings')}>
+          <View style={styles.settingsButtonInner}>
+            <Ionicons name="settings-outline" size={22} color={colors.text.primary} />
+          </View>
+        </TouchableOpacity>
+      </View>
 
       <View style={styles.profileRow}>
         <TouchableOpacity onPress={handleChangeAvatar} disabled={uploading}>
@@ -283,12 +305,15 @@ const styles = StyleSheet.create({
     right: 0,
     height: 300,
   },
-  settingsButton: {
+  topButtons: {
     position: 'absolute',
     top: 60,
     right: spacing.lg,
     zIndex: 10,
+    flexDirection: 'row',
+    gap: spacing.sm,
   },
+  settingsButton: {},
   settingsButtonInner: {
     width: 40,
     height: 40,
@@ -297,6 +322,23 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     ...shadows.small,
+  },
+  badge: {
+    position: 'absolute',
+    top: -4,
+    right: -4,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: colors.error,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 3,
+  },
+  badgeText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: colors.text.primary,
   },
   profileRow: {
     flexDirection: 'row',

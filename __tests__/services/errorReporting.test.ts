@@ -17,7 +17,7 @@ jest.mock('@/services/supabase', () => ({
 describe('reportError (DEV mode — no-op)', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    global.__DEV__ = true;
+    (global as any).__DEV__ = true;
   });
 
   it('does nothing in development mode', async () => {
@@ -31,7 +31,7 @@ describe('reportError (production mode)', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     jest.resetModules();
-    global.__DEV__ = false;
+    (global as any).__DEV__ = false;
 
     // Re-apply mocks after resetModules
     jest.mock('@/services/supabase', () => ({
@@ -47,7 +47,7 @@ describe('reportError (production mode)', () => {
   });
 
   afterAll(() => {
-    global.__DEV__ = true;
+    (global as any).__DEV__ = true;
   });
 
   it('inserts error log in production', async () => {

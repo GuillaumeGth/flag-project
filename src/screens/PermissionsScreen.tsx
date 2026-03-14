@@ -8,6 +8,7 @@ import {
 } from 'react-native';
 import * as Location from 'expo-location';
 import * as Notifications from 'expo-notifications';
+import { reportError } from '@/services/errorReporting';
 import { Camera } from 'expo-camera';
 import { Audio } from 'expo-av';
 import { Ionicons } from '@expo/vector-icons';
@@ -143,7 +144,7 @@ export default function PermissionsScreen({ onComplete }: PermissionsScreenProps
         }
       }
     } catch (error) {
-      console.error(`Error requesting ${key} permission:`, error);
+      reportError(error, `permissions.request.${key}`);
     }
 
     setPermissions((prev) =>

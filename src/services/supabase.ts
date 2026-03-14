@@ -1,6 +1,8 @@
 import { createClient } from '@supabase/supabase-js';
 import * as SecureStore from 'expo-secure-store';
 import Constants from 'expo-constants';
+import { reportError } from './errorReporting';
+import { log } from '@/utils/debug';
 
 // Hardcoded fallbacks — last resort if Constants.expoConfig or process.env are unavailable
 // (can happen in production bare workflow builds when the native ExponentConstants module
@@ -16,28 +18,71 @@ const supabaseAnonKey =
   process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ||
   _SUPABASE_ANON_KEY;
 
-// Custom storage using SecureStore for sensitive data
+// SecureStore has a 2048 byte limit per value. Supabase session JSON (access token +
+// user object with Google metadata + identities) easily exceeds this. We chunk large
+// values across multiple SecureStore entries to avoid silent storage failures.
+const CHUNK_SIZE = 1800; // conservative limit well below 2048 bytes
+
 const ExpoSecureStoreAdapter = {
   getItem: async (key: string): Promise<string | null> => {
     try {
+      // Check if value was stored in chunks
+      const countStr = await SecureStore.getItemAsync(`${key}.chunks`);
+      if (countStr) {
+        const count = parseInt(countStr, 10);
+        const parts: string[] = [];
+        for (let i = 0; i < count; i++) {
+          const chunk = await SecureStore.getItemAsync(`${key}.chunk-${i}`);
+          if (chunk === null) return null;
+          parts.push(chunk);
+        }
+        return parts.join('');
+      }
+      // Fallback: value stored directly (no chunking)
       return await SecureStore.getItemAsync(key);
     } catch (error) {
-      console.log('SecureStore getItem error:', error);
+      reportError(error, 'secureStore.getItem');
       return null;
     }
   },
   setItem: async (key: string, value: string): Promise<void> => {
     try {
-      await SecureStore.setItemAsync(key, value);
+      if (value.length > CHUNK_SIZE) {
+        // Store in chunks
+        const chunks: string[] = [];
+        for (let i = 0; i < value.length; i += CHUNK_SIZE) {
+          chunks.push(value.slice(i, i + CHUNK_SIZE));
+        }
+        await SecureStore.setItemAsync(`${key}.chunks`, String(chunks.length));
+        for (let i = 0; i < chunks.length; i++) {
+          await SecureStore.setItemAsync(`${key}.chunk-${i}`, chunks[i]);
+        }
+        // Clean up any previous non-chunked value
+        await SecureStore.deleteItemAsync(key).catch(() => {});
+      } else {
+        await SecureStore.setItemAsync(key, value);
+        // Clean up any previous chunked value
+        await SecureStore.deleteItemAsync(`${key}.chunks`).catch(() => {});
+      }
     } catch (error) {
-      console.log('SecureStore setItem error:', error);
+      reportError(error, 'secureStore.setItem');
     }
   },
   removeItem: async (key: string): Promise<void> => {
     try {
+      // Remove chunks if they exist
+      const countStr = await SecureStore.getItemAsync(`${key}.chunks`);
+      if (countStr) {
+        const count = parseInt(countStr, 10);
+        await SecureStore.deleteItemAsync(`${key}.chunks`);
+        for (let i = 0; i < count; i++) {
+          await SecureStore.deleteItemAsync(`${key}.chunk-${i}`);
+        }
+      }
+      // Also remove direct value (handles non-chunked entries)
       await SecureStore.deleteItemAsync(key);
     } catch (error) {
-      console.log('SecureStore removeItem error:', error);
+      reportError(error, 'secureStore.removeItem');
     }
   },
 };
@@ -60,7 +105,7 @@ let _cachedUserId: string | null = null;
 // Await this instead of getSession() inside onAuthStateChange to avoid deadlock.
 export const supabaseReady = supabase.auth.getSession().then(({ data: { session } }) => {
   _cachedUserId = session?.user?.id ?? null;
-  console.log('[supabase] supabaseReady resolved, cachedUserId:', _cachedUserId);
+  log('[supabase] supabaseReady resolved, cachedUserId:', _cachedUserId);
 });
 
 // Keep cached userId in sync with auth state changes (sign-in, sign-out, token refresh)

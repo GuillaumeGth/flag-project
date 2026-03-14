@@ -60,7 +60,6 @@ export async function getCurrentLocation(): Promise<Coordinates | null> {
       longitude: location.coords.longitude,
     };
   } catch (error) {
-    console.error('Error getting location:', error);
     reportError(error, 'location.getCurrentLocation');
     return null;
   }
@@ -85,7 +84,6 @@ export async function startBackgroundLocationTracking(): Promise<boolean> {
     });
     return true;
   } catch (error) {
-    console.error('Error starting background location:', error);
     reportError(error, 'location.startBackgroundLocationTracking');
     return false;
   }
@@ -120,7 +118,6 @@ export async function watchForegroundLocation(
     );
     return subscription;
   } catch (error) {
-    console.error('Error watching foreground location:', error);
     reportError(error, 'location.watchForegroundLocation');
     return null;
   }

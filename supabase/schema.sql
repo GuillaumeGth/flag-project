@@ -298,13 +298,11 @@ BEGIN
             'data', jsonb_build_object('messageId', NEW.id)
         );
 
-        PERFORM http((
-            'POST',
-            expo_url,
-            ARRAY[http_header('Content-Type', 'application/json')],
-            'application/json',
-            payload::text
-        )::http_request);
+        PERFORM net.http_post(
+            url     := expo_url,
+            body    := payload,
+            headers := '{"Content-Type": "application/json"}'::jsonb
+        );
     END LOOP;
 
     RETURN NEW;
@@ -359,13 +357,11 @@ BEGIN
             'data', jsonb_build_object('messageId', NEW.id)
         );
 
-        PERFORM http((
-            'POST',
-            expo_url,
-            ARRAY[http_header('Content-Type', 'application/json')],
-            'application/json',
-            payload::text
-        )::http_request);
+        PERFORM net.http_post(
+            url     := expo_url,
+            body    := payload,
+            headers := '{"Content-Type": "application/json"}'::jsonb
+        );
     END LOOP;
 
     RETURN NEW;
@@ -473,13 +469,11 @@ BEGIN
             'data', jsonb_build_object('followerId', NEW.follower_id)
         );
 
-        PERFORM http((
-            'POST',
-            expo_url,
-            ARRAY[http_header('Content-Type', 'application/json')],
-            'application/json',
-            payload::text
-        )::http_request);
+        PERFORM net.http_post(
+            url     := expo_url,
+            body    := payload,
+            headers := '{"Content-Type": "application/json"}'::jsonb
+        );
     END LOOP;
 
     RETURN NEW;
@@ -530,9 +524,11 @@ BEGIN
           'body', sender_name || ' a déposé un nouveau flag',
           'data', jsonb_build_object('messageId', NEW.id)
         );
-        PERFORM http(('POST', expo_url,
-          ARRAY[http_header('Content-Type','application/json')],
-          'application/json', payload::text)::http_request);
+        PERFORM net.http_post(
+            url     := expo_url,
+            body    := payload,
+            headers := '{"Content-Type": "application/json"}'::jsonb
+        );
       END LOOP;
     END IF;
   END LOOP;
@@ -770,9 +766,11 @@ BEGIN
             'body', requester_name || ' souhaite s''abonner à vous',
             'data', jsonb_build_object('requesterId', NEW.requester_id)
         );
-        PERFORM http(('POST', expo_url,
-            ARRAY[http_header('Content-Type', 'application/json')],
-            'application/json', payload::text)::http_request);
+        PERFORM net.http_post(
+            url     := expo_url,
+            body    := payload,
+            headers := '{"Content-Type": "application/json"}'::jsonb
+        );
     END LOOP;
 
     RETURN NEW;
@@ -868,13 +866,11 @@ BEGIN
             'data', jsonb_build_object('messageId', NEW.message_id)
         );
 
-        PERFORM http((
-            'POST',
-            expo_url,
-            ARRAY[http_header('Content-Type', 'application/json')],
-            'application/json',
-            payload::text
-        )::http_request);
+        PERFORM net.http_post(
+            url     := expo_url,
+            body    := payload,
+            headers := '{"Content-Type": "application/json"}'::jsonb
+        );
     END LOOP;
 
     RETURN NEW;

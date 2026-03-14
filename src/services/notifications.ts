@@ -4,6 +4,7 @@ import { Platform } from 'react-native';
 import { Coordinates } from '@/types';
 import { supabase } from '@/services/supabase';
 import { reportError } from '@/services/errorReporting';
+import { log } from '@/utils/debug';
 
 // Configure notification behavior
 Notifications.setNotificationHandler({
@@ -100,14 +101,12 @@ export async function registerPushToken(userId: string): Promise<boolean> {
       .select();
 
     if (error) {
-      console.error('Error registering push token:', error);
       reportError(error, 'notifications.registerPushToken');
       return false;
     }
 
     return true;
   } catch (error) {
-    console.error('Error in registerPushToken:', error);
     reportError(error, 'notifications.registerPushToken');
     return false;
   }
@@ -124,13 +123,11 @@ export async function unregisterPushToken(userId: string): Promise<void> {
       .eq('user_id', userId);
 
     if (error) {
-      console.error('Error unregistering push token:', error);
       reportError(error, 'notifications.unregisterPushToken');
     } else {
-      console.log('Push token unregistered successfully');
+      log('notifications', 'Push token unregistered successfully');
     }
   } catch (error) {
-    console.error('Error in unregisterPushToken:', error);
     reportError(error, 'notifications.unregisterPushToken');
   }
 }

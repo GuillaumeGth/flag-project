@@ -219,7 +219,7 @@ CREATE TRIGGER on_user_created_send_welcome
     FOR EACH ROW EXECUTE FUNCTION public.send_welcome_message();
 
 -- HTTP extension for calling external APIs (used for push notifications)
-CREATE EXTENSION IF NOT EXISTS http;
+CREATE EXTENSION IF NOT EXISTS pg_net;
 
 -- Function to send push notification via Expo when a new message is created
 CREATE OR REPLACE FUNCTION public.send_push_on_new_message()
@@ -660,8 +660,8 @@ BEGIN
     END IF;
 
     payload := jsonb_build_object(
-        'from', 'Flag App <alerts@flag-app.com>',
-        'to', json_build_array(alert_email),
+        'from', 'Flag App <onboarding@resend.dev>',
+        'to', jsonb_build_array(alert_email),
         'subject', '[Flag] Erreur prod: ' || LEFT(NEW.error_message, 80),
         'html', '<h2>Erreur en production</h2>'
             || '<p><strong>Contexte:</strong> ' || COALESCE(NEW.error_context, 'N/A') || '</p>'
@@ -672,13 +672,15 @@ BEGIN
             || '<p><strong>Date:</strong> ' || NEW.created_at::text || '</p>'
     );
 
-    PERFORM http((
-        'POST',
-        'https://api.resend.com/emails',
-        ARRAY[http_header('Authorization', 'Bearer ' || resend_key)],
-        'application/json',
-        payload::text
-    )::http_request);
+    -- Uses pg_net (must be enabled: CREATE EXTENSION IF NOT EXISTS pg_net)
+    PERFORM net.http_post(
+        url := 'https://api.resend.com/emails',
+        headers := jsonb_build_object(
+            'Authorization', 'Bearer ' || resend_key,
+            'Content-Type', 'application/json'
+        ),
+        body := payload
+    );
 
     RETURN NEW;
 EXCEPTION WHEN OTHERS THEN

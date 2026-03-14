@@ -9,6 +9,7 @@ import {
 import * as Location from 'expo-location';
 import * as Notifications from 'expo-notifications';
 import { reportError } from '@/services/errorReporting';
+import { startBackgroundLocationTracking } from '@/services/location';
 import { Camera } from 'expo-camera';
 import { Audio } from 'expo-av';
 import { Ionicons } from '@expo/vector-icons';
@@ -117,6 +118,9 @@ export default function PermissionsScreen({ onComplete }: PermissionsScreenProps
         case 'locationBackground': {
           const result = await Location.requestBackgroundPermissionsAsync();
           status = result.status;
+          if (status === 'granted') {
+            startBackgroundLocationTracking();
+          }
           break;
         }
         case 'camera': {

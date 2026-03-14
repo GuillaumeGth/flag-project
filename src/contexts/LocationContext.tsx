@@ -6,6 +6,7 @@ import {
   requestForegroundPermission,
   startBackgroundLocationTracking,
   watchForegroundLocation,
+  LOCATION_TASK_NAME,
 } from '@/services/location';
 
 interface LocationContextType extends LocationState {
@@ -56,6 +57,16 @@ export function LocationProvider({ children }: { children: React.ReactNode }) {
         loading: false,
       }));
       await startLocationWatch();
+
+      // Start background tracking if background permission is already granted
+      // (handles returning users who completed onboarding in a previous session)
+      const { status: bgStatus } = await Location.getBackgroundPermissionsAsync();
+      if (bgStatus === 'granted') {
+        const isRunning = await Location.hasStartedLocationUpdatesAsync(LOCATION_TASK_NAME);
+        if (!isRunning) {
+          startBackgroundLocationTracking();
+        }
+      }
     } else {
       setState((prev) => ({ ...prev, loading: false }));
     }

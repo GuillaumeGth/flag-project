@@ -108,7 +108,7 @@ export async function registerPushToken(userId: string): Promise<boolean> {
 
     // Clean up tokens from this user that haven't been used in 30+ days
     // Fire-and-forget: a cleanup failure must not break the registration
-    supabase.rpc('cleanup_stale_push_tokens').catch(() => {});
+    void Promise.resolve(supabase.rpc('cleanup_stale_push_tokens')).catch(() => {});
 
     return true;
   } catch (error) {

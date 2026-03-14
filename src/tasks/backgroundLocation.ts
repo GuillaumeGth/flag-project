@@ -1,5 +1,6 @@
 import * as TaskManager from 'expo-task-manager';
 import * as Location from 'expo-location';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '@/services/supabase';
 import { calculateDistance } from '@/services/location';
 import { notifyNearbyMessage } from '@/services/notifications';
@@ -8,9 +9,23 @@ import { Coordinates } from '@/types';
 
 const LOCATION_TASK_NAME = 'background-location-task';
 const PROXIMITY_RADIUS = 300; // Notify at 300m to give time before reaching message
+const NOTIFIED_MESSAGES_KEY = '@flagapp/notified_proximity_messages';
 
-// Store notified message IDs to avoid duplicate notifications
-const notifiedMessages = new Set<string>();
+async function loadNotifiedMessages(): Promise<Set<string>> {
+  try {
+    const stored = await AsyncStorage.getItem(NOTIFIED_MESSAGES_KEY);
+    if (stored) {
+      return new Set(JSON.parse(stored) as string[]);
+    }
+  } catch {}
+  return new Set();
+}
+
+async function saveNotifiedMessages(ids: Set<string>): Promise<void> {
+  try {
+    await AsyncStorage.setItem(NOTIFIED_MESSAGES_KEY, JSON.stringify([...ids]));
+  } catch {}
+}
 
 TaskManager.defineTask(LOCATION_TASK_NAME, async ({ data, error }) => {
   if (error) {
@@ -48,6 +63,19 @@ async function checkNearbyMessages(userLocation: Coordinates) {
 
     if (error || !messages) return;
 
+    // Load persisted notified message IDs
+    const notifiedMessages = await loadNotifiedMessages();
+
+    // Prune IDs that are no longer in the unread list (already read or deleted)
+    const unreadIds = new Set(messages.map((m) => m.id));
+    let changed = false;
+    for (const id of notifiedMessages) {
+      if (!unreadIds.has(id)) {
+        notifiedMessages.delete(id);
+        changed = true;
+      }
+    }
+
     for (const message of messages) {
       // Skip if already notified
       if (notifiedMessages.has(message.id)) continue;
@@ -64,7 +92,12 @@ async function checkNearbyMessages(userLocation: Coordinates) {
         const senderName = (message as any).users?.display_name || 'Quelqu\'un';
         await notifyNearbyMessage(message.id, senderName);
         notifiedMessages.add(message.id);
+        changed = true;
       }
+    }
+
+    if (changed) {
+      await saveNotifiedMessages(notifiedMessages);
     }
   } catch (error) {
     reportError(error, 'backgroundLocation.checkNearbyMessages');

@@ -38,8 +38,23 @@ CREATE TABLE IF NOT EXISTS public.user_push_tokens (
     user_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
     expo_push_token TEXT NOT NULL,
     device_name TEXT,
-    created_at TIMESTAMPTZ DEFAULT NOW()
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    last_used_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- Add last_used_at column if it doesn't exist (idempotent migration)
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = 'user_push_tokens'
+          AND column_name = 'last_used_at'
+    ) THEN
+        ALTER TABLE public.user_push_tokens ADD COLUMN last_used_at TIMESTAMPTZ DEFAULT NOW();
+    END IF;
+END
+$$;
 
 ALTER TABLE public.user_push_tokens ENABLE ROW LEVEL SECURITY;
 
@@ -873,3 +888,14 @@ DROP TRIGGER IF EXISTS on_reaction_created_send_push ON public.message_reactions
 CREATE TRIGGER on_reaction_created_send_push
     AFTER INSERT ON public.message_reactions
     FOR EACH ROW EXECUTE FUNCTION public.send_push_on_reaction();
+
+-- Function to clean up push tokens unused for more than 30 days
+-- Called from the client on app startup via RPC
+CREATE OR REPLACE FUNCTION public.cleanup_stale_push_tokens()
+RETURNS void AS $$
+BEGIN
+    DELETE FROM public.user_push_tokens
+    WHERE user_id = auth.uid()
+      AND last_used_at < NOW() - INTERVAL '30 days';
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;

@@ -1,5 +1,4 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { AppState } from 'react-native';
 import * as WebBrowser from 'expo-web-browser';
 import * as Linking from 'expo-linking';
 import { File } from 'expo-file-system/next';
@@ -364,21 +363,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       log('AuthContext', 'OAuth URL:', data.url);
 
-      // On Android, the Chrome Custom Tab may close (via deep link redirect) without
-      // openAuthSessionAsync ever resolving. Detect when the app returns to foreground
-      // and dismiss the auth session so the promise resolves.
-      let wentToBackground = false;
-      const appStateSub = AppState.addEventListener('change', (nextState) => {
-        if (nextState === 'background' || nextState === 'inactive') {
-          wentToBackground = true;
-        } else if (nextState === 'active' && wentToBackground) {
-          WebBrowser.dismissAuthSession();
-        }
-      });
+      // Safety timeout: prevents openAuthSessionAsync from hanging forever in edge cases.
+      // With the expo-web-browser plugin, the RedirectActivity natively captures flag://
+      // redirects and resolves the promise — no AppState/dismissAuthSession hack needed.
+      const dismissTimeout = setTimeout(() => {
+        log('AuthContext', 'Safety timeout: dismissing auth session');
+        WebBrowser.dismissAuthSession();
+      }, 60000);
 
       // Use openAuthSessionAsync with flag:// prefix to capture any flag:// redirect
       const result = await WebBrowser.openAuthSessionAsync(data.url, 'flag://');
-      appStateSub.remove();
+      clearTimeout(dismissTimeout);
 
       log('AuthContext', '=== AUTH DEBUG ===');
       log('AuthContext', 'Result type:', result.type);

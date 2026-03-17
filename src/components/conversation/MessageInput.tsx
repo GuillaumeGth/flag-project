@@ -20,6 +20,7 @@ import { reportError } from '@/services/errorReporting';
 interface MessageInputProps {
   sending: boolean;
   canSendMessages: boolean;
+  isBot?: boolean;
   paddingBottom: number;
   replyTo?: MessageWithUsers | null;
   onCancelReply?: () => void;
@@ -35,6 +36,7 @@ interface MessageInputProps {
 export default function MessageInput({
   sending,
   canSendMessages,
+  isBot = false,
   paddingBottom,
   replyTo,
   onCancelReply,
@@ -160,7 +162,9 @@ export default function MessageInput({
       <View style={styles.inputRow}>
         {!canSendMessages ? (
           <Text style={styles.cannotSendText}>
-            Suivez-vous mutuellement pour échanger des messages
+            {isBot
+              ? 'Canal de diffusion officiel — la réponse n\'est pas possible'
+              : 'Suivez-vous mutuellement pour échanger des messages'}
           </Text>
         ) : (
           <>

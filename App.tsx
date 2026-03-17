@@ -14,6 +14,8 @@ import { log } from '@/utils/debug';
 import { LocationProvider } from '@/contexts/LocationContext';
 import ScreenLoader from '@/components/ScreenLoader';
 import { addNotificationResponseListener } from '@/services/notifications';
+import { fetchMessageById } from '@/services/messages';
+import { supabase } from '@/services/supabase';
 import { checkForAppUpdate } from '@/services/appUpdater';
 import { setupGlobalErrorHandler } from '@/services/errorReporting';
 
@@ -183,9 +185,32 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    const subscription = addNotificationResponseListener(() => {
-      if (navigationRef.current?.isReady()) {
+    const subscription = addNotificationResponseListener(async (messageId) => {
+      if (!navigationRef.current?.isReady()) return;
+
+      const message = await fetchMessageById(messageId);
+      if (!message) {
         navigationRef.current.navigate('Main', { screen: 'Map', params: { refresh: Date.now() } });
+        return;
+      }
+
+      const { data: { user } } = await supabase.auth.getUser();
+      const currentUserId = user?.id;
+
+      // Public flags and own messages (discovered / reacted) → show on map
+      if (message.is_public || message.sender_id === currentUserId) {
+        navigationRef.current.navigate('Main', {
+          screen: 'Map',
+          params: { messageId },
+        });
+      } else {
+        // Private message where current user is recipient → open conversation
+        navigationRef.current.navigate('Conversation', {
+          otherUserId: message.sender.id,
+          otherUserName: message.sender.display_name,
+          otherUserAvatarUrl: message.sender.avatar_url ?? undefined,
+          scrollToMessageId: messageId,
+        });
       }
     });
     return () => subscription.remove();

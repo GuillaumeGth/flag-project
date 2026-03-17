@@ -115,7 +115,7 @@ export default function ConversationScreen({ navigation, route }: Props) {
   }, [messages, user]);
 
   const checkCanSend = async () => {
-    if (isBot) { setCanSendMessages(true); return; }
+    if (isBot) { setCanSendMessages(false); return; }
     const eitherFollowing = await isEitherFollowing(otherUserId);
     setCanSendMessages(eitherFollowing);
   };
@@ -403,6 +403,7 @@ export default function ConversationScreen({ navigation, route }: Props) {
         <MessageInput
           sending={sending}
           canSendMessages={canSendMessages}
+          isBot={isBot}
           paddingBottom={Platform.OS === 'ios' ? insets.bottom : keyboardVisible ? 0 : insets.bottom}
           replyTo={replyToMessage}
           onCancelReply={() => setReplyToMessage(null)}

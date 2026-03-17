@@ -165,6 +165,8 @@ function buildConversations(messages: RawMessageWithUsers[], currentUserId: stri
           created_at: msg.created_at,
           is_read: msg.is_read,
           is_from_me: isFromMe,
+          deleted_by_sender: msg.deleted_by_sender,
+          deleted_by_recipient: msg.deleted_by_recipient,
         },
         unreadCount,
       });

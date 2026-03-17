@@ -111,6 +111,10 @@ const ConversationItem = React.memo(({ item, anim, navigation }: ConversationIte
 
 const getMessagePreview = (conversation: Conversation) => {
   const { lastMessage } = conversation;
+  const isDeleted = lastMessage.is_from_me
+    ? !!lastMessage.deleted_by_sender
+    : !!lastMessage.deleted_by_recipient;
+  if (isDeleted) return 'Message supprimé';
   const isUndiscovered = !lastMessage.is_from_me && !lastMessage.is_read;
   if (isUndiscovered) return 'Nouveau message à découvrir';
   const prefix = lastMessage.is_from_me ? 'Vous: ' : '';

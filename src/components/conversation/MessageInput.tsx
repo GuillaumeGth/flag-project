@@ -127,6 +127,8 @@ export default function MessageInput({
     setIsPlayingInputAudio(false);
   };
 
+  if (isBot) return null;
+
   return (
     <View style={[styles.inputContainer, { paddingBottom: spacing.lg + paddingBottom }]}>
       {replyTo && onCancelReply && (
@@ -162,9 +164,7 @@ export default function MessageInput({
       <View style={styles.inputRow}>
         {!canSendMessages ? (
           <Text style={styles.cannotSendText}>
-            {isBot
-              ? 'Canal de diffusion officiel — la réponse n\'est pas possible'
-              : 'Suivez-vous mutuellement pour échanger des messages'}
+            Suivez-vous mutuellement pour échanger des messages
           </Text>
         ) : (
           <>

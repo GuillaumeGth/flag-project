@@ -49,6 +49,7 @@ export interface Message {
   reply_to_message_id?: string | null;
   reply_to?: MessageReply | null;
   is_admin_placed?: boolean;
+  discovery_count?: number;
 }
 
 // Message with sender info for display

@@ -55,7 +55,6 @@ export async function follow(userId: string): Promise<boolean> {
     .insert({ follower_id: currentUserId, following_id: userId });
 
   if (error) {
-    console.error('Error following user:', error);
     reportError(error, 'subscriptions.follow');
     return false;
   }
@@ -73,7 +72,6 @@ export async function unfollow(userId: string): Promise<boolean> {
     .eq('following_id', userId);
 
   if (error) {
-    console.error('Error unfollowing user:', error);
     reportError(error, 'subscriptions.unfollow');
     return false;
   }
@@ -92,7 +90,6 @@ export async function isFollowing(userId: string): Promise<boolean> {
     .maybeSingle();
 
   if (error) {
-    console.error('Error checking follow status:', error);
     reportError(error, 'subscriptions.isFollowing');
     return false;
   }
@@ -109,7 +106,6 @@ export async function fetchFollowingIds(): Promise<string[]> {
     .eq('follower_id', currentUserId);
 
   if (error) {
-    console.error('Error fetching following ids:', error);
     reportError(error, 'subscriptions.fetchFollowingIds');
     return [];
   }
@@ -140,7 +136,6 @@ export async function isEitherFollowing(userId: string): Promise<boolean> {
     .maybeSingle();
 
   if (revError) {
-    console.error('Error checking mutual follow status:', revError);
     reportError(revError, 'subscriptions.isEitherFollowing');
     return false;
   }
@@ -154,7 +149,7 @@ export async function fetchFollowerCount(userId: string): Promise<number> {
     .eq('following_id', userId);
 
   if (error) {
-    console.error('Error fetching follower count:', error);
+    reportError(error, 'subscriptions.fetchFollowerCount');
     return 0;
   }
   return count || 0;

@@ -34,8 +34,11 @@ export async function reportError(
   context: string,
   metadata?: Record<string, unknown>,
 ): Promise<void> {
-  // Only report in production
-  if (__DEV__) return;
+  // In dev: log to console so errors are visible during development
+  if (__DEV__) {
+    console.warn(`[reportError] ${context}:`, error);
+    return;
+  }
 
   if (isThrottled(context)) return;
 

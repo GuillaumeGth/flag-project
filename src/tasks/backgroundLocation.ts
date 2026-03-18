@@ -14,7 +14,6 @@ const notifiedMessages = new Set<string>();
 
 TaskManager.defineTask(LOCATION_TASK_NAME, async ({ data, error }) => {
   if (error) {
-    console.error('Background location error:', error);
     reportError(error, 'backgroundLocation.task');
     return;
   }
@@ -68,7 +67,6 @@ async function checkNearbyMessages(userLocation: Coordinates) {
       }
     }
   } catch (error) {
-    console.error('Error checking nearby messages:', error);
     reportError(error, 'backgroundLocation.checkNearbyMessages');
   }
 }

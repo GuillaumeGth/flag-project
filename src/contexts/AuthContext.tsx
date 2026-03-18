@@ -7,7 +7,8 @@ import { User as SupabaseUser } from '@supabase/supabase-js';
 import { supabase, supabaseReady } from '@/services/supabase';
 import { registerPushToken, unregisterPushToken } from '@/services/notifications';
 import { clearAllCache } from '@/services/cache';
-import { reportError } from '@/services/errorReporting';
+import { subscribeToUserProfileChanges } from '@/services/messages';
+import { reportError, setUserContext } from '@/services/errorReporting';
 import { log } from '@/utils/debug';
 import { User, AuthState } from '@/types';
 
@@ -211,6 +212,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       });
     }, 10000);
 
+    // Subscription to user profile changes — patches local caches in real-time
+    // when any user updates their avatar or display name.
+    let unsubscribeProfiles: (() => void) | null = null;
+
     // Handle deep link for OAuth callback
     const handleDeepLink = async (event: { url: string }) => {
       const url = event.url;
@@ -280,6 +285,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // On explicit sign out, clear everything
       if (_event === 'SIGNED_OUT') {
         log('AuthContext', 'SIGNED_OUT -> clearing state');
+        unsubscribeProfiles?.();
+        unsubscribeProfiles = null;
+        setUserContext(null, null);
         setState({ user: null, session: null, loading: false });
         return;
       }
@@ -288,6 +296,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (session?.user) {
         const mappedUser = mapUser(session.user);
         log('AuthContext', 'Setting user:', mappedUser.id, 'event:', _event);
+        setUserContext(
+          mappedUser.display_name ?? mappedUser.email ?? mappedUser.phone ?? null,
+          null,
+        );
         setState((prev) => ({
           ...prev,
           session,
@@ -304,6 +316,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           syncUserProfile(session.user).catch((e) => log('AuthContext', 'Sync profile error:', e));
           updateUserWithDbProfile(mappedUser.id).catch((e) => log('AuthContext', 'Update profile error:', e));
           registerPushToken(mappedUser.id).catch((e) => log('AuthContext', 'Register push token error:', e));
+
+          // Subscribe to user profile changes to keep local caches fresh
+          if (!unsubscribeProfiles) {
+            unsubscribeProfiles = subscribeToUserProfileChanges();
+            log('AuthContext', 'Subscribed to user profile changes');
+          }
         }
         return;
       }
@@ -322,6 +340,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       clearTimeout(loadingTimeout);
       subscription.unsubscribe();
       linkingSubscription.remove();
+      unsubscribeProfiles?.();
     };
   }, []);
 

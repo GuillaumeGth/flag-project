@@ -1,7 +1,7 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { NavigationContainer, NavigationContainerRef } from '@react-navigation/native';
+import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
@@ -18,6 +18,7 @@ import { fetchMessageById } from '@/services/messages';
 import { supabase } from '@/services/supabase';
 import { checkForAppUpdate } from '@/services/appUpdater';
 import { setupGlobalErrorHandler } from '@/services/errorReporting';
+import { navigationRef } from '@/services/navigationRef';
 
 // Catch unhandled JS errors and forward them to Crashlytics
 setupGlobalErrorHandler();
@@ -178,7 +179,6 @@ function AppNavigator() {
 }
 
 export default function App() {
-  const navigationRef = useRef<NavigationContainerRef<any>>(null);
 
   useEffect(() => {
     checkForAppUpdate();
@@ -207,7 +207,7 @@ export default function App() {
         // Private message where current user is recipient → open conversation
         navigationRef.current.navigate('Conversation', {
           otherUserId: message.sender.id,
-          otherUserName: message.sender.display_name,
+          otherUserName: message.sender.display_name as string,
           otherUserAvatarUrl: message.sender.avatar_url ?? undefined,
           scrollToMessageId: messageId,
         });

@@ -75,10 +75,6 @@ const ConversationItem = React.memo(({ item, anim, navigation }: ConversationIte
               uri={item.otherUser.avatar_url}
               name={item.otherUser.display_name}
               size="medium"
-              withRing={hasUnread}
-              ringColor={isBot ? 'cyan' : 'gradient'}
-              withGlow={hasUnread}
-              glowColor={isBot ? 'cyan' : 'violet'}
               isBot={isBot}
             />
             <View style={styles.conversationContent}>

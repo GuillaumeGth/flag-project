@@ -51,6 +51,22 @@ export async function setLastSyncTimestamp(key: string, timestamp: string): Prom
   }
 }
 
+/**
+ * Returns all cache keys that start with the given prefix (without the internal CACHE_PREFIX).
+ * Useful for finding all keys matching a pattern (e.g. all 'conversation_*' caches).
+ */
+export async function getKeysWithPrefix(prefix: string): Promise<string[]> {
+  try {
+    const allKeys = await AsyncStorage.getAllKeys();
+    return allKeys
+      .filter(k => k.startsWith(CACHE_PREFIX + prefix))
+      .map(k => k.slice(CACHE_PREFIX.length));
+  } catch (e) {
+    warn('cache', 'getKeysWithPrefix error:', prefix, e);
+    return [];
+  }
+}
+
 export async function removeCachedData(key: string): Promise<void> {
   try {
     await AsyncStorage.multiRemove([CACHE_PREFIX + key, SYNC_PREFIX + key]);

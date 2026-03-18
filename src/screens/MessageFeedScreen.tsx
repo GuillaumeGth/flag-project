@@ -6,6 +6,8 @@ import {
   TouchableOpacity,
   StyleSheet,
   ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -76,7 +78,10 @@ export default function MessageFeedScreen({ navigation, route }: Props) {
   ), [userProfile, handleUserPress]);
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top }]}>
+    <KeyboardAvoidingView
+      style={[styles.container, { paddingTop: insets.top }]}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+    >
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
@@ -96,6 +101,7 @@ export default function MessageFeedScreen({ navigation, route }: Props) {
           data={messages}
           renderItem={renderItem}
           keyExtractor={item => item.id}
+          keyboardShouldPersistTaps="handled"
           onScrollToIndexFailed={(info) => {
             setTimeout(() => {
               flatListRef.current?.scrollToIndex({ index: info.index, animated: false });
@@ -103,7 +109,7 @@ export default function MessageFeedScreen({ navigation, route }: Props) {
           }}
         />
       )}
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 

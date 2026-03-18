@@ -10,9 +10,10 @@ const SCREEN_WIDTH = Dimensions.get('window').width;
 interface MessageContentDisplayProps {
   message: Message;
   variant: 'feed' | 'fullscreen';
+  renderAfterMedia?: () => React.ReactNode;
 }
 
-export default function MessageContentDisplay({ message, variant }: MessageContentDisplayProps) {
+export default function MessageContentDisplay({ message, variant, renderAfterMedia }: MessageContentDisplayProps) {
   const [playing, setPlaying] = useState(false);
   const [sound, setSound] = useState<Audio.Sound | null>(null);
 
@@ -53,6 +54,7 @@ export default function MessageContentDisplay({ message, variant }: MessageConte
           style={variant === 'feed' ? styles.feedImage : styles.fullscreenImage}
           resizeMode={variant === 'feed' ? 'cover' : 'contain'}
         />
+        {renderAfterMedia?.()}
         {message.text_content ? (
           <View style={variant === 'feed' ? styles.textContainerFeed : styles.textContainerFullscreen}>
             <Text style={variant === 'feed' ? styles.textContentFeed : styles.textContentFullscreen}>

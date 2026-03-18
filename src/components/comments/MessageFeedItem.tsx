@@ -161,29 +161,26 @@ export default function MessageFeedItem({
       </TouchableOpacity>
 
       {/* Flag content */}
-      <MessageContentDisplay message={message} variant="feed" />
-
-      {/* Action bar */}
-      <View style={styles.actionBar}>
-        <TouchableOpacity style={styles.actionItem} onPress={handleToggleLike} activeOpacity={0.7}>
-          <Ionicons
-            name={liked ? 'heart' : 'heart-outline'}
-            size={20}
-            color={liked ? colors.error : colors.text.secondary}
-          />
-          {likeCount > 0 && (
-            <Text style={[styles.actionCount, liked && styles.actionCountActive]}>
-              {likeCount}
-            </Text>
-          )}
-        </TouchableOpacity>
-        <View style={styles.actionItem}>
-          <Ionicons name="chatbubble-outline" size={18} color={colors.text.secondary} />
-          {commentCount > 0 && (
-            <Text style={styles.actionCount}>{commentCount}</Text>
-          )}
-        </View>
-      </View>
+      <MessageContentDisplay
+        message={message}
+        variant="feed"
+        renderAfterMedia={() => (
+          <View style={styles.actionBar}>
+            <TouchableOpacity style={styles.actionItem} onPress={handleToggleLike} activeOpacity={0.7}>
+              <Ionicons
+                name={liked ? 'heart' : 'heart-outline'}
+                size={20}
+                color={liked ? colors.error : colors.text.secondary}
+              />
+              {likeCount > 0 && (
+                <Text style={[styles.actionCount, liked && styles.actionCountActive]}>
+                  {likeCount}
+                </Text>
+              )}
+            </TouchableOpacity>
+          </View>
+        )}
+      />
 
       {/* Comments section */}
       {loaded && (

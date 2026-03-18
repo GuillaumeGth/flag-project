@@ -115,7 +115,7 @@ export default function ConversationScreen({ navigation, route }: Props) {
   }, [messages, user]);
 
   const checkCanSend = async () => {
-    if (isBot) { setCanSendMessages(true); return; }
+    if (isBot) { setCanSendMessages(false); return; }
     const eitherFollowing = await isEitherFollowing(otherUserId);
     setCanSendMessages(eitherFollowing);
   };
@@ -338,9 +338,9 @@ export default function ConversationScreen({ navigation, route }: Props) {
       </TouchableOpacity>
       <TouchableOpacity
         style={styles.headerProfile}
-        onPress={() => !isBot && !selectedMessageId && navigation.navigate('UserProfile', { userId: otherUserId })}
-        disabled={isBot || !!selectedMessageId}
-        activeOpacity={isBot || !!selectedMessageId ? 1 : 0.7}
+        onPress={() => !selectedMessageId && navigation.navigate('UserProfile', { userId: otherUserId })}
+        disabled={!!selectedMessageId}
+        activeOpacity={!!selectedMessageId ? 1 : 0.7}
       >
         <PremiumAvatar uri={otherUserAvatarUrl} name={otherUserName} size="small" isBot={isBot} withGlow={isBot} glowColor="cyan" />
         <Text style={styles.headerTitle}>{otherUserName}</Text>
@@ -403,6 +403,7 @@ export default function ConversationScreen({ navigation, route }: Props) {
         <MessageInput
           sending={sending}
           canSendMessages={canSendMessages}
+          isBot={isBot}
           paddingBottom={Platform.OS === 'ios' ? insets.bottom : keyboardVisible ? 0 : insets.bottom}
           replyTo={replyToMessage}
           onCancelReply={() => setReplyToMessage(null)}

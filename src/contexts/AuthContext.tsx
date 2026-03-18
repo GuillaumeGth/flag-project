@@ -1,5 +1,4 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { AppState } from 'react-native';
 import * as WebBrowser from 'expo-web-browser';
 import * as Linking from 'expo-linking';
 import { File } from 'expo-file-system/next';
@@ -8,7 +7,8 @@ import { User as SupabaseUser } from '@supabase/supabase-js';
 import { supabase, supabaseReady } from '@/services/supabase';
 import { registerPushToken, unregisterPushToken } from '@/services/notifications';
 import { clearAllCache } from '@/services/cache';
-import { reportError } from '@/services/errorReporting';
+import { subscribeToUserProfileChanges } from '@/services/messages';
+import { reportError, setUserContext } from '@/services/errorReporting';
 import { log } from '@/utils/debug';
 import { User, AuthState } from '@/types';
 
@@ -212,6 +212,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       });
     }, 10000);
 
+    // Subscription to user profile changes — patches local caches in real-time
+    // when any user updates their avatar or display name.
+    let unsubscribeProfiles: (() => void) | null = null;
+
     // Handle deep link for OAuth callback
     const handleDeepLink = async (event: { url: string }) => {
       const url = event.url;
@@ -281,6 +285,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // On explicit sign out, clear everything
       if (_event === 'SIGNED_OUT') {
         log('AuthContext', 'SIGNED_OUT -> clearing state');
+        unsubscribeProfiles?.();
+        unsubscribeProfiles = null;
+        setUserContext(null, null);
         setState({ user: null, session: null, loading: false });
         return;
       }
@@ -289,6 +296,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (session?.user) {
         const mappedUser = mapUser(session.user);
         log('AuthContext', 'Setting user:', mappedUser.id, 'event:', _event);
+        setUserContext(
+          mappedUser.display_name ?? mappedUser.email ?? mappedUser.phone ?? null,
+          null,
+        );
         setState((prev) => ({
           ...prev,
           session,
@@ -305,6 +316,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           syncUserProfile(session.user).catch((e) => log('AuthContext', 'Sync profile error:', e));
           updateUserWithDbProfile(mappedUser.id).catch((e) => log('AuthContext', 'Update profile error:', e));
           registerPushToken(mappedUser.id).catch((e) => log('AuthContext', 'Register push token error:', e));
+
+          // Subscribe to user profile changes to keep local caches fresh
+          if (!unsubscribeProfiles) {
+            unsubscribeProfiles = subscribeToUserProfileChanges();
+            log('AuthContext', 'Subscribed to user profile changes');
+          }
         }
         return;
       }
@@ -323,6 +340,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       clearTimeout(loadingTimeout);
       subscription.unsubscribe();
       linkingSubscription.remove();
+      unsubscribeProfiles?.();
     };
   }, []);
 
@@ -364,21 +382,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       log('AuthContext', 'OAuth URL:', data.url);
 
-      // On Android, the Chrome Custom Tab may close (via deep link redirect) without
-      // openAuthSessionAsync ever resolving. Detect when the app returns to foreground
-      // and dismiss the auth session so the promise resolves.
-      let wentToBackground = false;
-      const appStateSub = AppState.addEventListener('change', (nextState) => {
-        if (nextState === 'background' || nextState === 'inactive') {
-          wentToBackground = true;
-        } else if (nextState === 'active' && wentToBackground) {
-          WebBrowser.dismissAuthSession();
-        }
-      });
+      // Safety timeout: prevents openAuthSessionAsync from hanging forever in edge cases.
+      // With the expo-web-browser plugin, the RedirectActivity natively captures flag://
+      // redirects and resolves the promise — no AppState/dismissAuthSession hack needed.
+      const dismissTimeout = setTimeout(() => {
+        log('AuthContext', 'Safety timeout: dismissing auth session');
+        WebBrowser.dismissAuthSession();
+      }, 60000);
 
       // Use openAuthSessionAsync with flag:// prefix to capture any flag:// redirect
       const result = await WebBrowser.openAuthSessionAsync(data.url, 'flag://');
-      appStateSub.remove();
+      clearTimeout(dismissTimeout);
 
       log('AuthContext', '=== AUTH DEBUG ===');
       log('AuthContext', 'Result type:', result.type);

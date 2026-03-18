@@ -107,6 +107,8 @@ export interface Conversation {
     created_at: string;
     is_read: boolean;
     is_from_me: boolean;
+    deleted_by_sender?: boolean;
+    deleted_by_recipient?: boolean;
   };
   unreadCount: number;
 }

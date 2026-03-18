@@ -1,7 +1,7 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { NavigationContainer, NavigationContainerRef } from '@react-navigation/native';
+import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
@@ -14,8 +14,11 @@ import { log } from '@/utils/debug';
 import { LocationProvider } from '@/contexts/LocationContext';
 import ScreenLoader from '@/components/ScreenLoader';
 import { addNotificationResponseListener } from '@/services/notifications';
+import { fetchMessageById } from '@/services/messages';
+import { supabase } from '@/services/supabase';
 import { checkForAppUpdate } from '@/services/appUpdater';
 import { setupGlobalErrorHandler } from '@/services/errorReporting';
+import { navigationRef } from '@/services/navigationRef';
 
 // Catch unhandled JS errors and forward them to Crashlytics
 setupGlobalErrorHandler();
@@ -176,16 +179,38 @@ function AppNavigator() {
 }
 
 export default function App() {
-  const navigationRef = useRef<NavigationContainerRef<any>>(null);
 
   useEffect(() => {
     checkForAppUpdate();
   }, []);
 
   useEffect(() => {
-    const subscription = addNotificationResponseListener(() => {
-      if (navigationRef.current?.isReady()) {
+    const subscription = addNotificationResponseListener(async (messageId) => {
+      if (!navigationRef.current?.isReady()) return;
+
+      const message = await fetchMessageById(messageId);
+      if (!message) {
         navigationRef.current.navigate('Main', { screen: 'Map', params: { refresh: Date.now() } });
+        return;
+      }
+
+      const { data: { user } } = await supabase.auth.getUser();
+      const currentUserId = user?.id;
+
+      // Public flags and own messages (discovered / reacted) → show on map
+      if (message.is_public || message.sender_id === currentUserId) {
+        navigationRef.current.navigate('Main', {
+          screen: 'Map',
+          params: { messageId },
+        });
+      } else {
+        // Private message where current user is recipient → open conversation
+        navigationRef.current.navigate('Conversation', {
+          otherUserId: message.sender.id,
+          otherUserName: message.sender.display_name as string,
+          otherUserAvatarUrl: message.sender.avatar_url ?? undefined,
+          scrollToMessageId: messageId,
+        });
       }
     });
     return () => subscription.remove();

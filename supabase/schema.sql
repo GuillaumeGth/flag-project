@@ -12,6 +12,7 @@ CREATE TABLE IF NOT EXISTS public.users (
     is_admin BOOLEAN NOT NULL DEFAULT FALSE,
     is_private BOOLEAN NOT NULL DEFAULT FALSE,
     is_searchable BOOLEAN NOT NULL DEFAULT TRUE,
+    is_bot BOOLEAN NOT NULL DEFAULT FALSE,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -115,6 +116,13 @@ DROP POLICY IF EXISTS "Users can send messages" ON public.messages;
 CREATE POLICY "Users can send messages" ON public.messages
     FOR INSERT WITH CHECK (
         auth.uid() = sender_id
+        -- Cannot send to a bot
+        AND (
+            recipient_id IS NULL
+            OR NOT EXISTS (
+                SELECT 1 FROM public.users WHERE id = recipient_id AND is_bot = true
+            )
+        )
         AND (
             -- Public messages don't require a subscription
             is_public = true
@@ -282,14 +290,13 @@ BEGIN
             'body', notif_body,
             'data', jsonb_build_object('messageId', NEW.id)
         );
-
-        PERFORM http((
-            'POST',
-            expo_url,
-            ARRAY[http_header('Content-Type', 'application/json')],
-            'application/json',
-            payload::text
-        )::http_request);
+        PERFORM net.http_post(
+            url := expo_url,
+            body := payload,
+            headers := '{"Content-Type": "application/json"}'::jsonb
+        );
+        INSERT INTO public.notification_logs(type, recipient_user_id, sender_user_id, expo_push_token, title, body, data)
+        VALUES ('new_message', NEW.recipient_id, NEW.sender_id, token, notif_title, notif_body, jsonb_build_object('messageId', NEW.id));
     END LOOP;
 
     RETURN NEW;
@@ -344,13 +351,11 @@ BEGIN
             'data', jsonb_build_object('messageId', NEW.id)
         );
 
-        PERFORM http((
-            'POST',
-            expo_url,
-            ARRAY[http_header('Content-Type', 'application/json')],
-            'application/json',
-            payload::text
-        )::http_request);
+        PERFORM net.http_post(
+            url := expo_url,
+            body := payload,
+            headers := '{"Content-Type": "application/json"}'::jsonb
+        );
     END LOOP;
 
     RETURN NEW;
@@ -423,6 +428,67 @@ CREATE POLICY "Users can update own subscriptions" ON public.subscriptions
 CREATE INDEX IF NOT EXISTS subscriptions_follower_idx ON public.subscriptions(follower_id);
 CREATE INDEX IF NOT EXISTS subscriptions_following_idx ON public.subscriptions(following_id);
 
+-- Auto-subscribe every new user to Guigz
+CREATE OR REPLACE FUNCTION public.auto_follow_guigz()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  guigz_id UUID := 'c46b8f9d-dd8c-46b9-9b9f-aa5886952d11';
+BEGIN
+  IF NEW.id = guigz_id THEN
+    RETURN NEW;
+  END IF;
+
+  INSERT INTO public.subscriptions (follower_id, following_id, notify_private_flags, notify_public_flags)
+  VALUES (NEW.id, guigz_id, true, false)
+  ON CONFLICT (follower_id, following_id) DO NOTHING;
+
+  RETURN NEW;
+EXCEPTION WHEN OTHERS THEN
+  RETURN NEW;
+END;
+$$;
+
+CREATE TRIGGER trg_auto_follow_guigz
+AFTER INSERT ON public.users
+FOR EACH ROW
+EXECUTE FUNCTION public.auto_follow_guigz();
+
+-- Auto-subscribe every new user to FläagBot
+-- FläagBot UUID: 00000000-0000-0000-0000-000000000001
+-- is_bot=true, is_searchable=false — unidirectional broadcast only
+CREATE OR REPLACE FUNCTION public.auto_follow_flaagbot()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  flaagbot_id UUID := '00000000-0000-0000-0000-000000000001';
+BEGIN
+  IF NEW.id = flaagbot_id THEN
+    RETURN NEW;
+  END IF;
+
+  INSERT INTO public.subscriptions (follower_id, following_id, notify_private_flags, notify_public_flags)
+  VALUES (NEW.id, flaagbot_id, true, false)
+  ON CONFLICT (follower_id, following_id) DO NOTHING;
+
+  RETURN NEW;
+EXCEPTION WHEN OTHERS THEN
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS trg_auto_follow_flaagbot ON public.users;
+CREATE TRIGGER trg_auto_follow_flaagbot
+AFTER INSERT ON public.users
+FOR EACH ROW
+EXECUTE FUNCTION public.auto_follow_flaagbot();
+
 -- Function to send push notification when someone gets a new follower
 CREATE OR REPLACE FUNCTION public.send_push_on_new_follow()
 RETURNS TRIGGER AS $$
@@ -458,13 +524,11 @@ BEGIN
             'data', jsonb_build_object('followerId', NEW.follower_id)
         );
 
-        PERFORM http((
-            'POST',
-            expo_url,
-            ARRAY[http_header('Content-Type', 'application/json')],
-            'application/json',
-            payload::text
-        )::http_request);
+        PERFORM net.http_post(
+            url := expo_url,
+            body := payload,
+            headers := '{"Content-Type": "application/json"}'::jsonb
+        );
     END LOOP;
 
     RETURN NEW;
@@ -515,9 +579,11 @@ BEGIN
           'body', sender_name || ' a déposé un nouveau flag',
           'data', jsonb_build_object('messageId', NEW.id)
         );
-        PERFORM http(('POST', expo_url,
-          ARRAY[http_header('Content-Type','application/json')],
-          'application/json', payload::text)::http_request);
+        PERFORM net.http_post(
+            url := expo_url,
+            body := payload,
+            headers := '{"Content-Type": "application/json"}'::jsonb
+        );
       END LOOP;
     END IF;
   END LOOP;
@@ -755,9 +821,11 @@ BEGIN
             'body', requester_name || ' souhaite s''abonner à vous',
             'data', jsonb_build_object('requesterId', NEW.requester_id)
         );
-        PERFORM http(('POST', expo_url,
-            ARRAY[http_header('Content-Type', 'application/json')],
-            'application/json', payload::text)::http_request);
+        PERFORM net.http_post(
+            url := expo_url,
+            body := payload,
+            headers := '{"Content-Type": "application/json"}'::jsonb
+        );
     END LOOP;
 
     RETURN NEW;
@@ -853,13 +921,11 @@ BEGIN
             'data', jsonb_build_object('messageId', NEW.message_id)
         );
 
-        PERFORM http((
-            'POST',
-            expo_url,
-            ARRAY[http_header('Content-Type', 'application/json')],
-            'application/json',
-            payload::text
-        )::http_request);
+        PERFORM net.http_post(
+            url := expo_url,
+            body := payload,
+            headers := '{"Content-Type": "application/json"}'::jsonb
+        );
     END LOOP;
 
     RETURN NEW;
@@ -1088,3 +1154,20 @@ BEGIN
     GROUP BY mc.message_id;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Top users for search screen (excludes bots and non-searchable users)
+CREATE OR REPLACE FUNCTION public.get_top_users_by_followers(limit_count integer DEFAULT 10, exclude_user_id uuid DEFAULT NULL::uuid)
+RETURNS SETOF users
+LANGUAGE sql
+STABLE SECURITY DEFINER
+AS $$
+  SELECT u.*
+  FROM public.users u
+  LEFT JOIN public.subscriptions s ON s.following_id = u.id
+  WHERE (exclude_user_id IS NULL OR u.id != exclude_user_id)
+    AND u.is_searchable = true
+    AND u.is_bot = false
+  GROUP BY u.id
+  ORDER BY COUNT(s.follower_id) DESC
+  LIMIT limit_count;
+$$;

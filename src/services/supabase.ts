@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 import * as SecureStore from 'expo-secure-store';
 import Constants from 'expo-constants';
+import { AppState } from 'react-native';
 import { reportError } from './errorReporting';
 import { log } from '@/utils/debug';
 
@@ -111,6 +112,17 @@ export const supabaseReady = supabase.auth.getSession().then(({ data: { session 
 // Keep cached userId in sync with auth state changes (sign-in, sign-out, token refresh)
 supabase.auth.onAuthStateChange((_event, session) => {
   _cachedUserId = session?.user?.id ?? null;
+});
+
+// React Native suspends JS timers in background, so Supabase's auto-refresh setInterval
+// never fires after long inactivity — the token expires silently. Restart auto-refresh
+// whenever the app becomes active so the token is refreshed immediately on resume.
+AppState.addEventListener('change', (state) => {
+  if (state === 'active') {
+    supabase.auth.startAutoRefresh();
+  } else {
+    supabase.auth.stopAutoRefresh();
+  }
 });
 
 export function getCachedUserId(): string | null {

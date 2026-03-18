@@ -38,12 +38,20 @@ export default function GridCell({ item, index, onPress }: GridCellProps) {
     }).start();
   }, [index]);
 
+  const discoveryBadge = typeof item.discovery_count === 'number' && item.discovery_count > 0 ? (
+    <View style={styles.discoveryBadge}>
+      <Ionicons name="eye" size={10} color="#fff" />
+      <Text style={styles.discoveryCount}>{item.discovery_count > 99 ? '99+' : item.discovery_count}</Text>
+    </View>
+  ) : null;
+
   if (item.content_type === 'photo') {
     return (
       <Animated.View style={fadeStyle}>
         <TouchableOpacity style={styles.cell} onPress={handlePress}>
           <Image source={{ uri: item.media_url }} style={styles.cellImage} />
           <LinearGradient colors={CELL_GRADIENT_COLORS} style={styles.cellOverlay} />
+          {discoveryBadge}
         </TouchableOpacity>
       </Animated.View>
     );
@@ -56,6 +64,7 @@ export default function GridCell({ item, index, onPress }: GridCellProps) {
           <View style={styles.cellIconContainer}>
             <Ionicons name="mic" size={32} color={colors.primary.cyan} />
           </View>
+          {discoveryBadge}
         </View>
       </Animated.View>
     );
@@ -67,6 +76,7 @@ export default function GridCell({ item, index, onPress }: GridCellProps) {
         <Text style={styles.cellText} numberOfLines={4}>
           {item.text_content}
         </Text>
+        {discoveryBadge}
       </TouchableOpacity>
     </Animated.View>
   );
@@ -108,5 +118,22 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.xs,
     textAlign: 'center',
     lineHeight: 16,
+  },
+  discoveryBadge: {
+    position: 'absolute',
+    bottom: 4,
+    right: 4,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    borderRadius: 8,
+    paddingHorizontal: 5,
+    paddingVertical: 2,
+  },
+  discoveryCount: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: '600',
   },
 });

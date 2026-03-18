@@ -23,6 +23,7 @@ interface MessageFeedItemProps {
   senderName?: string;
   senderAvatarUrl?: string | null;
   onUserPress?: (userId: string) => void;
+  onInputFocus?: () => void;
 }
 
 export default function MessageFeedItem({
@@ -30,6 +31,7 @@ export default function MessageFeedItem({
   senderName,
   senderAvatarUrl,
   onUserPress,
+  onInputFocus,
 }: MessageFeedItemProps) {
   const { user } = useAuth();
   const [comments, setComments] = useState<CommentWithReplies[]>([]);
@@ -199,6 +201,7 @@ export default function MessageFeedItem({
         onSubmit={handleCreateComment}
         replyingTo={replyingTo}
         onCancelReply={() => setReplyingTo(null)}
+        onFocus={onInputFocus}
       />
 
       {/* Separator */}

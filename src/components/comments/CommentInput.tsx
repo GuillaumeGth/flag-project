@@ -7,9 +7,10 @@ interface CommentInputProps {
   onSubmit: (text: string) => void;
   replyingTo?: { id: string; userName: string } | null;
   onCancelReply?: () => void;
+  onFocus?: () => void;
 }
 
-export default function CommentInput({ onSubmit, replyingTo, onCancelReply }: CommentInputProps) {
+export default function CommentInput({ onSubmit, replyingTo, onCancelReply, onFocus }: CommentInputProps) {
   const [text, setText] = useState('');
   const inputRef = useRef<TextInput>(null);
 
@@ -42,6 +43,7 @@ export default function CommentInput({ onSubmit, replyingTo, onCancelReply }: Co
           placeholderTextColor={colors.text.tertiary}
           multiline
           maxLength={2000}
+          onFocus={onFocus}
         />
         {text.trim().length > 0 && (
           <TouchableOpacity style={styles.sendButton} onPress={handleSend}>

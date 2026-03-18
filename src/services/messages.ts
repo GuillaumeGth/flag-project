@@ -544,15 +544,19 @@ export async function fetchMyPublicMessages(): Promise<Message[]> {
   return data || [];
 }
 
-// Fetch public messages for a specific user (for UserProfileScreen)
+// Fetch public messages for a specific user — only those the current user has discovered
 export async function fetchUserPublicMessages(userId: string): Promise<Message[]> {
   log('messages', 'fetchUserPublicMessages: userId =', userId);
 
+  const currentUserId = getCurrentUserId();
+  if (!currentUserId) return [];
+
   const { data, error } = await supabase
     .from('messages')
-    .select('*')
+    .select('*, discovered_public_messages!inner(user_id)')
     .eq('sender_id', userId)
     .eq('is_public', true)
+    .eq('discovered_public_messages.user_id', currentUserId)
     .order('created_at', { ascending: false });
 
   log('messages', 'fetchUserPublicMessages: data =', data?.length, 'error =', error);

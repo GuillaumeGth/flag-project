@@ -126,10 +126,8 @@ const styles = StyleSheet.create({
     color: colors.text.secondary,
   },
   textContainerFeed: {
-    paddingVertical: spacing.xxl,
+    paddingVertical: spacing.md,
     paddingHorizontal: spacing.lg,
-    minHeight: 120,
-    justifyContent: 'center',
   },
   textContainerFullscreen: {
     flex: 1,

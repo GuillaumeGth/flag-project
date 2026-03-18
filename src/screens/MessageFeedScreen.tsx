@@ -7,6 +7,7 @@ import {
   StyleSheet,
   ActivityIndicator,
   KeyboardAvoidingView,
+  Keyboard,
   Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -26,6 +27,7 @@ export default function MessageFeedScreen({ navigation, route }: Props) {
   const { user } = useAuth();
   const { userId, initialMessageId } = route.params;
   const flatListRef = useRef<FlatList>(null);
+  const focusedIndexRef = useRef<number>(-1);
 
   const [messages, setMessages] = useState<Message[]>([]);
   const [userProfile, setUserProfile] = useState<User | null>(null);
@@ -62,25 +64,36 @@ export default function MessageFeedScreen({ navigation, route }: Props) {
     }
   }, [loading, messages, initialMessageId, scrolledToInitial]);
 
+  useEffect(() => {
+    const sub = Keyboard.addListener('keyboardDidShow', () => {
+      const idx = focusedIndexRef.current;
+      if (idx >= 0) {
+        flatListRef.current?.scrollToIndex({ index: idx, animated: true, viewPosition: 1 });
+      }
+    });
+    return () => sub.remove();
+  }, []);
+
   const handleUserPress = useCallback((pressedUserId: string) => {
     if (pressedUserId !== userId) {
       navigation.push('UserProfile', { userId: pressedUserId });
     }
   }, [navigation, userId]);
 
-  const renderItem = useCallback(({ item }: { item: Message }) => (
+  const renderItem = useCallback(({ item, index }: { item: Message; index: number }) => (
     <MessageFeedItem
       message={item}
       senderName={userProfile?.display_name ?? undefined}
       senderAvatarUrl={userProfile?.avatar_url}
       onUserPress={handleUserPress}
+      onInputFocus={() => { focusedIndexRef.current = index; }}
     />
   ), [userProfile, handleUserPress]);
 
   return (
     <KeyboardAvoidingView
       style={[styles.container, { paddingTop: insets.top }]}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       {/* Header */}
       <View style={styles.header}>

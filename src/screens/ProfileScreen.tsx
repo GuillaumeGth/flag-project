@@ -267,7 +267,7 @@ const styles = StyleSheet.create({
   },
   headerContainer: {
     paddingTop: 60,
-    paddingBottom: 24,
+    paddingBottom: 8,
     position: 'relative',
   },
   headerGradient: {
@@ -356,8 +356,8 @@ const styles = StyleSheet.create({
     height: 1,
     backgroundColor: colors.border.default,
     marginHorizontal: spacing.xl,
-    marginTop: spacing.xl,
-    marginBottom: spacing.lg,
+    marginTop: spacing.md,
+    marginBottom: spacing.sm,
   },
   gridRow: {
     gap: 2,

@@ -60,7 +60,7 @@ export default function CommentList({
 
 const styles = StyleSheet.create({
   empty: {
-    paddingVertical: spacing.xxl,
+    paddingVertical: spacing.md,
     alignItems: 'center',
   },
   emptyText: {

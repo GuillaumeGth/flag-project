@@ -47,11 +47,20 @@ export default function MessageContentDisplay({ message, variant }: MessageConte
 
   if (message.content_type === 'photo' && message.media_url) {
     return (
-      <Image
-        source={{ uri: message.media_url }}
-        style={variant === 'feed' ? styles.feedImage : styles.fullscreenImage}
-        resizeMode={variant === 'feed' ? 'cover' : 'contain'}
-      />
+      <View>
+        <Image
+          source={{ uri: message.media_url }}
+          style={variant === 'feed' ? styles.feedImage : styles.fullscreenImage}
+          resizeMode={variant === 'feed' ? 'cover' : 'contain'}
+        />
+        {message.text_content ? (
+          <View style={variant === 'feed' ? styles.textContainerFeed : styles.textContainerFullscreen}>
+            <Text style={variant === 'feed' ? styles.textContentFeed : styles.textContentFullscreen}>
+              {message.text_content}
+            </Text>
+          </View>
+        ) : null}
+      </View>
     );
   }
 

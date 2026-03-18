@@ -7,9 +7,11 @@ import { colors, spacing, radius, typography } from '@/theme-redesign';
 import { useAuth } from '@/contexts/AuthContext';
 import {
   fetchCommentsForMessage,
+  fetchMessageLikes,
   createComment,
   deleteComment,
   toggleCommentLike,
+  toggleMessageLike,
 } from '@/services/comments';
 import PremiumAvatar from '@/components/redesign/PremiumAvatar';
 import MessageContentDisplay from '@/components/shared/MessageContentDisplay';
@@ -33,6 +35,8 @@ export default function MessageFeedItem({
   const [comments, setComments] = useState<CommentWithReplies[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [replyingTo, setReplyingTo] = useState<{ id: string; userName: string } | null>(null);
+  const [liked, setLiked] = useState(false);
+  const [likeCount, setLikeCount] = useState(0);
   const commentsRef = useRef(comments);
   commentsRef.current = comments;
 
@@ -43,10 +47,21 @@ export default function MessageFeedItem({
     setLoaded(true);
   }, [message.id, user?.id]);
 
-  // Load comments on first render
+  const loadLikes = useCallback(async () => {
+    if (!user?.id) return;
+    const data = await fetchMessageLikes([message.id], user.id);
+    const info = data[message.id];
+    if (info) {
+      setLikeCount(info.count);
+      setLiked(info.hasLiked);
+    }
+  }, [message.id, user?.id]);
+
+  // Load comments and likes on first render
   React.useEffect(() => {
     loadComments();
-  }, [loadComments]);
+    loadLikes();
+  }, [loadComments, loadLikes]);
 
   const handleCreateComment = useCallback(async (text: string) => {
     const parentId = replyingTo?.id ?? undefined;
@@ -110,6 +125,13 @@ export default function MessageFeedItem({
     });
   }, []);
 
+  const handleToggleLike = useCallback(async () => {
+    // Optimistic update
+    setLiked(prev => !prev);
+    setLikeCount(prev => liked ? prev - 1 : prev + 1);
+    await toggleMessageLike(message.id, liked);
+  }, [message.id, liked]);
+
   const commentCount = comments.reduce((acc, c) => acc + 1 + c.replies.length, 0);
 
   return (
@@ -143,6 +165,18 @@ export default function MessageFeedItem({
 
       {/* Action bar */}
       <View style={styles.actionBar}>
+        <TouchableOpacity style={styles.actionItem} onPress={handleToggleLike} activeOpacity={0.7}>
+          <Ionicons
+            name={liked ? 'heart' : 'heart-outline'}
+            size={20}
+            color={liked ? colors.error : colors.text.secondary}
+          />
+          {likeCount > 0 && (
+            <Text style={[styles.actionCount, liked && styles.actionCountActive]}>
+              {likeCount}
+            </Text>
+          )}
+        </TouchableOpacity>
         <View style={styles.actionItem}>
           <Ionicons name="chatbubble-outline" size={18} color={colors.text.secondary} />
           {commentCount > 0 && (
@@ -211,6 +245,9 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.sm,
     fontWeight: '600',
     color: colors.text.secondary,
+  },
+  actionCountActive: {
+    color: colors.error,
   },
   separator: {
     height: 8,

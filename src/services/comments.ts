@@ -182,6 +182,75 @@ export async function deleteComment(commentId: string): Promise<boolean> {
  * Toggle like on a comment (heart).
  * If hasLiked is true, removes the like; otherwise adds it.
  */
+/**
+ * Fetch like info (count + has_liked) for a batch of public messages.
+ * Uses the message_reactions table with emoji ❤️.
+ */
+export async function fetchMessageLikes(
+  messageIds: string[],
+  currentUserId: string
+): Promise<Record<string, { count: number; hasLiked: boolean }>> {
+  if (messageIds.length === 0) return {};
+
+  const { data, error } = await supabase
+    .from('message_reactions')
+    .select('message_id, user_id')
+    .in('message_id', messageIds)
+    .eq('emoji', '❤️');
+
+  if (error) {
+    reportError(error, 'comments.fetchMessageLikes');
+    return {};
+  }
+
+  const result: Record<string, { count: number; hasLiked: boolean }> = {};
+  for (const row of data ?? []) {
+    if (!result[row.message_id]) {
+      result[row.message_id] = { count: 0, hasLiked: false };
+    }
+    result[row.message_id].count++;
+    if (row.user_id === currentUserId) {
+      result[row.message_id].hasLiked = true;
+    }
+  }
+  return result;
+}
+
+/**
+ * Toggle a ❤️ like on a public message.
+ */
+export async function toggleMessageLike(
+  messageId: string,
+  hasLiked: boolean
+): Promise<boolean> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return false;
+
+  if (hasLiked) {
+    const { error } = await supabase
+      .from('message_reactions')
+      .delete()
+      .eq('message_id', messageId)
+      .eq('user_id', user.id)
+      .eq('emoji', '❤️');
+
+    if (error) {
+      reportError(error, 'comments.toggleMessageLike.delete');
+      return false;
+    }
+  } else {
+    const { error } = await supabase
+      .from('message_reactions')
+      .insert({ message_id: messageId, user_id: user.id, emoji: '❤️' });
+
+    if (error) {
+      reportError(error, 'comments.toggleMessageLike.insert');
+      return false;
+    }
+  }
+  return true;
+}
+
 export async function toggleCommentLike(
   commentId: string,
   hasLiked: boolean

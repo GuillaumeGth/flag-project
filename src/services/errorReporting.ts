@@ -1,4 +1,5 @@
 import { supabase, getCachedUserId } from './supabase';
+import { getCurrentRouteName } from './navigationRef';
 import Constants from 'expo-constants';
 import { Platform } from 'react-native';
 
@@ -24,6 +25,15 @@ function isThrottled(context: string): boolean {
   return false;
 }
 
+// User context cache — set at login so it's available in error reports
+let _cachedDisplayName: string | null = null;
+let _cachedUsername: string | null = null;
+
+export function setUserContext(displayName: string | null, username: string | null): void {
+  _cachedDisplayName = displayName;
+  _cachedUsername = username;
+}
+
 /**
  * Report an error to Firebase Crashlytics and the error_logs Supabase table.
  * Only active in production builds (__DEV__ === false).
@@ -43,11 +53,26 @@ export async function reportError(
   if (isThrottled(context)) return;
 
   const errorMessage =
-    error instanceof Error ? error.message : String(error);
+    error instanceof Error
+      ? error.message
+      : typeof error === 'object' && error !== null
+        ? JSON.stringify(error)
+        : String(error);
   const errorStack =
     error instanceof Error ? error.stack ?? null : null;
 
   const userId = getCachedUserId();
+  const currentScreen = getCurrentRouteName();
+
+  const enrichedMetadata = {
+    ...metadata,
+    platform: Platform.OS,
+    os_version: String(Platform.Version),
+    app_version: Constants.expoConfig?.version ?? 'unknown',
+    ...(currentScreen ? { screen: currentScreen } : {}),
+    ...(_cachedDisplayName ? { display_name: _cachedDisplayName } : {}),
+    ...(_cachedUsername ? { username: _cachedUsername } : {}),
+  };
 
   // --- Firebase Crashlytics ---
   try {
@@ -56,6 +81,8 @@ export async function reportError(
       if (userId) c.setUserId(userId);
       c.setAttribute('context', context);
       c.setAttribute('app_version', Constants.expoConfig?.version ?? 'unknown');
+      if (currentScreen) c.setAttribute('screen', currentScreen);
+      if (_cachedUsername) c.setAttribute('username', _cachedUsername);
       if (metadata) {
         for (const [key, value] of Object.entries(metadata)) {
           c.setAttribute(key, String(value));
@@ -74,11 +101,7 @@ export async function reportError(
       error_context: context,
       error_stack: errorStack,
       user_id: userId,
-      metadata: {
-        ...metadata,
-        platform: Platform.OS,
-        app_version: Constants.expoConfig?.version ?? 'unknown',
-      },
+      metadata: enrichedMetadata,
     });
   } catch {
     // Silent fail — we don't want error reporting to cause more errors

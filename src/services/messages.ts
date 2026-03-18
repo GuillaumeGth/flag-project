@@ -6,6 +6,7 @@ import {
   setCachedData,
   getLastSyncTimestamp,
   setLastSyncTimestamp,
+  getKeysWithPrefix,
   CACHE_KEYS,
 } from './cache';
 import { reportError } from './errorReporting';
@@ -165,6 +166,8 @@ function buildConversations(messages: RawMessageWithUsers[], currentUserId: stri
           created_at: msg.created_at,
           is_read: msg.is_read,
           is_from_me: isFromMe,
+          deleted_by_sender: msg.deleted_by_sender,
+          deleted_by_recipient: msg.deleted_by_recipient,
         },
         unreadCount,
       });
@@ -843,4 +846,71 @@ export async function uploadMedia(
     reportError(e, 'messages.uploadMedia');
     return null;
   }
+}
+
+// -------------------------------------------------------------------
+// User profile cache patching
+// When a user's profile changes (avatar, display_name), we patch all
+// cached messages that embed their data so the UI stays consistent
+// without a full cache invalidation.
+// -------------------------------------------------------------------
+
+type UserProfileUpdates = {
+  display_name?: string | null;
+  avatar_url?: string | null;
+};
+
+function patchUserInMessages<T extends { sender?: { id: string } | null; recipient?: { id: string } | null }>(
+  messages: T[],
+  userId: string,
+  updates: UserProfileUpdates
+): T[] {
+  return messages.map(msg => ({
+    ...msg,
+    sender: msg.sender?.id === userId ? { ...msg.sender, ...updates } : msg.sender,
+    recipient: msg.recipient?.id === userId ? { ...msg.recipient, ...updates } : msg.recipient,
+  }));
+}
+
+export async function patchUserInAllCaches(userId: string, updates: UserProfileUpdates): Promise<void> {
+  // 1. Patch the conversations messages cache
+  const convMsgs = await getCachedData<RawMessageWithUsers[]>(CACHE_KEYS.CONVERSATIONS_MESSAGES);
+  if (convMsgs) {
+    await setCachedData(CACHE_KEYS.CONVERSATIONS_MESSAGES, patchUserInMessages(convMsgs, userId, updates));
+  }
+
+  // 2. Patch all individual conversation caches (one per interlocutor)
+  const convKeys = await getKeysWithPrefix('conversation_');
+  for (const key of convKeys) {
+    const msgs = await getCachedData<MessageWithUsers[]>(key);
+    if (!msgs) continue;
+    await setCachedData(key, patchUserInMessages(msgs, userId, updates));
+  }
+}
+
+/**
+ * Subscribe to profile changes on public.users via Supabase Realtime.
+ * Automatically patches all local caches when a user updates their avatar or display name.
+ * Returns a cleanup function — call it on logout or unmount.
+ */
+export function subscribeToUserProfileChanges(): () => void {
+  const channel = supabase
+    .channel('user-profile-changes')
+    .on(
+      'postgres_changes',
+      { event: 'UPDATE', schema: 'public', table: 'users' },
+      (payload) => {
+        const { id, display_name, avatar_url } = payload.new as {
+          id: string;
+          display_name?: string | null;
+          avatar_url?: string | null;
+        };
+        patchUserInAllCaches(id, { display_name, avatar_url }).catch((e) =>
+          log('messages', 'patchUserInAllCaches error:', e)
+        );
+      }
+    )
+    .subscribe();
+
+  return () => { supabase.removeChannel(channel); };
 }

@@ -7,7 +7,6 @@ import {
   Image,
   ActivityIndicator,
   FlatList,
-  Dimensions,
   RefreshControl,
   Modal,
   Switch,
@@ -32,10 +31,10 @@ import {
   cancelFollowRequest,
   fetchSentRequestStatus,
 } from '@/services/followRequests';
+import { fetchCommentCounts } from '@/services/comments';
 import { Message, User, RootStackParamList } from '@/types';
-
-const SCREEN_WIDTH = Dimensions.get('window').width;
-const CELL_SIZE = SCREEN_WIDTH / 3;
+import GridCell from '@/components/profile/GridCell';
+import ProfileStatsRow from '@/components/profile/ProfileStatsRow';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'UserProfile'>;
 
@@ -50,9 +49,9 @@ export default function UserProfileScreen({ navigation, route }: Props) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [discoveredIds, setDiscoveredIds] = useState<Set<string>>(new Set());
   const [followerCount, setFollowerCount] = useState(0);
+  const [commentCounts, setCommentCounts] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [viewingMessage, setViewingMessage] = useState<Message | null>(null);
   const [notifPrefs, setNotifPrefs] = useState<NotificationPrefs>({ notifyPrivateFlags: true, notifyPublicFlags: false });
   const [showNotifModal, setShowNotifModal] = useState(false);
 
@@ -68,10 +67,13 @@ export default function UserProfileScreen({ navigation, route }: Props) {
   const loadMessages = useCallback(async () => {
     const data = await fetchUserPublicMessages(userId);
     setMessages(data);
-    // Fetch which of these the current user has discovered
     if (data.length > 0) {
-      const ids = await fetchDiscoveredPublicMessageIds(data.map(m => m.id));
+      const [ids, counts] = await Promise.all([
+        fetchDiscoveredPublicMessageIds(data.map(m => m.id)),
+        fetchCommentCounts(data.map(m => m.id)),
+      ]);
       setDiscoveredIds(ids);
+      setCommentCounts(counts);
     }
   }, [userId]);
 
@@ -136,63 +138,30 @@ export default function UserProfileScreen({ navigation, route }: Props) {
     setFollowLoading(false);
   };
 
-  const renderCell = ({ item }: { item: Message }) => {
-    const isDiscovered = discoveredIds.has(item.id);
+  const handleCellPress = useCallback((message: Message) => {
+    navigation.navigate('MessageFeed', { userId, initialMessageId: message.id });
+  }, [navigation, userId]);
 
-    if (!isDiscovered) {
-      return (
-        <TouchableOpacity
-          style={[styles.cell, styles.cellUndiscovered]}
-          onPress={() => {
-            const loc = item.location;
-            if (loc && typeof loc === 'object' && 'latitude' in loc) {
-              navigation.navigate('Main', {
-                screen: 'Map',
-                params: { focusLocation: { latitude: loc.latitude, longitude: loc.longitude } },
-              });
-            }
-          }}
-        >
-          {item.content_type === 'photo' && item.media_url && (
-            <Image source={{ uri: item.media_url }} style={styles.cellImageBlurred} blurRadius={150} />
-          )}
-          {item.content_type === 'audio' && (
-            <Ionicons name="mic" size={32} color="rgba(107,114,128,0.3)" />
-          )}
-          {item.content_type === 'text' && item.text_content && (
-            <Text style={styles.cellTextBlurred} numberOfLines={4}>
-              {'••••••••••••\n••••••••\n••••••••••'}
-            </Text>
-          )}
-          <View style={styles.lockOverlay}>
-            <Ionicons name="eye-off" size={40} color="rgba(190,170,255,0.2)" />
-          </View>
-        </TouchableOpacity>
-      );
+  const handleUndiscoveredPress = useCallback((message: Message) => {
+    const loc = message.location;
+    if (loc && typeof loc === 'object' && 'latitude' in loc) {
+      navigation.navigate('Main', {
+        screen: 'Map',
+        params: { focusLocation: { latitude: loc.latitude, longitude: loc.longitude } },
+      });
     }
+  }, [navigation]);
 
-    if (item.content_type === 'photo') {
-      return (
-        <TouchableOpacity style={styles.cell} onPress={() => setViewingMessage(item)}>
-          <Image source={{ uri: item.media_url }} style={styles.cellImage} />
-        </TouchableOpacity>
-      );
-    }
-    if (item.content_type === 'audio') {
-      return (
-        <View style={[styles.cell, styles.cellPlaceholder]}>
-          <Ionicons name="mic" size={32} color={colors.text.tertiary} />
-        </View>
-      );
-    }
-    return (
-      <TouchableOpacity style={[styles.cell, styles.cellPlaceholder]} onPress={() => setViewingMessage(item)}>
-        <Text style={styles.cellText} numberOfLines={4}>
-          {item.text_content}
-        </Text>
-      </TouchableOpacity>
-    );
-  };
+  const renderCell = ({ item, index }: { item: Message; index: number }) => (
+    <GridCell
+      item={item}
+      index={index}
+      onPress={handleCellPress}
+      commentCount={commentCounts[item.id]}
+      discovered={discoveredIds.has(item.id)}
+      onUndiscoveredPress={handleUndiscoveredPress}
+    />
+  );
 
   const renderEmpty = () => {
     if (loading) return null;
@@ -281,23 +250,11 @@ export default function UserProfileScreen({ navigation, route }: Props) {
         </View>
       </View>
 
-      {/* Stats Row */}
-      <View style={styles.statsRow}>
-        <View style={styles.statCard}>
-          <Ionicons name="images" size={18} color={colors.primary.cyan} />
-          <Text style={styles.statNumber}>{messages.length}</Text>
-        </View>
-
-        <View style={styles.statCard}>
-          <Ionicons name="people" size={18} color={colors.primary.cyan} />
-          <Text style={styles.statNumber}>{followerCount}</Text>
-        </View>
-
-        <View style={styles.statCard}>
-          <Ionicons name="location" size={18} color={colors.primary.cyan} />
-          <Text style={styles.statNumber}>{messages.length}</Text>
-        </View>
-      </View>
+      <ProfileStatsRow
+        messagesCount={messages.length}
+        followerCount={followerCount}
+        locationsCount={messages.length}
+      />
 
       <View style={styles.divider} />
     </>
@@ -382,46 +339,6 @@ export default function UserProfileScreen({ navigation, route }: Props) {
         </TouchableOpacity>
       </Modal>
 
-      <Modal
-        visible={!!viewingMessage}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setViewingMessage(null)}
-      >
-        <View style={styles.photoViewerOverlay}>
-          {viewingMessage?.content_type === 'photo' && viewingMessage?.media_url && (
-            <Image
-              source={{ uri: viewingMessage.media_url }}
-              style={styles.photoViewerImage}
-              resizeMode="contain"
-            />
-          )}
-          {viewingMessage?.content_type === 'text' && (
-            <View style={styles.textViewerContainer}>
-              <Text style={styles.textViewerContent}>{viewingMessage.text_content}</Text>
-            </View>
-          )}
-          <TouchableOpacity style={styles.photoViewerClose} onPress={() => setViewingMessage(null)}>
-            <Ionicons name="close" size={28} color={colors.text.primary} />
-          </TouchableOpacity>
-          {viewingMessage?.location && (
-            <TouchableOpacity
-              style={styles.photoViewerLocationButton}
-              onPress={() => {
-                const loc = viewingMessage.location;
-                setViewingMessage(null);
-                navigation.navigate('Main', {
-                  screen: 'Map',
-                  params: { focusLocation: loc },
-                });
-              }}
-            >
-              <Ionicons name="location" size={20} color={colors.text.primary} />
-              <Text style={styles.photoViewerLocationText}>Voir sur la carte</Text>
-            </TouchableOpacity>
-          )}
-        </View>
-      </Modal>
     </View>
   );
 }
@@ -498,29 +415,6 @@ const styles = StyleSheet.create({
   followButtonTextActive: {
     color: colors.primary.violet,
   },
-  statsRow: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: spacing.md,
-    marginTop: spacing.lg,
-    paddingHorizontal: spacing.lg,
-  },
-  statCard: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.sm,
-    gap: 6,
-    backgroundColor: colors.surface.glass,
-    borderRadius: radius.lg,
-  },
-  statNumber: {
-    fontSize: typography.sizes.lg,
-    fontWeight: '700',
-    color: colors.text.primary,
-  },
   divider: {
     height: 1,
     backgroundColor: colors.border.default,
@@ -535,49 +429,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     marginBottom: spacing.sm,
   },
-  cell: {
-    width: CELL_SIZE,
-    height: CELL_SIZE,
-    borderWidth: 0.5,
-    borderColor: colors.border.default,
-  },
-  cellImage: {
-    width: '100%',
-    height: '100%',
-  },
-  cellImageBlurred: {
-    ...StyleSheet.absoluteFillObject,
-    width: '100%',
-    height: '100%',
-  },
-  cellUndiscovered: {
-    backgroundColor: colors.surface.elevated,
-    justifyContent: 'center',
-    alignItems: 'center',
-    overflow: 'hidden',
-  },
-  lockOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.4)',
-  },
-  cellPlaceholder: {
-    backgroundColor: colors.surface.elevated,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 8,
-  },
-  cellText: {
-    color: colors.text.secondary,
-    fontSize: 12,
-    textAlign: 'center',
-  },
-  cellTextBlurred: {
-    color: 'rgba(107,114,128,0.3)',
-    fontSize: 12,
-    textAlign: 'center',
-  },
   emptyContainer: {
     alignItems: 'center',
     paddingTop: 48,
@@ -586,43 +437,6 @@ const styles = StyleSheet.create({
   emptyText: {
     color: colors.text.tertiary,
     fontSize: 14,
-  },
-  photoViewerOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.95)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  photoViewerImage: {
-    width: '100%',
-    height: '100%',
-  },
-  photoViewerClose: {
-    position: 'absolute',
-    top: 50,
-    right: 20,
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  photoViewerLocationButton: {
-    position: 'absolute',
-    bottom: 60,
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(124,92,252,0.85)',
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderRadius: 24,
-    gap: 8,
-  },
-  photoViewerLocationText: {
-    color: colors.text.primary,
-    fontSize: 15,
-    fontWeight: '600',
   },
   nameRow: {
     flexDirection: 'row',
@@ -699,17 +513,5 @@ const styles = StyleSheet.create({
     height: 1,
     backgroundColor: colors.border.default,
     marginVertical: spacing.sm,
-  },
-  textViewerContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: spacing.xxl,
-  },
-  textViewerContent: {
-    fontSize: typography.sizes.xl,
-    color: colors.text.primary,
-    textAlign: 'center',
-    lineHeight: 32,
   },
 });

@@ -68,25 +68,31 @@ export default function MessageContentDisplay({ message, variant, renderAfterMed
 
   if (message.content_type === 'audio' && message.media_url) {
     return (
-      <View style={styles.audioContainer}>
-        <TouchableOpacity style={styles.audioButton} onPress={handleAudioToggle}>
-          <Ionicons
-            name={playing ? 'pause' : 'play'}
-            size={28}
-            color={colors.primary.violet}
-          />
-        </TouchableOpacity>
-        <Text style={styles.audioLabel}>Message audio</Text>
+      <View>
+        <View style={styles.audioContainer}>
+          <TouchableOpacity style={styles.audioButton} onPress={handleAudioToggle}>
+            <Ionicons
+              name={playing ? 'pause' : 'play'}
+              size={28}
+              color={colors.primary.violet}
+            />
+          </TouchableOpacity>
+          <Text style={styles.audioLabel}>Message audio</Text>
+        </View>
+        {renderAfterMedia?.()}
       </View>
     );
   }
 
   // Text content
   return (
-    <View style={variant === 'feed' ? styles.textContainerFeed : styles.textContainerFullscreen}>
-      <Text style={variant === 'feed' ? styles.textContentFeed : styles.textContentFullscreen}>
-        {message.text_content}
-      </Text>
+    <View>
+      <View style={variant === 'feed' ? styles.textContainerFeed : styles.textContainerFullscreen}>
+        <Text style={variant === 'feed' ? styles.textContentFeed : styles.textContentFullscreen}>
+          {message.text_content}
+        </Text>
+      </View>
+      {renderAfterMedia?.()}
     </View>
   );
 }

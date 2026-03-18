@@ -228,16 +228,6 @@ export default function UserProfileScreen({ navigation, route }: Props) {
             </Text>
           </View>
           <View style={styles.profileActions}>
-            <TouchableOpacity
-              style={styles.messageButton}
-              onPress={() => navigation.navigate('Conversation', {
-                otherUserId: userId,
-                otherUserName: userProfile?.display_name || 'Utilisateur',
-                otherUserAvatarUrl: userProfile?.avatar_url,
-              })}
-            >
-              <Ionicons name="chatbubble-outline" size={18} color={colors.primary.violet} />
-            </TouchableOpacity>
             {following && (
               <TouchableOpacity onPress={() => setShowNotifModal(true)} style={styles.bellButton}>
                 <Ionicons
@@ -642,15 +632,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  messageButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    borderWidth: 1,
-    borderColor: colors.primary.violet,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
+
   notifModalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.6)',

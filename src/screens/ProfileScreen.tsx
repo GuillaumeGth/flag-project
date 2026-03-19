@@ -11,7 +11,6 @@ import {
   FlatList,
   RefreshControl,
   Animated,
-  Image,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -25,11 +24,13 @@ import { colors, shadows, radius, spacing, typography } from '@/theme-redesign';
 import { fetchMyPublicMessages } from '@/services/messages';
 import { fetchFollowerCount } from '@/services/subscriptions';
 import { fetchReceivedRequestsCount } from '@/services/followRequests';
+import { fetchCommentCounts } from '@/services/comments';
 import { Message, MainTabParamList, RootStackParamList } from '@/types';
 import GlassCard from '@/components/redesign/GlassCard';
 import PremiumButton from '@/components/redesign/PremiumButton';
 import PremiumAvatar from '@/components/redesign/PremiumAvatar';
 import GridCell from '@/components/profile/GridCell';
+import ProfileStatsRow from '@/components/profile/ProfileStatsRow';
 
 type ProfileNavigationProp = CompositeNavigationProp<
   BottomTabNavigationProp<MainTabParamList, 'Profile'>,
@@ -50,9 +51,9 @@ export default function ProfileScreen({ navigation }: Props) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [followerCount, setFollowerCount] = useState(0);
   const [pendingRequestsCount, setPendingRequestsCount] = useState(0);
+  const [commentCounts, setCommentCounts] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [viewingMessage, setViewingMessage] = useState<Message | null>(null);
 
   const [fadeAnim] = useState(new Animated.Value(0));
   const [slideAnim] = useState(new Animated.Value(30));
@@ -67,6 +68,10 @@ export default function ProfileScreen({ navigation }: Props) {
   const loadMessages = useCallback(async () => {
     const data = await fetchMyPublicMessages();
     setMessages(data);
+    if (data.length > 0) {
+      const counts = await fetchCommentCounts(data.map(m => m.id));
+      setCommentCounts(counts);
+    }
   }, []);
 
   const loadFollowerCount = useCallback(async () => {
@@ -114,8 +119,18 @@ export default function ProfileScreen({ navigation }: Props) {
     setEditNameVisible(false);
   };
 
+  const handleCellPress = useCallback((message: Message) => {
+    if (!user?.id) return;
+    navigation.navigate('MessageFeed', { userId: user.id, initialMessageId: message.id });
+  }, [navigation, user?.id]);
+
   const renderCell = ({ item, index }: { item: Message; index: number }) => (
-    <GridCell item={item} index={index} onPress={setViewingMessage} />
+    <GridCell
+      item={item}
+      index={index}
+      onPress={handleCellPress}
+      commentCount={commentCounts[item.id]}
+    />
   );
 
   const renderEmpty = () => {
@@ -182,20 +197,11 @@ export default function ProfileScreen({ navigation }: Props) {
         </View>
       </View>
 
-      <View style={styles.statsRow}>
-        <View style={styles.statCard}>
-          <Ionicons name="images" size={18} color={colors.primary.cyan} />
-          <Text style={styles.statNumber}>{messages.length}</Text>
-        </View>
-        <View style={styles.statCard}>
-          <Ionicons name="people" size={18} color={colors.primary.cyan} />
-          <Text style={styles.statNumber}>{followerCount}</Text>
-        </View>
-        <View style={styles.statCard}>
-          <Ionicons name="location" size={18} color={colors.primary.cyan} />
-          <Text style={styles.statNumber}>24</Text>
-        </View>
-      </View>
+      <ProfileStatsRow
+        messagesCount={messages.length}
+        followerCount={followerCount}
+        locationsCount={messages.length}
+      />
 
       <View style={styles.divider} />
     </Animated.View>
@@ -247,40 +253,6 @@ export default function ProfileScreen({ navigation }: Props) {
         </KeyboardAvoidingView>
       </Modal>
 
-      <Modal visible={!!viewingMessage} transparent animationType="fade" onRequestClose={() => setViewingMessage(null)}>
-        <View style={styles.photoViewerOverlay}>
-          {viewingMessage?.content_type === 'photo' && viewingMessage?.media_url && (
-            <Image source={{ uri: viewingMessage.media_url }} style={styles.photoViewerImage} resizeMode="contain" />
-          )}
-          {viewingMessage?.content_type === 'text' && (
-            <View style={styles.textViewerContainer}>
-              <Text style={styles.textViewerContent}>{viewingMessage.text_content}</Text>
-            </View>
-          )}
-          <TouchableOpacity
-            style={[styles.photoViewerClose, { top: 60 + insets.top }]}
-            onPress={() => setViewingMessage(null)}
-          >
-            <View style={styles.photoViewerCloseInner}>
-              <Ionicons name="close" size={28} color={colors.text.primary} />
-            </View>
-          </TouchableOpacity>
-          {viewingMessage?.location && (
-            <PremiumButton
-              title="Voir sur la carte"
-              variant="gradient"
-              icon="location"
-              onPress={() => {
-                const id = viewingMessage.id;
-                setViewingMessage(null);
-                navigation.navigate('Map', { messageId: id, mine: true });
-              }}
-              style={[styles.photoViewerLocationButton, { bottom: 60 + insets.bottom }]}
-              withGlow
-            />
-          )}
-        </View>
-      </Modal>
     </View>
   );
 }
@@ -295,7 +267,7 @@ const styles = StyleSheet.create({
   },
   headerContainer: {
     paddingTop: 60,
-    paddingBottom: 24,
+    paddingBottom: 8,
     position: 'relative',
   },
   headerGradient: {
@@ -380,35 +352,12 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.sm,
     color: colors.text.secondary,
   },
-  statsRow: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: spacing.md,
-    marginTop: spacing.xl,
-    paddingHorizontal: spacing.lg,
-  },
-  statCard: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.sm,
-    gap: 6,
-    backgroundColor: colors.surface.glass,
-    borderRadius: radius.lg,
-  },
-  statNumber: {
-    fontSize: typography.sizes.lg,
-    fontWeight: '700',
-    color: colors.text.primary,
-  },
   divider: {
     height: 1,
     backgroundColor: colors.border.default,
     marginHorizontal: spacing.xl,
-    marginTop: spacing.xl,
-    marginBottom: spacing.lg,
+    marginTop: spacing.md,
+    marginBottom: spacing.sm,
   },
   gridRow: {
     gap: 2,
@@ -480,46 +429,5 @@ const styles = StyleSheet.create({
   },
   modalButton: {
     flex: 1,
-  },
-  photoViewerOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.95)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  photoViewerImage: {
-    width: '100%',
-    height: '100%',
-  },
-  photoViewerClose: {
-    position: 'absolute',
-    top: 60,
-    right: 20,
-  },
-  photoViewerCloseInner: {
-    width: 48,
-    height: 48,
-    borderRadius: radius.full,
-    backgroundColor: colors.surface.glass,
-    justifyContent: 'center',
-    alignItems: 'center',
-    ...shadows.medium,
-  },
-  photoViewerLocationButton: {
-    position: 'absolute',
-    bottom: 60,
-    paddingHorizontal: spacing.xl,
-  },
-  textViewerContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: spacing.xxl,
-  },
-  textViewerContent: {
-    fontSize: typography.sizes.xl,
-    color: colors.text.primary,
-    textAlign: 'center',
-    lineHeight: 32,
   },
 });

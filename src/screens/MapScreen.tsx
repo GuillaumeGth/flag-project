@@ -1002,16 +1002,12 @@ const styles = StyleSheet.create({
     top: -200,
     left: -200,
   },
-  // Wrapper circulaire : élimine les coins transparents qui deviennent blancs
-  // dans le renderer natif de la map (GMSMarker/MKAnnotationView).
-  // Le badge (top:2, right:2, 26x26) — excentré haut-droite, centre du badge ≈ 25px du centre du cercle.
   captureAvatarWrapper: {
     width: 70,
     height: 70,
     justifyContent: 'center',
     alignItems: 'center',
-    borderRadius: 35,
-    overflow: 'hidden',
+    backgroundColor: 'transparent',
   },
   captureAvatar: {
     width: 56,

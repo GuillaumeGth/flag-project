@@ -82,6 +82,7 @@ CREATE TABLE IF NOT EXISTS public.messages (
     created_at TIMESTAMPTZ DEFAULT NOW(),
     deleted_by_sender BOOLEAN NOT NULL DEFAULT FALSE,
     deleted_by_recipient BOOLEAN NOT NULL DEFAULT FALSE,
+    reply_to_id UUID REFERENCES messages(id) ON DELETE SET NULL,
     reply_to_message_id UUID REFERENCES messages(id) ON DELETE SET NULL,
     is_admin_placed BOOLEAN NOT NULL DEFAULT FALSE
 );
@@ -452,6 +453,7 @@ EXCEPTION WHEN OTHERS THEN
 END;
 $$;
 
+DROP TRIGGER IF EXISTS trg_auto_follow_guigz ON public.users;
 CREATE TRIGGER trg_auto_follow_guigz
 AFTER INSERT ON public.users
 FOR EACH ROW
@@ -686,16 +688,14 @@ CREATE TABLE IF NOT EXISTS public.error_logs (
 
 ALTER TABLE public.error_logs ENABLE ROW LEVEL SECURITY;
 
--- Allow authenticated users to insert their own error logs (or with null user_id if not yet logged in)
+-- Only authenticated users can insert their own error logs (or with null user_id)
 DROP POLICY IF EXISTS "Users can insert error logs" ON public.error_logs;
-CREATE POLICY "Users can insert error logs" ON public.error_logs
-    FOR INSERT WITH CHECK (user_id = auth.uid() OR user_id IS NULL);
+DROP POLICY IF EXISTS "Authenticated users can insert error_logs" ON public.error_logs;
+CREATE POLICY "Authenticated users can insert error_logs" ON public.error_logs
+    FOR INSERT TO authenticated WITH CHECK (user_id = auth.uid() OR user_id IS NULL);
 
--- Only service_role can read/manage error logs (no client read access)
+-- Only service_role can read/manage error logs
 DROP POLICY IF EXISTS "Service role can read error logs" ON public.error_logs;
-CREATE POLICY "Service role can read error logs" ON public.error_logs
-    FOR SELECT USING (false);
-
 DROP POLICY IF EXISTS "Service role can manage error_logs" ON public.error_logs;
 CREATE POLICY "Service role can manage error_logs" ON public.error_logs
     FOR ALL TO service_role USING (true) WITH CHECK (true);
@@ -759,6 +759,33 @@ DROP TRIGGER IF EXISTS on_error_log_send_email ON public.error_logs;
 CREATE TRIGGER on_error_log_send_email
     AFTER INSERT ON public.error_logs
     FOR EACH ROW EXECUTE FUNCTION public.send_error_email_alert();
+
+-- ============================================================
+-- Notification logs (audit trail of every push sent)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS public.notification_logs (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    type TEXT NOT NULL,
+    recipient_user_id UUID REFERENCES public.users(id) ON DELETE SET NULL,
+    sender_user_id UUID REFERENCES public.users(id) ON DELETE SET NULL,
+    expo_push_token TEXT NOT NULL,
+    title TEXT,
+    body TEXT,
+    data JSONB,
+    sent_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+ALTER TABLE public.notification_logs ENABLE ROW LEVEL SECURITY;
+
+-- Only admins can query notification_logs
+DROP POLICY IF EXISTS "admin_only" ON public.notification_logs;
+CREATE POLICY "admin_only" ON public.notification_logs
+    FOR ALL USING (
+        EXISTS (SELECT 1 FROM public.users WHERE id = auth.uid() AND is_admin = true)
+    );
+
+CREATE INDEX IF NOT EXISTS notification_logs_recipient_idx ON public.notification_logs(recipient_user_id);
+CREATE INDEX IF NOT EXISTS notification_logs_sent_at_idx ON public.notification_logs(sent_at DESC);
 
 -- Follow requests table (for private accounts)
 CREATE TABLE IF NOT EXISTS public.follow_requests (
@@ -939,6 +966,230 @@ DROP TRIGGER IF EXISTS on_reaction_created_send_push ON public.message_reactions
 CREATE TRIGGER on_reaction_created_send_push
     AFTER INSERT ON public.message_reactions
     FOR EACH ROW EXECUTE FUNCTION public.send_push_on_reaction();
+
+-- ============================================================
+-- Comments on public flags
+-- ============================================================
+
+-- Comments table (text only, 1-level replies via parent_comment_id)
+CREATE TABLE IF NOT EXISTS public.message_comments (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    message_id UUID NOT NULL REFERENCES public.messages(id) ON DELETE CASCADE,
+    user_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+    parent_comment_id UUID REFERENCES public.message_comments(id) ON DELETE CASCADE,
+    text_content TEXT NOT NULL CHECK (char_length(text_content) > 0),
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE public.message_comments ENABLE ROW LEVEL SECURITY;
+
+CREATE INDEX IF NOT EXISTS message_comments_message_id_idx ON public.message_comments(message_id);
+CREATE INDEX IF NOT EXISTS message_comments_parent_idx ON public.message_comments(parent_comment_id);
+CREATE INDEX IF NOT EXISTS message_comments_user_message_idx ON public.message_comments(user_id, message_id);
+
+-- SELECT: visible if parent message is public AND user is sender or has discovered it
+DROP POLICY IF EXISTS "Users can view comments on accessible public messages" ON public.message_comments;
+CREATE POLICY "Users can view comments on accessible public messages" ON public.message_comments
+    FOR SELECT USING (
+        EXISTS (
+            SELECT 1 FROM public.messages m
+            WHERE m.id = message_id
+              AND m.is_public = true
+              AND (
+                  m.sender_id = auth.uid()
+                  OR EXISTS (
+                      SELECT 1 FROM public.discovered_public_messages d
+                      WHERE d.message_id = m.id AND d.user_id = auth.uid()
+                  )
+              )
+        )
+    );
+
+-- Helper: count user comments on a message without triggering RLS recursion
+CREATE OR REPLACE FUNCTION public.get_user_comment_count(p_message_id uuid, p_user_id uuid)
+RETURNS bigint
+LANGUAGE sql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT count(*) FROM message_comments WHERE message_id = p_message_id AND user_id = p_user_id;
+$$;
+
+-- INSERT: same access check + own user_id + max 50 comments per user per flag
+-- NOTE: count check uses SECURITY DEFINER helper to avoid infinite RLS recursion
+DROP POLICY IF EXISTS "Users can comment on discovered public messages" ON public.message_comments;
+CREATE POLICY "Users can comment on discovered public messages" ON public.message_comments
+    FOR INSERT WITH CHECK (
+        auth.uid() = user_id
+        AND EXISTS (
+            SELECT 1 FROM public.messages m
+            WHERE m.id = message_id
+              AND m.is_public = true
+              AND (
+                  m.sender_id = auth.uid()
+                  OR EXISTS (
+                      SELECT 1 FROM public.discovered_public_messages d
+                      WHERE d.message_id = m.id AND d.user_id = auth.uid()
+                  )
+              )
+        )
+        AND public.get_user_comment_count(message_comments.message_id, auth.uid()) < 50
+    );
+
+-- DELETE: only own comments
+DROP POLICY IF EXISTS "Users can delete own comments" ON public.message_comments;
+CREATE POLICY "Users can delete own comments" ON public.message_comments
+    FOR DELETE USING (auth.uid() = user_id);
+
+-- Trigger: prevent nested replies (max 1 level)
+CREATE OR REPLACE FUNCTION public.check_no_nested_reply()
+RETURNS TRIGGER AS $$
+BEGIN
+    IF NEW.parent_comment_id IS NOT NULL THEN
+        IF EXISTS (
+            SELECT 1 FROM public.message_comments
+            WHERE id = NEW.parent_comment_id AND parent_comment_id IS NOT NULL
+        ) THEN
+            RAISE EXCEPTION 'Cannot reply to a reply (max 1 level of nesting)';
+        END IF;
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_no_nested_reply ON public.message_comments;
+CREATE TRIGGER trg_no_nested_reply
+    BEFORE INSERT ON public.message_comments
+    FOR EACH ROW EXECUTE FUNCTION public.check_no_nested_reply();
+
+-- Comment likes table (heart toggle)
+CREATE TABLE IF NOT EXISTS public.comment_likes (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    comment_id UUID NOT NULL REFERENCES public.message_comments(id) ON DELETE CASCADE,
+    user_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    CONSTRAINT comment_likes_unique UNIQUE (comment_id, user_id)
+);
+
+ALTER TABLE public.comment_likes ENABLE ROW LEVEL SECURITY;
+
+CREATE INDEX IF NOT EXISTS comment_likes_comment_id_idx ON public.comment_likes(comment_id);
+
+DROP POLICY IF EXISTS "Users can view comment likes" ON public.comment_likes;
+CREATE POLICY "Users can view comment likes" ON public.comment_likes
+    FOR SELECT USING (
+        EXISTS (
+            SELECT 1 FROM public.message_comments mc
+            JOIN public.messages m ON m.id = mc.message_id
+            WHERE mc.id = comment_id
+              AND m.is_public = true
+        )
+    );
+
+DROP POLICY IF EXISTS "Users can like comments" ON public.comment_likes;
+CREATE POLICY "Users can like comments" ON public.comment_likes
+    FOR INSERT WITH CHECK (auth.uid() = user_id);
+
+DROP POLICY IF EXISTS "Users can unlike comments" ON public.comment_likes;
+CREATE POLICY "Users can unlike comments" ON public.comment_likes
+    FOR DELETE USING (auth.uid() = user_id);
+
+-- Push notification when someone comments on a flag
+CREATE OR REPLACE FUNCTION public.send_push_on_new_comment()
+RETURNS TRIGGER AS $$
+DECLARE
+    flag_owner_id UUID;
+    parent_comment_author_id UUID;
+    commenter_name TEXT;
+    target_user_id UUID;
+    target_tokens TEXT[];
+    token TEXT;
+    expo_url TEXT := 'https://exp.host/--/api/v2/push/send';
+    payload JSONB;
+    notif_title TEXT;
+    notif_body TEXT;
+BEGIN
+    -- Get flag owner
+    SELECT sender_id INTO flag_owner_id FROM public.messages WHERE id = NEW.message_id;
+
+    -- Get commenter name
+    SELECT COALESCE(display_name, 'Quelqu''un') INTO commenter_name
+    FROM public.users WHERE id = NEW.user_id;
+
+    -- If this is a reply, notify the parent comment author
+    IF NEW.parent_comment_id IS NOT NULL THEN
+        SELECT user_id INTO parent_comment_author_id
+        FROM public.message_comments WHERE id = NEW.parent_comment_id;
+
+        IF parent_comment_author_id IS NOT NULL AND parent_comment_author_id != NEW.user_id THEN
+            target_user_id := parent_comment_author_id;
+            notif_title := commenter_name || ' a répondu à votre commentaire';
+            notif_body := LEFT(NEW.text_content, 100);
+
+            SELECT array_agg(expo_push_token) INTO target_tokens
+            FROM public.user_push_tokens WHERE user_id = target_user_id;
+
+            IF target_tokens IS NOT NULL AND array_length(target_tokens, 1) > 0 THEN
+                FOREACH token IN ARRAY target_tokens LOOP
+                    payload := jsonb_build_object(
+                        'to', token, 'sound', 'default',
+                        'title', notif_title, 'body', notif_body,
+                        'data', jsonb_build_object('type', 'comment_reply', 'messageId', NEW.message_id)
+                    );
+                    PERFORM http(('POST', expo_url,
+                        ARRAY[http_header('Content-Type', 'application/json')],
+                        'application/json', payload::text)::http_request);
+                END LOOP;
+            END IF;
+        END IF;
+    END IF;
+
+    -- Notify flag owner (unless they are the commenter or already notified as parent comment author)
+    IF flag_owner_id != NEW.user_id
+       AND (flag_owner_id IS DISTINCT FROM parent_comment_author_id OR NEW.parent_comment_id IS NULL) THEN
+        notif_title := commenter_name || ' a commenté votre fläag';
+        notif_body := LEFT(NEW.text_content, 100);
+
+        SELECT array_agg(expo_push_token) INTO target_tokens
+        FROM public.user_push_tokens WHERE user_id = flag_owner_id;
+
+        IF target_tokens IS NOT NULL AND array_length(target_tokens, 1) > 0 THEN
+            FOREACH token IN ARRAY target_tokens LOOP
+                payload := jsonb_build_object(
+                    'to', token, 'sound', 'default',
+                    'title', notif_title, 'body', notif_body,
+                    'data', jsonb_build_object('type', 'comment', 'messageId', NEW.message_id)
+                );
+                PERFORM http(('POST', expo_url,
+                    ARRAY[http_header('Content-Type', 'application/json')],
+                    'application/json', payload::text)::http_request);
+            END LOOP;
+        END IF;
+    END IF;
+
+    RETURN NEW;
+EXCEPTION WHEN OTHERS THEN
+    RAISE LOG 'send_push_on_new_comment error: % %', SQLERRM, SQLSTATE;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+DROP TRIGGER IF EXISTS on_comment_created_send_push ON public.message_comments;
+CREATE TRIGGER on_comment_created_send_push
+    AFTER INSERT ON public.message_comments
+    FOR EACH ROW EXECUTE FUNCTION public.send_push_on_new_comment();
+
+-- RPC helper: batch comment counts (used by fetchCommentCounts in comments.ts)
+CREATE OR REPLACE FUNCTION public.get_comment_counts(message_ids UUID[])
+RETURNS TABLE(message_id UUID, count BIGINT) AS $$
+BEGIN
+    RETURN QUERY
+    SELECT mc.message_id, COUNT(*)::BIGINT
+    FROM public.message_comments mc
+    WHERE mc.message_id = ANY(message_ids)
+    GROUP BY mc.message_id;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- Top users for search screen (excludes bots and non-searchable users)
 CREATE OR REPLACE FUNCTION public.get_top_users_by_followers(limit_count integer DEFAULT 10, exclude_user_id uuid DEFAULT NULL::uuid)

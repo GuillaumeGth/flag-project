@@ -150,7 +150,7 @@ export default function ConversationScreen({ navigation, route }: Props) {
   const handleSend = async ({ text, mediaUri, contentType }: { text: string; mediaUri: string | null; contentType: MessageContentType }) => {
     const hasText = !!text.trim();
     const hasMedia = !!mediaUri;
-    if ((!hasText && !hasMedia) || sending) return;
+    if ((!hasText && !hasMedia) || sending || isBot) return;
 
     setSending(true);
     try {

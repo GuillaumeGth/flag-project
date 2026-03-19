@@ -548,7 +548,7 @@ export async function fetchMyPublicMessages(): Promise<Message[]> {
   }));
 }
 
-// Fetch public messages for a specific user (for UserProfileScreen)
+// Fetch all public messages for a specific user (discovered ones shown clearly, others blurred in UI)
 export async function fetchUserPublicMessages(userId: string): Promise<Message[]> {
   log('messages', 'fetchUserPublicMessages: userId =', userId);
 

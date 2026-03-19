@@ -36,6 +36,7 @@ import SettingsScreen from '@/screens/SettingsScreen';
 import PrivacyScreen from '@/screens/PrivacyScreen';
 import FollowRequestsScreen from '@/screens/FollowRequestsScreen';
 import UserProfileScreen from '@/screens/UserProfileScreen';
+import MessageFeedScreen from '@/screens/MessageFeedScreen';
 import SearchUsersScreen from '@/screens/SearchUsersScreen';
 
 // Register background task
@@ -168,6 +169,11 @@ function AppNavigator() {
           <Stack.Screen
             name="UserProfile"
             component={UserProfileScreen}
+            options={{ presentation: 'card' }}
+          />
+          <Stack.Screen
+            name="MessageFeed"
+            component={MessageFeedScreen}
             options={{ presentation: 'card' }}
           />
         </>

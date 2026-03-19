@@ -35,7 +35,7 @@ jest.mock('react-native/Libraries/Utilities/Platform', () => ({
 }));
 
 jest.mock('@/services/supabase', () => ({
-  supabase: { from: jest.fn() },
+  supabase: { from: jest.fn(), rpc: jest.fn() },
 }));
 
 jest.mock('@/services/errorReporting', () => ({
@@ -57,6 +57,7 @@ import {
 
 const mockNotifications = Notifications as jest.Mocked<typeof Notifications>;
 const mockFrom = supabase.from as jest.Mock;
+const mockRpc = supabase.rpc as jest.Mock;
 const mockReportError = reportError as jest.Mock;
 
 function makeUpsertChain(result: { error: unknown }) {
@@ -286,6 +287,7 @@ describe('registerPushToken', () => {
 
     const chain = makeUpsertChain({ error: null });
     mockFrom.mockReturnValue(chain);
+    mockRpc.mockResolvedValue({ error: null });
 
     const result = await registerPushToken('user-1');
     expect(result).toBe(true);
@@ -296,6 +298,78 @@ describe('registerPushToken', () => {
       }),
       expect.anything()
     );
+  });
+
+  it('includes last_used_at in the upsert payload', async () => {
+    mockNotifications.getPermissionsAsync.mockResolvedValue({
+      status: 'granted',
+      granted: true,
+      canAskAgain: true,
+      expires: 'never',
+    } as any);
+    mockNotifications.getExpoPushTokenAsync.mockResolvedValue({
+      data: 'ExponentPushToken[abc]',
+      type: 'expo',
+    } as any);
+
+    const chain = makeUpsertChain({ error: null });
+    mockFrom.mockReturnValue(chain);
+    mockRpc.mockResolvedValue({ error: null });
+
+    await registerPushToken('user-1');
+
+    expect(chain.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        last_used_at: expect.any(String),
+      }),
+      expect.anything()
+    );
+  });
+
+  it('fires cleanup_stale_push_tokens RPC after successful upsert', async () => {
+    mockNotifications.getPermissionsAsync.mockResolvedValue({
+      status: 'granted',
+      granted: true,
+      canAskAgain: true,
+      expires: 'never',
+    } as any);
+    mockNotifications.getExpoPushTokenAsync.mockResolvedValue({
+      data: 'ExponentPushToken[abc]',
+      type: 'expo',
+    } as any);
+
+    const chain = makeUpsertChain({ error: null });
+    mockFrom.mockReturnValue(chain);
+    mockRpc.mockResolvedValue({ error: null });
+
+    await registerPushToken('user-1');
+    // Flush microtask queue so the fire-and-forget Promise settles
+    await Promise.resolve();
+
+    expect(mockRpc).toHaveBeenCalledWith('cleanup_stale_push_tokens');
+  });
+
+  it('still returns true even if cleanup RPC rejects', async () => {
+    mockNotifications.getPermissionsAsync.mockResolvedValue({
+      status: 'granted',
+      granted: true,
+      canAskAgain: true,
+      expires: 'never',
+    } as any);
+    mockNotifications.getExpoPushTokenAsync.mockResolvedValue({
+      data: 'ExponentPushToken[abc]',
+      type: 'expo',
+    } as any);
+
+    const chain = makeUpsertChain({ error: null });
+    mockFrom.mockReturnValue(chain);
+    // The rejection is swallowed by .catch(() => {}) — must not affect result
+    mockRpc.mockRejectedValue(new Error('RPC network error'));
+
+    const result = await registerPushToken('user-1');
+    await Promise.resolve();
+
+    expect(result).toBe(true);
   });
 });
 

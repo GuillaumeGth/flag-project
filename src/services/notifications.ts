@@ -85,7 +85,7 @@ export async function registerPushToken(userId: string): Promise<boolean> {
       return false;
     }
 
-    // Upsert token in database
+    // Upsert token in database and refresh last_used_at
     const { error } = await supabase
       .from('user_push_tokens')
       .upsert(
@@ -93,6 +93,7 @@ export async function registerPushToken(userId: string): Promise<boolean> {
           user_id: userId,
           expo_push_token: token,
           device_name: Platform.OS,
+          last_used_at: new Date().toISOString(),
         },
         {
           onConflict: 'user_id,expo_push_token',
@@ -104,6 +105,10 @@ export async function registerPushToken(userId: string): Promise<boolean> {
       reportError(error, 'notifications.registerPushToken');
       return false;
     }
+
+    // Clean up tokens from this user that haven't been used in 30+ days
+    // Fire-and-forget: a cleanup failure must not break the registration
+    void Promise.resolve(supabase.rpc('cleanup_stale_push_tokens')).catch(() => {});
 
     return true;
   } catch (error) {

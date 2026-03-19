@@ -62,6 +62,13 @@ export default function GridCell({
     }).start();
   }, [index]);
 
+  const discoveryBadge = typeof item.discovery_count === 'number' && item.discovery_count > 0 ? (
+    <View style={styles.discoveryBadge}>
+      <Ionicons name="eye" size={10} color="#fff" />
+      <Text style={styles.discoveryCount}>{item.discovery_count > 99 ? '99+' : item.discovery_count}</Text>
+    </View>
+  ) : null;
+
   // Undiscovered state
   if (!discovered) {
     return (
@@ -100,6 +107,7 @@ export default function GridCell({
           <Image source={{ uri: item.media_url }} style={styles.cellImage} />
           <LinearGradient colors={CELL_GRADIENT_COLORS} style={styles.cellOverlay} />
           {badge}
+          {discoveryBadge}
         </TouchableOpacity>
       </Animated.View>
     );
@@ -113,6 +121,7 @@ export default function GridCell({
             <Ionicons name="mic" size={32} color={colors.primary.cyan} />
           </View>
           {badge}
+          {discoveryBadge}
         </TouchableOpacity>
       </Animated.View>
     );
@@ -125,6 +134,7 @@ export default function GridCell({
           {item.text_content}
         </Text>
         {badge}
+        {discoveryBadge}
       </TouchableOpacity>
     </Animated.View>
   );
@@ -205,5 +215,22 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '700',
     color: colors.text.primary,
+  },
+  discoveryBadge: {
+    position: 'absolute',
+    bottom: 6,
+    left: 6,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: radius.sm,
+  },
+  discoveryCount: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#fff',
   },
 });

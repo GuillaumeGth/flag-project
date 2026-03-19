@@ -531,7 +531,7 @@ export async function fetchMyPublicMessages(): Promise<Message[]> {
 
   const { data, error } = await supabase
     .from('messages')
-    .select('*')
+    .select('*, discovered_public_messages(count)')
     .eq('sender_id', currentUserId)
     .eq('is_public', true)
     .order('created_at', { ascending: false });
@@ -541,7 +541,11 @@ export async function fetchMyPublicMessages(): Promise<Message[]> {
     return [];
   }
 
-  return data || [];
+  return (data || []).map((msg: any) => ({
+    ...msg,
+    discovery_count: msg.discovered_public_messages?.[0]?.count ?? 0,
+    discovered_public_messages: undefined,
+  }));
 }
 
 // Fetch all public messages for a specific user (discovered ones shown clearly, others blurred in UI)
@@ -550,7 +554,7 @@ export async function fetchUserPublicMessages(userId: string): Promise<Message[]
 
   const { data, error } = await supabase
     .from('messages')
-    .select('*')
+    .select('*, discovered_public_messages(count)')
     .eq('sender_id', userId)
     .eq('is_public', true)
     .order('created_at', { ascending: false });
@@ -562,7 +566,11 @@ export async function fetchUserPublicMessages(userId: string): Promise<Message[]
     return [];
   }
 
-  return data || [];
+  return (data || []).map((msg: any) => ({
+    ...msg,
+    discovery_count: msg.discovered_public_messages?.[0]?.count ?? 0,
+    discovered_public_messages: undefined,
+  }));
 }
 
 // Fetch public messages from all followed users (for map display)

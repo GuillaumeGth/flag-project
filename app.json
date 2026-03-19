@@ -63,7 +63,7 @@
         "android.permission.CAMERA",
         "android.permission.RECORD_AUDIO"
       ],
-      "versionCode": 47
+      "versionCode": 58
     },
     "plugins": [
       [

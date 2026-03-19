@@ -56,7 +56,20 @@ export async function reportError(
     error instanceof Error
       ? error.message
       : typeof error === 'object' && error !== null
-        ? JSON.stringify(error)
+        ? (() => {
+            try {
+              const s = JSON.stringify(error);
+              return s === '{}' ? String(error) : s;
+            } catch {
+              // Circular refs or non-serializable — extract known fields (e.g. PostgrestError)
+              const e = error as Record<string, unknown>;
+              const extracted: Record<string, unknown> = {};
+              for (const key of ['message', 'code', 'details', 'hint', 'status']) {
+                if (key in e) extracted[key] = e[key];
+              }
+              return Object.keys(extracted).length ? JSON.stringify(extracted) : String(error);
+            }
+          })()
         : String(error);
   const errorStack =
     error instanceof Error ? error.stack ?? null : null;

@@ -668,13 +668,13 @@ describe('fetchUserPublicMessages', () => {
     const result = await fetchUserPublicMessages(OTHER_USER);
 
     expect(mockFrom).toHaveBeenCalledWith('messages');
-    // Must use simple select — no inner join on discovered_public_messages
-    expect(chain.select).toHaveBeenCalledWith('*');
+    // Uses join to fetch discovery count
+    expect(chain.select).toHaveBeenCalledWith('*, discovered_public_messages(count)');
     expect(chain.eq).toHaveBeenCalledWith('sender_id', OTHER_USER);
     expect(chain.eq).toHaveBeenCalledWith('is_public', true);
     // Must NOT filter by discovered_public_messages.user_id
     expect(chain.eq).not.toHaveBeenCalledWith(
-      expect.stringContaining('discovered_public_messages'),
+      expect.stringContaining('discovered_public_messages.user_id'),
       expect.anything()
     );
     expect(result).toHaveLength(2);
@@ -742,13 +742,13 @@ describe('fetchMyPublicMessages', () => {
     const result = await fetchMyPublicMessages();
 
     expect(mockFrom).toHaveBeenCalledWith('messages');
-    // Must NOT use inner join on discovered_public_messages
-    expect(chain.select).toHaveBeenCalledWith('*');
+    // Uses join to fetch discovery count
+    expect(chain.select).toHaveBeenCalledWith('*, discovered_public_messages(count)');
     expect(chain.eq).toHaveBeenCalledWith('sender_id', CURRENT_USER);
     expect(chain.eq).toHaveBeenCalledWith('is_public', true);
     // Must NOT filter by discovered_public_messages.user_id
     expect(chain.eq).not.toHaveBeenCalledWith(
-      expect.stringContaining('discovered_public_messages'),
+      expect.stringContaining('discovered_public_messages.user_id'),
       expect.anything()
     );
     expect(result).toHaveLength(2);

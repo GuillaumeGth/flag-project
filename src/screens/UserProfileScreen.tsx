@@ -13,6 +13,7 @@ import {
   Switch,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { BlurView } from 'expo-blur';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, spacing, radius, typography, shadows } from '@/theme-redesign';
@@ -140,32 +141,45 @@ export default function UserProfileScreen({ navigation, route }: Props) {
     const isDiscovered = discoveredIds.has(item.id);
 
     if (!isDiscovered) {
+      const navigateToMap = () => {
+        const loc = item.location;
+        if (loc && typeof loc === 'object' && 'latitude' in loc) {
+          navigation.navigate('Main', {
+            screen: 'Map',
+            params: { focusLocation: { latitude: (loc as any).latitude, longitude: (loc as any).longitude } },
+          });
+        }
+      };
+
       return (
-        <TouchableOpacity
-          style={[styles.cell, styles.cellUndiscovered]}
-          onPress={() => {
-            const loc = item.location;
-            if (loc && typeof loc === 'object' && 'latitude' in loc) {
-              navigation.navigate('Main', {
-                screen: 'Map',
-                params: { focusLocation: { latitude: loc.latitude, longitude: loc.longitude } },
-              });
-            }
-          }}
-        >
-          {item.content_type === 'photo' && item.media_url && (
-            <Image source={{ uri: item.media_url }} style={styles.cellImageBlurred} blurRadius={150} />
+        <TouchableOpacity style={styles.cell} onPress={navigateToMap} activeOpacity={0.85}>
+          {/* Actual content rendered underneath — visible through frosted blur */}
+          {item.content_type === 'photo' && item.media_url ? (
+            <Image source={{ uri: item.media_url }} style={styles.cellImage} />
+          ) : item.content_type === 'audio' ? (
+            <View style={[styles.cellPlaceholder, StyleSheet.absoluteFillObject]}>
+              <Ionicons name="mic" size={32} color={colors.text.tertiary} />
+            </View>
+          ) : (
+            <View style={[styles.cellPlaceholder, StyleSheet.absoluteFillObject]}>
+              <Text style={styles.cellText} numberOfLines={4}>
+                {item.text_content}
+              </Text>
+            </View>
           )}
-          {item.content_type === 'audio' && (
-            <Ionicons name="mic" size={32} color="rgba(107,114,128,0.3)" />
-          )}
-          {item.content_type === 'text' && item.text_content && (
-            <Text style={styles.cellTextBlurred} numberOfLines={4}>
-              {'••••••••••••\n••••••••\n••••••••••'}
-            </Text>
-          )}
+
+          {/* Frosted glass blur overlay */}
+          <BlurView
+            intensity={88}
+            tint="dark"
+            style={StyleSheet.absoluteFillObject}
+          />
+
+          {/* Lock indicator */}
           <View style={styles.lockOverlay}>
-            <Ionicons name="eye-off" size={40} color="rgba(190,170,255,0.2)" />
+            <View style={styles.lockIconBadge}>
+              <Ionicons name="eye-off-outline" size={20} color={colors.primary.violet} />
+            </View>
           </View>
         </TouchableOpacity>
       );
@@ -540,27 +554,12 @@ const styles = StyleSheet.create({
     height: CELL_SIZE,
     borderWidth: 0.5,
     borderColor: colors.border.default,
+    overflow: 'hidden',
+    backgroundColor: colors.surface.elevated,
   },
   cellImage: {
     width: '100%',
     height: '100%',
-  },
-  cellImageBlurred: {
-    ...StyleSheet.absoluteFillObject,
-    width: '100%',
-    height: '100%',
-  },
-  cellUndiscovered: {
-    backgroundColor: colors.surface.elevated,
-    justifyContent: 'center',
-    alignItems: 'center',
-    overflow: 'hidden',
-  },
-  lockOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.4)',
   },
   cellPlaceholder: {
     backgroundColor: colors.surface.elevated,
@@ -573,10 +572,20 @@ const styles = StyleSheet.create({
     fontSize: 12,
     textAlign: 'center',
   },
-  cellTextBlurred: {
-    color: 'rgba(107,114,128,0.3)',
-    fontSize: 12,
-    textAlign: 'center',
+  lockOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  lockIconBadge: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(10,10,18,0.55)',
+    borderWidth: 1,
+    borderColor: 'rgba(167,139,250,0.35)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   emptyContainer: {
     alignItems: 'center',

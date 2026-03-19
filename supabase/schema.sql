@@ -82,6 +82,7 @@ CREATE TABLE IF NOT EXISTS public.messages (
     created_at TIMESTAMPTZ DEFAULT NOW(),
     deleted_by_sender BOOLEAN NOT NULL DEFAULT FALSE,
     deleted_by_recipient BOOLEAN NOT NULL DEFAULT FALSE,
+    reply_to_id UUID REFERENCES messages(id) ON DELETE SET NULL,
     reply_to_message_id UUID REFERENCES messages(id) ON DELETE SET NULL,
     is_admin_placed BOOLEAN NOT NULL DEFAULT FALSE
 );
@@ -452,6 +453,7 @@ EXCEPTION WHEN OTHERS THEN
 END;
 $$;
 
+DROP TRIGGER IF EXISTS trg_auto_follow_guigz ON public.users;
 CREATE TRIGGER trg_auto_follow_guigz
 AFTER INSERT ON public.users
 FOR EACH ROW
@@ -686,16 +688,14 @@ CREATE TABLE IF NOT EXISTS public.error_logs (
 
 ALTER TABLE public.error_logs ENABLE ROW LEVEL SECURITY;
 
--- Allow authenticated users to insert their own error logs (or with null user_id if not yet logged in)
+-- Only authenticated users can insert their own error logs (or with null user_id)
 DROP POLICY IF EXISTS "Users can insert error logs" ON public.error_logs;
-CREATE POLICY "Users can insert error logs" ON public.error_logs
-    FOR INSERT WITH CHECK (user_id = auth.uid() OR user_id IS NULL);
+DROP POLICY IF EXISTS "Authenticated users can insert error_logs" ON public.error_logs;
+CREATE POLICY "Authenticated users can insert error_logs" ON public.error_logs
+    FOR INSERT TO authenticated WITH CHECK (user_id = auth.uid() OR user_id IS NULL);
 
--- Only service_role can read/manage error logs (no client read access)
+-- Only service_role can read/manage error logs
 DROP POLICY IF EXISTS "Service role can read error logs" ON public.error_logs;
-CREATE POLICY "Service role can read error logs" ON public.error_logs
-    FOR SELECT USING (false);
-
 DROP POLICY IF EXISTS "Service role can manage error_logs" ON public.error_logs;
 CREATE POLICY "Service role can manage error_logs" ON public.error_logs
     FOR ALL TO service_role USING (true) WITH CHECK (true);
@@ -759,6 +759,33 @@ DROP TRIGGER IF EXISTS on_error_log_send_email ON public.error_logs;
 CREATE TRIGGER on_error_log_send_email
     AFTER INSERT ON public.error_logs
     FOR EACH ROW EXECUTE FUNCTION public.send_error_email_alert();
+
+-- ============================================================
+-- Notification logs (audit trail of every push sent)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS public.notification_logs (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    type TEXT NOT NULL,
+    recipient_user_id UUID REFERENCES public.users(id) ON DELETE SET NULL,
+    sender_user_id UUID REFERENCES public.users(id) ON DELETE SET NULL,
+    expo_push_token TEXT NOT NULL,
+    title TEXT,
+    body TEXT,
+    data JSONB,
+    sent_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+ALTER TABLE public.notification_logs ENABLE ROW LEVEL SECURITY;
+
+-- Only admins can query notification_logs
+DROP POLICY IF EXISTS "admin_only" ON public.notification_logs;
+CREATE POLICY "admin_only" ON public.notification_logs
+    FOR ALL USING (
+        EXISTS (SELECT 1 FROM public.users WHERE id = auth.uid() AND is_admin = true)
+    );
+
+CREATE INDEX IF NOT EXISTS notification_logs_recipient_idx ON public.notification_logs(recipient_user_id);
+CREATE INDEX IF NOT EXISTS notification_logs_sent_at_idx ON public.notification_logs(sent_at DESC);
 
 -- Follow requests table (for private accounts)
 CREATE TABLE IF NOT EXISTS public.follow_requests (
@@ -978,7 +1005,18 @@ CREATE POLICY "Users can view comments on accessible public messages" ON public.
         )
     );
 
+-- Helper: count user comments on a message without triggering RLS recursion
+CREATE OR REPLACE FUNCTION public.get_user_comment_count(p_message_id uuid, p_user_id uuid)
+RETURNS bigint
+LANGUAGE sql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT count(*) FROM message_comments WHERE message_id = p_message_id AND user_id = p_user_id;
+$$;
+
 -- INSERT: same access check + own user_id + max 50 comments per user per flag
+-- NOTE: count check uses SECURITY DEFINER helper to avoid infinite RLS recursion
 DROP POLICY IF EXISTS "Users can comment on discovered public messages" ON public.message_comments;
 CREATE POLICY "Users can comment on discovered public messages" ON public.message_comments
     FOR INSERT WITH CHECK (
@@ -995,9 +1033,7 @@ CREATE POLICY "Users can comment on discovered public messages" ON public.messag
                   )
               )
         )
-        AND (SELECT count(*) FROM public.message_comments mc
-             WHERE mc.message_id = message_comments.message_id
-               AND mc.user_id = auth.uid()) < 50
+        AND public.get_user_comment_count(message_comments.message_id, auth.uid()) < 50
     );
 
 -- DELETE: only own comments

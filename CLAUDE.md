@@ -30,7 +30,26 @@ src/
 
 supabase/
 └── schema.sql       # Schéma complet avec PostGIS, triggers, RLS
+
+docs/
+├── spec/            # Specs techniques numérotées + features produit
+│   └── 00-index.md  # Index de toute la documentation
+└── screens/         # Specs détaillées par écran (un écran = un fichier)
+
+ROADMAP_IDEAS.md     # Idées d'évolution produit (racine, document stratégique)
 ```
+
+## Organisation de la documentation
+
+> **Règle** : toute documentation doit aller dans `docs/`. Jamais de fichiers `.md` de spec à la racine ni dans des dossiers ad hoc.
+
+| Dossier | Quand l'utiliser |
+|---------|-----------------|
+| `docs/spec/` | Specs techniques (couches système) et features produit. Fichiers techniques numérotés `NN-nom.md`, features en `kebab-case.md`. |
+| `docs/screens/` | Spécification détaillée d'un écran ou groupe d'écrans liés (flux, règles métier, composants). Un fichier par écran/groupe, nommé `kebab-case.md`. |
+| `ROADMAP_IDEAS.md` | Idées d'évolution produit long terme — reste à la racine car c'est un document stratégique, pas une spec. |
+
+Mettre à jour `docs/spec/00-index.md` quand un nouveau fichier de doc est créé.
 
 ## Écrans principaux
 
@@ -83,6 +102,9 @@ Points importants :
 - Mise à jour optimiste côté client puis sync Supabase via `toggleReaction`
 - Pattern `generationRef` dans `ConversationScreen` : `reactionsMapRef` garde la dernière valeur de `reactionsMap` accessible dans les callbacks stables (`useCallback` avec deps `[user]` seulement)
 - Table `message_reactions` avec contrainte UNIQUE `(message_id, user_id, emoji)` — RLS basée sur la visibilité du message parent
+
+### Découverte de messages publics (mosaïque & feed)
+→ Voir `docs/screens/profile.md` — règles de floutage, services, composants impliqués.
 
 ### Cache
 - Toutes les fetches supportent le sync incrémental via timestamp

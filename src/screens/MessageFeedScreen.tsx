@@ -15,7 +15,7 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, spacing, typography } from '@/theme-redesign';
 import { supabase } from '@/services/supabase';
-import { fetchUserPublicMessages, fetchMyPublicMessages } from '@/services/messages';
+import { fetchUserPublicMessages, fetchMyPublicMessages, fetchDiscoveredPublicMessageIds } from '@/services/messages';
 import { useAuth } from '@/contexts/AuthContext';
 import { Message, User, RootStackParamList } from '@/types';
 import MessageFeedItem from '@/components/comments/MessageFeedItem';
@@ -30,6 +30,7 @@ export default function MessageFeedScreen({ navigation, route }: Props) {
   const focusedIndexRef = useRef<number>(-1);
 
   const [messages, setMessages] = useState<Message[]>([]);
+  const [discoveredIds, setDiscoveredIds] = useState<Set<string>>(new Set());
   const [userProfile, setUserProfile] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [scrolledToInitial, setScrolledToInitial] = useState(false);
@@ -46,6 +47,10 @@ export default function MessageFeedScreen({ navigation, route }: Props) {
       ]);
       setMessages(msgs);
       if (profile) setUserProfile(profile);
+      if (!isOwnProfile && msgs.length > 0) {
+        const ids = await fetchDiscoveredPublicMessageIds(msgs.map(m => m.id));
+        setDiscoveredIds(ids);
+      }
       setLoading(false);
     }
     load();
@@ -80,15 +85,25 @@ export default function MessageFeedScreen({ navigation, route }: Props) {
     }
   }, [navigation, userId]);
 
+  const handleMapPress = useCallback((message: Message) => {
+    const { latitude, longitude } = message.location;
+    navigation.navigate('Main', {
+      screen: 'Map',
+      params: { focusLocation: { latitude, longitude } },
+    });
+  }, [navigation]);
+
   const renderItem = useCallback(({ item, index }: { item: Message; index: number }) => (
     <MessageFeedItem
       message={item}
       senderName={userProfile?.display_name ?? undefined}
       senderAvatarUrl={userProfile?.avatar_url}
+      isDiscovered={isOwnProfile ? undefined : discoveredIds.has(item.id)}
       onUserPress={handleUserPress}
       onInputFocus={() => { focusedIndexRef.current = index; }}
+      onMapPress={() => handleMapPress(item)}
     />
-  ), [userProfile, handleUserPress]);
+  ), [userProfile, discoveredIds, isOwnProfile, handleUserPress, handleMapPress]);
 
   return (
     <KeyboardAvoidingView

@@ -657,16 +657,10 @@ describe('fetchUserPublicMessages', () => {
   const OTHER_USER = 'other-user-uuid';
   const CURRENT_USER = 'user-current';
 
-  it('returns empty array if no current user', async () => {
-    mockGetCachedUserId.mockReturnValue(null);
-    const result = await fetchUserPublicMessages(OTHER_USER);
-    expect(result).toEqual([]);
-    expect(mockFrom).not.toHaveBeenCalled();
-  });
-
-  it('uses inner join on discovered_public_messages', async () => {
+  it('returns all public messages without filtering by discovery status', async () => {
     const messages = [
-      { id: 'msg-1', sender_id: OTHER_USER, is_public: true, text_content: 'Hello', discovered_public_messages: [{ user_id: CURRENT_USER }] },
+      { id: 'msg-1', sender_id: OTHER_USER, is_public: true, text_content: 'Hello' },
+      { id: 'msg-2', sender_id: OTHER_USER, is_public: true, text_content: 'World' },
     ];
     const chain = makeChain({ data: messages, error: null });
     mockFrom.mockReturnValue(chain);
@@ -674,12 +668,32 @@ describe('fetchUserPublicMessages', () => {
     const result = await fetchUserPublicMessages(OTHER_USER);
 
     expect(mockFrom).toHaveBeenCalledWith('messages');
-    expect(chain.select).toHaveBeenCalledWith('*, discovered_public_messages!inner(user_id)');
+    // Must use simple select — no inner join on discovered_public_messages
+    expect(chain.select).toHaveBeenCalledWith('*');
     expect(chain.eq).toHaveBeenCalledWith('sender_id', OTHER_USER);
     expect(chain.eq).toHaveBeenCalledWith('is_public', true);
-    expect(chain.eq).toHaveBeenCalledWith('discovered_public_messages.user_id', CURRENT_USER);
-    expect(result).toHaveLength(1);
-    expect(result[0].id).toBe('msg-1');
+    // Must NOT filter by discovered_public_messages.user_id
+    expect(chain.eq).not.toHaveBeenCalledWith(
+      expect.stringContaining('discovered_public_messages'),
+      expect.anything()
+    );
+    expect(result).toHaveLength(2);
+  });
+
+  it('returns all messages regardless of whether current user has discovered them', async () => {
+    // Both a discovered and an undiscovered message should be returned
+    const messages = [
+      { id: 'discovered-msg', sender_id: OTHER_USER, is_public: true },
+      { id: 'undiscovered-msg', sender_id: OTHER_USER, is_public: true },
+    ];
+    const chain = makeChain({ data: messages, error: null });
+    mockFrom.mockReturnValue(chain);
+
+    const result = await fetchUserPublicMessages(OTHER_USER);
+
+    expect(result).toHaveLength(2);
+    expect(result.map(m => m.id)).toContain('discovered-msg');
+    expect(result.map(m => m.id)).toContain('undiscovered-msg');
   });
 
   it('returns empty array and reports error on Supabase failure', async () => {
@@ -696,7 +710,7 @@ describe('fetchUserPublicMessages', () => {
     );
   });
 
-  it('returns empty array when no messages are discovered', async () => {
+  it('returns empty array when user has no public messages', async () => {
     const chain = makeChain({ data: [], error: null });
     mockFrom.mockReturnValue(chain);
 

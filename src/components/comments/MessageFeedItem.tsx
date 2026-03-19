@@ -1,6 +1,7 @@
 import React, { useState, useCallback, useRef } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { BlurView } from 'expo-blur';
 import { Message } from '@/types';
 import { CommentWithUser, CommentWithReplies } from '@/types/comments';
 import { colors, spacing, radius, typography } from '@/theme-redesign';
@@ -22,16 +23,21 @@ interface MessageFeedItemProps {
   message: Message;
   senderName?: string;
   senderAvatarUrl?: string | null;
+  /** undefined = own profile (always clear). false = not discovered (blurred). true = discovered (clear). */
+  isDiscovered?: boolean;
   onUserPress?: (userId: string) => void;
   onInputFocus?: () => void;
+  onMapPress?: () => void;
 }
 
 export default function MessageFeedItem({
   message,
   senderName,
   senderAvatarUrl,
+  isDiscovered,
   onUserPress,
   onInputFocus,
+  onMapPress,
 }: MessageFeedItemProps) {
   const { user } = useAuth();
   const [comments, setComments] = useState<CommentWithReplies[]>([]);
@@ -136,6 +142,50 @@ export default function MessageFeedItem({
 
   const commentCount = comments.reduce((acc, c) => acc + 1 + c.replies.length, 0);
 
+  // isDiscovered === false → message not yet physically discovered → show blurred preview
+  if (isDiscovered === false) {
+    return (
+      <View style={styles.container}>
+        <TouchableOpacity
+          style={styles.header}
+          onPress={() => onUserPress?.(message.sender_id)}
+          activeOpacity={0.7}
+        >
+          <PremiumAvatar
+            uri={senderAvatarUrl ?? undefined}
+            name={senderName}
+            size="small"
+            withRing
+            ringColor="gradient"
+          />
+          <View>
+            <Text style={styles.senderName}>{senderName || 'Utilisateur'}</Text>
+            <Text style={styles.date}>
+              {new Date(message.created_at).toLocaleDateString('fr-FR', {
+                day: 'numeric',
+                month: 'long',
+              })}
+            </Text>
+          </View>
+        </TouchableOpacity>
+
+        <TouchableOpacity style={styles.undiscoveredCard} onPress={onMapPress} activeOpacity={0.8}>
+          {message.content_type === 'photo' && message.media_url ? (
+            <Image source={{ uri: message.media_url }} style={styles.undiscoveredImage} blurRadius={40} />
+          ) : null}
+          <BlurView intensity={60} tint="dark" style={StyleSheet.absoluteFill} />
+          <View style={styles.undiscoveredContent}>
+            <Ionicons name="eye-off-outline" size={32} color="rgba(190,170,255,0.7)" />
+            <Text style={styles.undiscoveredTitle}>Fläag non découvert</Text>
+            <Text style={styles.undiscoveredHint}>Approche-toi pour le lire</Text>
+          </View>
+        </TouchableOpacity>
+
+        <View style={styles.separator} />
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
       {/* Flag header */}
@@ -179,6 +229,9 @@ export default function MessageFeedItem({
                   {likeCount}
                 </Text>
               )}
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.actionItem} onPress={onMapPress} activeOpacity={0.7}>
+              <Ionicons name="location-outline" size={20} color={colors.text.secondary} />
             </TouchableOpacity>
           </View>
         )}
@@ -252,5 +305,33 @@ const styles = StyleSheet.create({
   separator: {
     height: 8,
     backgroundColor: colors.background.secondary,
+  },
+  undiscoveredCard: {
+    marginHorizontal: spacing.lg,
+    marginBottom: spacing.md,
+    height: 120,
+    borderRadius: 16,
+    overflow: 'hidden',
+    backgroundColor: colors.surface.elevated,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  undiscoveredImage: {
+    ...StyleSheet.absoluteFillObject,
+    width: '100%',
+    height: '100%',
+  },
+  undiscoveredContent: {
+    alignItems: 'center',
+    gap: 6,
+  },
+  undiscoveredTitle: {
+    fontSize: typography.sizes.sm,
+    fontWeight: '700',
+    color: colors.text.primary,
+  },
+  undiscoveredHint: {
+    fontSize: typography.sizes.xs,
+    color: colors.text.secondary,
   },
 });

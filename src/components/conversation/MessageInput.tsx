@@ -178,7 +178,7 @@ export default function MessageInput({
 
             <TextInput
               style={styles.textInput}
-              placeholder="Message..."
+              placeholder="Ce message n'est pas géolocalisé..."
               placeholderTextColor={colors.text.tertiary}
               value={inputText}
               onChangeText={setInputText}

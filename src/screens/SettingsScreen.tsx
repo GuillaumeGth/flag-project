@@ -7,7 +7,7 @@ import {
   Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import Constants from 'expo-constants';
+import * as Application from 'expo-application';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '@/contexts/AuthContext';
@@ -73,7 +73,7 @@ export default function SettingsScreen({ navigation }: Props) {
       </TouchableOpacity>
 
       <Text style={[styles.version, { paddingBottom: Math.max(insets.bottom, 16) }]}>
-        Fläag v{Constants.expoConfig?.version ?? '—'}
+        Fläag v{Application.nativeApplicationVersion ?? '—'}
       </Text>
     </View>
   );

@@ -267,7 +267,10 @@ export default function CreateMessageScreen({ navigation, route }: Props) {
           <TouchableOpacity onPress={() => navigation.goBack()}>
             <Ionicons name="arrow-back" size={24} color={colors.text.primary} />
           </TouchableOpacity>
-          <Text style={styles.title}>Nouveau flag</Text>
+          <View style={styles.titleRow}>
+            <Ionicons name="location" size={18} color={colors.primary.cyan} />
+            <Text style={styles.title}>Nouveau Fläag</Text>
+          </View>
           <View style={{ width: 24 }} />
         </View>
 
@@ -338,7 +341,7 @@ export default function CreateMessageScreen({ navigation, route }: Props) {
         {/* Text input */}
         <TextInput
           style={styles.textInput}
-          placeholder="Votre message..."
+          placeholder="Ce message sera lié à votre position actuelle..."
           placeholderTextColor={colors.text.tertiary}
           multiline
           value={textContent}
@@ -413,6 +416,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     marginBottom: spacing.xxl,
+  },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
   },
   title: {
     fontSize: typography.sizes.lg,

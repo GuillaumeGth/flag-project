@@ -49,6 +49,7 @@ export interface Message {
   reply_to_message_id?: string | null;
   reply_to?: MessageReply | null;
   is_admin_placed?: boolean;
+  discovery_count?: number;
 }
 
 // Message with sender info for display
@@ -107,6 +108,8 @@ export interface Conversation {
     created_at: string;
     is_read: boolean;
     is_from_me: boolean;
+    deleted_by_sender?: boolean;
+    deleted_by_recipient?: boolean;
   };
   unreadCount: number;
 }
@@ -126,6 +129,7 @@ export interface AuthState {
 
 export * from './navigation';
 export * from './reactions';
+export * from './comments';
 
 // Location state
 export interface LocationState {

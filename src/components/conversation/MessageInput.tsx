@@ -20,6 +20,7 @@ import { reportError } from '@/services/errorReporting';
 interface MessageInputProps {
   sending: boolean;
   canSendMessages: boolean;
+  isBot?: boolean;
   paddingBottom: number;
   replyTo?: MessageWithUsers | null;
   onCancelReply?: () => void;
@@ -35,6 +36,7 @@ interface MessageInputProps {
 export default function MessageInput({
   sending,
   canSendMessages,
+  isBot = false,
   paddingBottom,
   replyTo,
   onCancelReply,
@@ -124,6 +126,8 @@ export default function MessageInput({
     }
     setIsPlayingInputAudio(false);
   };
+
+  if (isBot) return null;
 
   return (
     <View style={[styles.inputContainer, { paddingBottom: spacing.lg + paddingBottom }]}>

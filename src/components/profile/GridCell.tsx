@@ -81,7 +81,7 @@ export default function GridCell({
         >
           {/* Actual content rendered underneath — visible through frosted blur */}
           {item.content_type === 'photo' && item.media_url ? (
-            <Image source={{ uri: item.media_url }} style={styles.cellImageBlurred} />
+            <Image source={{ uri: item.media_url }} style={styles.cellImageBlurred} blurRadius={50} />
           ) : item.content_type === 'audio' ? (
             <View style={[styles.cellPlaceholder, StyleSheet.absoluteFillObject]}>
               <Ionicons name="mic" size={32} color={colors.text.tertiary} />
@@ -96,7 +96,7 @@ export default function GridCell({
 
           {/* Frosted glass blur overlay */}
           <BlurView
-            intensity={88}
+            intensity={100}
             tint="dark"
             style={StyleSheet.absoluteFillObject}
           />

@@ -1,7 +1,8 @@
 import React, { useState, useRef } from 'react';
-import { View, TextInput, TouchableOpacity, Text, StyleSheet } from 'react-native';
+import { View, TouchableOpacity, Text, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing, radius, typography } from '@/theme-redesign';
+import GlassInput from '@/components/redesign/GlassInput';
 
 interface CommentInputProps {
   onSubmit: (text: string) => void;
@@ -12,7 +13,7 @@ interface CommentInputProps {
 
 export default function CommentInput({ onSubmit, replyingTo, onCancelReply, onFocus }: CommentInputProps) {
   const [text, setText] = useState('');
-  const inputRef = useRef<TextInput>(null);
+  const inputRef = useRef<React.ElementRef<typeof GlassInput>>(null);
 
   const handleSend = () => {
     const trimmed = text.trim();
@@ -34,13 +35,12 @@ export default function CommentInput({ onSubmit, replyingTo, onCancelReply, onFo
         </View>
       )}
       <View style={styles.container}>
-        <TextInput
+        <GlassInput
           ref={inputRef}
           style={styles.input}
           value={text}
           onChangeText={setText}
           placeholder="Écrire un commentaire..."
-          placeholderTextColor={colors.text.tertiary}
           multiline
           maxLength={2000}
           onFocus={onFocus}
@@ -87,14 +87,10 @@ const styles = StyleSheet.create({
   input: {
     flex: 1,
     fontSize: typography.sizes.sm,
-    color: colors.text.primary,
     maxHeight: 80,
     paddingVertical: spacing.sm,
     paddingHorizontal: spacing.md,
-    backgroundColor: colors.surface.glass,
     borderRadius: radius.xl,
-    borderWidth: 1,
-    borderColor: colors.border.default,
   },
   sendButton: {
     width: 36,

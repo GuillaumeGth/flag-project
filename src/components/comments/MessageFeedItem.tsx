@@ -171,9 +171,9 @@ export default function MessageFeedItem({
 
         <TouchableOpacity style={styles.undiscoveredCard} onPress={onMapPress} activeOpacity={0.8}>
           {message.content_type === 'photo' && message.media_url ? (
-            <Image source={{ uri: message.media_url }} style={styles.undiscoveredImage} blurRadius={40} />
+            <Image source={{ uri: message.media_url }} style={styles.undiscoveredImage} blurRadius={50} />
           ) : null}
-          <BlurView intensity={60} tint="dark" style={StyleSheet.absoluteFill} />
+          <BlurView intensity={100} tint="dark" style={StyleSheet.absoluteFill} />
           <View style={styles.undiscoveredContent}>
             <Ionicons name="eye-off-outline" size={32} color="rgba(190,170,255,0.7)" />
             <Text style={styles.undiscoveredTitle}>Fläag non découvert</Text>

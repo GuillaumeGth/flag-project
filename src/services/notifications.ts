@@ -55,6 +55,9 @@ export async function notifyNearbyMessage(
       body: `${senderName} vous a laissé un message ici`,
       data: { messageId },
       sound: true,
+      ...(Platform.OS === 'android' && {
+        icon: 'ic_notification',
+      }),
     },
     trigger: null, // Immediate
   });

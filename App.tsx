@@ -34,6 +34,7 @@ import ReadMessageScreen from '@/screens/ReadMessageScreen';
 import SelectRecipientScreen from '@/screens/SelectRecipientScreen';
 import ConversationScreen from '@/screens/ConversationScreen';
 import SettingsScreen from '@/screens/SettingsScreen';
+import ContactScreen from '@/screens/ContactScreen';
 import PrivacyScreen from '@/screens/PrivacyScreen';
 import FollowRequestsScreen from '@/screens/FollowRequestsScreen';
 import UserProfileScreen from '@/screens/UserProfileScreen';
@@ -142,7 +143,8 @@ function AppNavigator() {
     );
   }
 
-  if (!hasSeenOnboarding) {
+  const isGuigz = user.display_name === 'guigz';
+  if (isGuigz && !hasSeenOnboarding) {
     log('AppNavigator', 'showing OnboardingScreen');
     return <OnboardingScreen onComplete={handleOnboardingComplete} />;
   }
@@ -179,6 +181,11 @@ function AppNavigator() {
       <Stack.Screen
         name="Settings"
         component={SettingsScreen}
+        options={{ presentation: 'card' }}
+      />
+      <Stack.Screen
+        name="Contact"
+        component={ContactScreen}
         options={{ presentation: 'card' }}
       />
       <Stack.Screen

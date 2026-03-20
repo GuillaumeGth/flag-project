@@ -60,9 +60,9 @@ export default function SettingsScreen({ navigation }: Props) {
           <Ionicons name="chevron-forward" size={20} color={colors.text.tertiary} />
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.menuItem}>
-          <Ionicons name="help-circle-outline" size={24} color={colors.text.primary} />
-          <Text style={styles.menuText}>Aide</Text>
+        <TouchableOpacity style={styles.menuItem} onPress={() => navigation.navigate('Contact')}>
+          <Ionicons name="mail-outline" size={24} color={colors.text.primary} />
+          <Text style={styles.menuText}>Nous contacter</Text>
           <Ionicons name="chevron-forward" size={20} color={colors.text.tertiary} />
         </TouchableOpacity>
       </View>

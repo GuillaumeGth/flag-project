@@ -5,7 +5,6 @@ import {
   TouchableOpacity,
   StyleSheet,
   Modal,
-  TextInput,
   KeyboardAvoidingView,
   Platform,
   FlatList,
@@ -27,6 +26,7 @@ import { fetchReceivedRequestsCount } from '@/services/followRequests';
 import { fetchCommentCounts } from '@/services/comments';
 import { Message, MainTabParamList, RootStackParamList } from '@/types';
 import GlassCard from '@/components/redesign/GlassCard';
+import GlassInput from '@/components/redesign/GlassInput';
 import PremiumButton from '@/components/redesign/PremiumButton';
 import PremiumAvatar from '@/components/redesign/PremiumAvatar';
 import GridCell from '@/components/profile/GridCell';
@@ -235,12 +235,12 @@ export default function ProfileScreen({ navigation }: Props) {
           <GlassCard style={styles.modalCard} withBorder withGlow glowColor="cyan">
             <Text style={styles.modalTitle}>Modifier le nom</Text>
             <View style={styles.inputContainer}>
-              <TextInput
+              <GlassInput
                 style={styles.modalInput}
                 value={newName}
                 onChangeText={setNewName}
                 placeholder="Votre nom"
-                placeholderTextColor={colors.text.tertiary}
+                borderVariant="accent"
                 autoFocus
                 maxLength={50}
               />
@@ -415,13 +415,8 @@ const styles = StyleSheet.create({
     marginBottom: spacing.xl,
   },
   modalInput: {
-    borderWidth: 1,
-    borderColor: colors.border.accent,
-    borderRadius: radius.md,
-    padding: spacing.lg,
-    fontSize: typography.sizes.md,
     backgroundColor: colors.surface.glassDark,
-    color: colors.text.primary,
+    padding: spacing.lg,
   },
   modalButtons: {
     flexDirection: 'row',

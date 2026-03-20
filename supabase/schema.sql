@@ -1229,12 +1229,24 @@ STABLE SECURITY DEFINER
 AS $$
   SELECT u.*
   FROM public.users u
-  LEFT JOIN public.subscriptions s ON s.following_id = u.id
+  LEFT JOIN public.subscriptions followers ON followers.following_id = u.id
+  LEFT JOIN public.subscriptions following ON following.follower_id = u.id
+  LEFT JOIN public.messages m ON m.sender_id = u.id AND m.is_public = true
   WHERE (exclude_user_id IS NULL OR u.id != exclude_user_id)
     AND u.is_searchable = true
     AND u.is_bot = false
   GROUP BY u.id
-  ORDER BY COUNT(s.follower_id) DESC
+  -- Must have at least 1 public message OR a follower/following ratio > 50
+  HAVING COUNT(DISTINCT m.id) > 0
+      OR (COUNT(DISTINCT followers.follower_id) > 0
+          AND COUNT(DISTINCT followers.follower_id)::float / GREATEST(COUNT(DISTINCT following.following_id), 1) > 50)
+  ORDER BY
+    -- Priority 1: high follower/following ratio (at least 1 follower required)
+    CASE WHEN COUNT(DISTINCT followers.follower_id) = 0 THEN 0
+         ELSE COUNT(DISTINCT followers.follower_id)::float / GREATEST(COUNT(DISTINCT following.following_id), 1)
+    END DESC,
+    -- Priority 2: most public messages
+    COUNT(DISTINCT m.id) DESC
   LIMIT limit_count;
 $$;
 

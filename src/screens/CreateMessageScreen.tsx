@@ -8,6 +8,7 @@ import {
   ActivityIndicator,
   ScrollView,
   Switch,
+  Linking,
 } from 'react-native';
 import Toast from '@/components/Toast';
 import { Ionicons } from '@expo/vector-icons';
@@ -30,7 +31,7 @@ type Recipient = { id: string; name: string };
 export default function CreateMessageScreen({ navigation, route }: Props) {
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
-  const { current: userLocation } = useLocation();
+  const { current: userLocation, permission, requestPermission } = useLocation();
 
   // Admin can provide a custom location (bypasses GPS restriction).
   // Captured once at mount via useState — immune to route.params being overwritten
@@ -39,6 +40,8 @@ export default function CreateMessageScreen({ navigation, route }: Props) {
     () => (user?.is_admin && route.params?.adminLocation ? route.params.adminLocation : null)
   );
   const effectiveLocation = adminLocation ?? userLocation;
+
+  const [geoRequestLoading, setGeoRequestLoading] = useState(false);
 
   const [recipients, setRecipients] = useState<Recipient[]>(route.params?.recipients ?? []);
   const [isPublic, setIsPublic] = useState((route.params?.recipients ?? []).length === 0);
@@ -252,6 +255,87 @@ export default function CreateMessageScreen({ navigation, route }: Props) {
 
     setLoading(false);
   };
+
+  const showGeolocationGate = !adminLocation && permission !== 'granted';
+
+  if (showGeolocationGate) {
+    const isDenied = permission === 'denied';
+
+    const handleRequestGeoPermission = async () => {
+      setGeoRequestLoading(true);
+      await requestPermission();
+      setGeoRequestLoading(false);
+    };
+
+    return (
+      <View style={{ flex: 1, backgroundColor: colors.background.primary }}>
+        <View style={[styles.header, { marginTop: insets.top, marginHorizontal: spacing.lg }]}>
+          <TouchableOpacity onPress={() => navigation.goBack()}>
+            <Ionicons name="arrow-back" size={24} color={colors.text.primary} />
+          </TouchableOpacity>
+          <View style={styles.titleRow}>
+            <Ionicons name="location" size={18} color="#FFFFFF" />
+            <Text style={styles.title}>Nouveau Fläag</Text>
+          </View>
+          <View style={{ width: 24 }} />
+        </View>
+
+        <View style={styles.gateContainer}>
+          <View style={styles.gateIconContainer}>
+            <Ionicons name="location-outline" size={64} color={colors.primary.cyan} />
+          </View>
+
+          <Text style={styles.gateTitle}>Localisation requise</Text>
+          <Text style={styles.gateDescription}>
+            {isDenied
+              ? 'La localisation a été refusée. Activez-la dans vos réglages pour pouvoir déposer un Fläag.'
+              : 'Fläag ancre vos messages à votre position GPS. Autorisez la localisation pour continuer.'}
+          </Text>
+
+          {isDenied ? (
+            <TouchableOpacity
+              style={styles.gateButton}
+              onPress={() => Linking.openSettings()}
+              activeOpacity={0.8}
+            >
+              <LinearGradient
+                colors={colors.gradients.button}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.gateButtonInner}
+              >
+                <Ionicons name="settings-outline" size={20} color="#FFFFFF" />
+                <Text style={styles.gateButtonText}>Ouvrir les réglages</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity
+              style={styles.gateButton}
+              onPress={handleRequestGeoPermission}
+              disabled={geoRequestLoading}
+              activeOpacity={0.8}
+            >
+              <LinearGradient
+                colors={colors.gradients.button}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.gateButtonInner}
+              >
+                {geoRequestLoading ? (
+                  <ActivityIndicator color="#FFFFFF" />
+                ) : (
+                  <>
+                    <Ionicons name="location-outline" size={20} color="#FFFFFF" />
+                    <Text style={styles.gateButtonText}>Activer la localisation</Text>
+                  </>
+                )}
+              </LinearGradient>
+            </TouchableOpacity>
+          )}
+        </View>
+      </View>
+    );
+  }
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background.primary }}>
@@ -536,6 +620,54 @@ const styles = StyleSheet.create({
   },
   sendButtonText: {
     marginLeft: spacing.sm,
+    fontSize: typography.sizes.md,
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
+  gateContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: spacing.xxl,
+  },
+  gateIconContainer: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    backgroundColor: colors.background.tertiary,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: spacing.xxl,
+  },
+  gateTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: colors.text.primary,
+    textAlign: 'center',
+    marginBottom: spacing.md,
+  },
+  gateDescription: {
+    fontSize: typography.sizes.md,
+    color: colors.text.secondary,
+    textAlign: 'center',
+    lineHeight: 22,
+    marginBottom: spacing.xxl,
+  },
+  gateButton: {
+    width: '100%',
+    borderRadius: radius.lg,
+    overflow: 'hidden',
+    ...shadows.medium,
+  },
+  gateButtonInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
+    borderRadius: radius.lg,
+    padding: spacing.lg,
+  },
+  gateButtonText: {
     fontSize: typography.sizes.md,
     fontWeight: '600',
     color: '#FFFFFF',

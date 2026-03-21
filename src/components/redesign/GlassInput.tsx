@@ -23,6 +23,8 @@ import { colors, radius, typography } from '@/theme-redesign';
 interface GlassInputProps extends TextInputProps {
   style?: StyleProp<TextStyle>;
   borderVariant?: 'default' | 'accent';
+  /** Disable built-in keyboard avoidance (use when parent already handles it) */
+  disableKeyboardAvoidance?: boolean;
 }
 
 const KEYBOARD_PADDING = 16;
@@ -54,7 +56,7 @@ function splitStyles(style?: StyleProp<TextStyle>) {
 }
 
 const GlassInput = forwardRef<TextInput, GlassInputProps>(
-  ({ style, borderVariant = 'default', onFocus, onBlur, ...props }, ref) => {
+  ({ style, borderVariant = 'default', disableKeyboardAvoidance = false, onFocus, onBlur, ...props }, ref) => {
     const containerRef = useAnimatedRef<Animated.View>();
     const localRef = useRef<TextInput>(null);
     const isFocusedRef = useRef(false);
@@ -80,6 +82,7 @@ const GlassInput = forwardRef<TextInput, GlassInputProps>(
 
     // Reset position when keyboard hides (e.g. user taps "Done" on iOS toolbar)
     useEffect(() => {
+      if (disableKeyboardAvoidance) return;
       const event = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
       const sub = Keyboard.addListener(event, () => {
         translateY.value = withTiming(0, {
@@ -88,12 +91,14 @@ const GlassInput = forwardRef<TextInput, GlassInputProps>(
         });
       });
       return () => sub.remove();
-    }, []);
+    }, [disableKeyboardAvoidance]);
 
     const handleFocus = useCallback(
       (e: any) => {
         isFocusedRef.current = true;
         onFocus?.(e);
+
+        if (disableKeyboardAvoidance) return;
 
         const kbEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
         const sub = Keyboard.addListener(kbEvent, (evt) => {
@@ -124,13 +129,15 @@ const GlassInput = forwardRef<TextInput, GlassInputProps>(
         // Safety: remove listener if keyboard never shows (hardware keyboard)
         setTimeout(() => sub.remove(), 1000);
       },
-      [onFocus],
+      [onFocus, disableKeyboardAvoidance],
     );
 
     const handleBlur = useCallback(
       (e: any) => {
         isFocusedRef.current = false;
         onBlur?.(e);
+
+        if (disableKeyboardAvoidance) return;
 
         translateY.value = withTiming(0, {
           duration: 250,

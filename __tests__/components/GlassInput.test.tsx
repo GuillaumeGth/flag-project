@@ -69,7 +69,7 @@ type KBCallback = (event: any) => void;
 const kbListeners: Record<string, KBCallback[]> = {};
 
 jest.spyOn(Keyboard, 'addListener').mockImplementation(
-  (event: string, callback: KBCallback) => {
+  ((event: string, callback: KBCallback) => {
     if (!kbListeners[event]) kbListeners[event] = [];
     kbListeners[event].push(callback);
     return {
@@ -79,7 +79,7 @@ jest.spyOn(Keyboard, 'addListener').mockImplementation(
           kbListeners[event].splice(idx, 1);
       },
     };
-  },
+  }) as any,
 );
 
 function emitKB(event: string, payload: any = {}) {

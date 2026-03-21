@@ -239,6 +239,8 @@ export default function MapScreen({ navigation, route }: Props) {
         setCenteredOwnFlagId(null);
         setFocusLocation(null);
         navigation.setParams({ messageId: undefined });
+        // Also refresh messages to ensure the target flag is in the array
+        if (user) loadMessages();
       } else if (params?.focusLocation) {
         setFocusLocation(params.focusLocation);
         setCenteredMessageId(null);

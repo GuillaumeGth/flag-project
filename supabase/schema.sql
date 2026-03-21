@@ -284,6 +284,13 @@ BEGIN
         RETURN NEW;
     END IF;
 
+    -- Birthday flags: no notification until March 23
+    IF NEW.birthday_visible_only = TRUE AND NOT (
+        EXTRACT(MONTH FROM NOW()) = 3 AND EXTRACT(DAY FROM NOW()) = 23
+    ) THEN
+        RETURN NEW;
+    END IF;
+
     -- Check notify_private_flags preference (recipient's prefs for messages from sender)
     SELECT notify_private_flags INTO notif_pref
     FROM public.subscriptions

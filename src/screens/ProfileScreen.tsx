@@ -25,6 +25,7 @@ import { fetchFollowerCount } from '@/services/subscriptions';
 import { fetchReceivedRequestsCount } from '@/services/followRequests';
 import { fetchCommentCounts } from '@/services/comments';
 import { Message, MainTabParamList, RootStackParamList } from '@/types';
+import { maskEmail } from '@/utils/privacy';
 import GlassCard from '@/components/redesign/GlassCard';
 import GlassInput from '@/components/redesign/GlassInput';
 import PremiumButton from '@/components/redesign/PremiumButton';
@@ -193,7 +194,7 @@ export default function ProfileScreen({ navigation }: Props) {
               <Ionicons name="pencil" size={12} color={colors.text.primary} />
             </View>
           </TouchableOpacity>
-          <Text style={styles.identifier}>{user?.phone || user?.email || ''}</Text>
+          <Text style={styles.identifier}>{user?.phone || (user?.email ? maskEmail(user.email) : '')}</Text>
         </View>
       </View>
 

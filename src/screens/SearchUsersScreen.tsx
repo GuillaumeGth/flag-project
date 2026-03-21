@@ -17,6 +17,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { supabase, getCachedUserId } from '@/services/supabase';
 import { colors } from '@/theme-redesign';
 import { User, MainTabParamList, RootStackParamList } from '@/types';
+import { maskEmail } from '@/utils/privacy';
 
 type SearchNavigationProp = CompositeNavigationProp<
   BottomTabNavigationProp<MainTabParamList, 'Search'>,
@@ -91,7 +92,7 @@ export default function SearchUsersScreen({ navigation }: Props) {
       <View style={styles.userInfo}>
         <Text style={styles.userName}>{item.display_name || 'Utilisateur'}</Text>
         {(item.phone || item.email) && (
-          <Text style={styles.userIdentifier}>{item.phone || item.email}</Text>
+          <Text style={styles.userIdentifier}>{item.phone || (item.email ? maskEmail(item.email) : '')}</Text>
         )}
       </View>
       <Ionicons name="chevron-forward" size={20} color={colors.text.tertiary} />

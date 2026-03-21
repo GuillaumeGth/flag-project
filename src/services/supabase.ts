@@ -102,11 +102,12 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
 // to avoid deadlocking on the internal Supabase auth lock.
 let _cachedUserId: string | null = null;
 
-// Resolves once Supabase's internal _initializePromise completes (SecureStore read done).
-// Await this instead of getSession() inside onAuthStateChange to avoid deadlock.
-export const supabaseReady = supabase.auth.getSession().then(({ data: { session } }) => {
+// Kick off Supabase initialization: reading session from SecureStore.
+// This triggers the internal _initializePromise so that subsequent getSession()
+// calls resolve quickly rather than waiting for a cold start.
+supabase.auth.getSession().then(({ data: { session } }) => {
   _cachedUserId = session?.user?.id ?? null;
-  log('[supabase] supabaseReady resolved, cachedUserId:', _cachedUserId);
+  log('[supabase] initial getSession resolved, cachedUserId:', _cachedUserId);
 });
 
 // Keep cached userId in sync with auth state changes (sign-in, sign-out, token refresh)
@@ -117,8 +118,8 @@ supabase.auth.onAuthStateChange((_event, session) => {
 // React Native suspends JS timers in background, so Supabase's auto-refresh setInterval
 // never fires after long inactivity — the token expires silently. Restart auto-refresh
 // whenever the app becomes active so the token is refreshed immediately on resume.
-AppState.addEventListener('change', (state) => {
-  if (state === 'active') {
+AppState.addEventListener('change', (nextState) => {
+  if (nextState === 'active') {
     supabase.auth.startAutoRefresh();
   } else {
     supabase.auth.stopAutoRefresh();

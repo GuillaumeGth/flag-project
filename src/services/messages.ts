@@ -880,7 +880,7 @@ export async function uploadBirthdayMarkerAvatar(uri: string): Promise<string | 
     const base64 = await FileSystem.readAsStringAsync(uri, { encoding: 'base64' });
     const { decode } = await import('base64-arraybuffer');
     const arrayBuffer = decode(base64);
-    const fileName = `birthday-markers/${currentUserId}/${Date.now()}.jpg`;
+    const fileName = `${currentUserId}/birthday-markers/${Date.now()}.jpg`;
 
     const { error } = await supabase.storage
       .from('avatars')

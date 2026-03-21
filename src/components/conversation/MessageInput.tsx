@@ -289,6 +289,7 @@ cannotSendText: {
     color: colors.text.primary,
     maxHeight: 100,
     paddingVertical: spacing.xs,
+    backgroundColor: colors.surface.elevated,
   },
   sendButton: {
     width: 40,

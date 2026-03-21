@@ -21,17 +21,33 @@ L'authentification est gérée par Supabase Auth via `AuthContext` (`src/context
 ## Flux Google OAuth
 
 ```
-1. signInWithGoogle() → supabase.auth.signInWithOAuth({ provider: 'google', ... })
-2. URL OAuth retournée → ouverture dans WebBrowser.openAuthSessionAsync()
-3. Utilisateur s'authentifie sur Google
-4. Redirect vers deep link : flag://auth/callback?...
-5. Listener deep link dans AuthContext reçoit l'URL
-6. supabase.auth.setSession({ access_token, refresh_token })
-7. onAuthStateChange déclenché → état mis à jour
-8. Sync profil Google (nom, avatar) vers public.users
+1. signInWithGoogle() → supabase.auth.signInWithOAuth({ provider: 'google', skipBrowserRedirect: true })
+2. googleAuthActiveRef = true — bloque le listener deep link pendant que signInWithGoogle gère
+3. URL OAuth retournée → ouverture dans WebBrowser.openAuthSessionAsync(url, 'flag://')
+4. Utilisateur s'authentifie sur Google
+5. Redirect vers flag://auth/callback (implicit: tokens dans le hash, ou PKCE: code en query param)
+
+Cas A — openAuthSessionAsync retourne { type: 'success', url }
+  → processCallbackUrl() extrait tokens ou code
+  → setSessionAndUpdateState() ou exchangeCodeForSession()
+  → applySession() met à jour l'état React
+
+Cas B — openAuthSessionAsync retourne { type: 'dismiss' } (courant sur Android)
+  → polling 25×200ms : vérifie stateRef.current.user + supabase.auth.getSession()
+  → si session trouvée : applySession() immédiat
+
+Dans les deux cas :
+  → applySession() est aussi appelé en redondance depuis onAuthStateChange('SIGNED_IN')
+  → Post-login setup (tokens push, sync profil, public.users) en fire-and-forget
+6. googleAuthActiveRef = false (bloc finally)
 ```
 
 **Deep link configuré** : `flag://auth/callback`
+
+**Robustesse** :
+- `googleAuthActiveRef` empêche la race condition entre le listener Linking et `signInWithGoogle`
+- `applySession()` est appelé par plusieurs chemins (belt & suspenders) — `onAuthStateChange` n'est plus le seul déclencheur
+- Après `exchangeCodeForSession`, session explicitement récupérée via `getSession()` en safety net
 
 ## Déconnexion
 
@@ -45,12 +61,19 @@ L'authentification est gérée par Supabase Auth via `AuthContext` (`src/context
 
 ## Initialisation du client Supabase
 
-**Problème connu** : Supabase peut créer un deadlock si `getSession()` est appelé depuis `onAuthStateChange`.
+**Problème connu** : Supabase peut bloquer si `getSession()` est appelé de façon synchrone depuis `onAuthStateChange` (lock interne tenu).
 
 **Solution** (`src/services/supabase.ts`) :
-- `supabaseReady` : Promise qui se résout après la première initialisation de session
-- `getCachedUserId()` : Retourne l'ID utilisateur depuis le cache interne `_cachedUserId` (pas d'appel à getSession)
-- `AuthContext` attend `supabaseReady` plutôt que d'appeler `getSession()` directement
+- `getCachedUserId()` : Retourne l'ID utilisateur depuis `_cachedUserId` (pas d'appel à `getSession`)
+- `_cachedUserId` mis à jour par un listener `onAuthStateChange` léger (sans async)
+- `onAuthStateChange` principal dans AuthContext ne fait **plus** `await supabaseReady` — les opérations Supabase dans le handler sont toutes en fire-and-forget pour éviter tout deadlock
+- `getSession()` déclenché au démarrage du module pour amorcer `_initializePromise` interne
+
+## Récupération de session au foreground
+
+Un listener `AppState` dans `AuthProvider` vérifie à chaque passage en `active` si une session est stockée mais l'état React ne la reflète pas (`user === null` avec `loading === false`). Si c'est le cas, `applySession()` restaure immédiatement la session.
+
+Couvre les cas : app tuée en background, race condition au retour d'OAuth, désynchronisation état/storage.
 
 ## Post-login setup
 

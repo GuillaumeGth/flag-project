@@ -142,6 +142,27 @@ export async function isEitherFollowing(userId: string): Promise<boolean> {
   return !!rev;
 }
 
+export interface SuggestedUser {
+  readonly id: string;
+  readonly display_name: string | null;
+  readonly avatar_url: string | null;
+  readonly is_private: boolean;
+  readonly mutual_count: number;
+}
+
+export async function fetchSuggestedUsers(limit = 10): Promise<SuggestedUser[]> {
+  const currentUserId = getCurrentUserId();
+  if (!currentUserId) return [];
+
+  const { data, error } = await supabase.rpc('get_suggested_users', { limit_count: limit });
+
+  if (error) {
+    reportError(error, 'subscriptions.fetchSuggestedUsers');
+    return [];
+  }
+  return (data as SuggestedUser[]) || [];
+}
+
 export async function fetchFollowerCount(userId: string): Promise<number> {
   const { count, error } = await supabase
     .from('subscriptions')

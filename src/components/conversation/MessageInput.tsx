@@ -162,7 +162,6 @@ export default function MessageInput({
       )}
 
       <View style={styles.inputRow}>
-        <Text style={styles.fieldsetLabel}>Message non géolocalisé</Text>
         {!canSendMessages ? (
           <Text style={styles.cannotSendText}>
             Suivez-vous mutuellement pour échanger des messages
@@ -179,7 +178,7 @@ export default function MessageInput({
 
             <TextInput
               style={styles.textInput}
-              placeholder="Envoyer un message..."
+              placeholder="Message non géolocalisé"
               placeholderTextColor={colors.text.tertiary}
               value={inputText}
               onChangeText={setInputText}
@@ -264,25 +263,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: spacing.sm,
     padding: spacing.sm,
-    paddingTop: spacing.lg,
     backgroundColor: colors.surface.glass,
     borderRadius: radius.lg,
     borderWidth: 1,
     borderColor: colors.border.accent,
   },
-  fieldsetLabel: {
-    position: 'absolute',
-    top: -8,
-    left: 12,
-    backgroundColor: 'transparent',
-    paddingHorizontal: 4,
-    fontSize: 12,
-    color: colors.text.accent,
-    fontWeight: '500',
-    letterSpacing: 0.3,
-    zIndex: 1,
-  },
-  cannotSendText: {
+cannotSendText: {
     flex: 1,
     fontSize: 14,
     color: colors.text.secondary,

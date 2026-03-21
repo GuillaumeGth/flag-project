@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { NavigationContainer } from '@react-navigation/native';
@@ -6,6 +6,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import * as SecureStore from 'expo-secure-store';
+import * as Notifications from 'expo-notifications';
 
 import { colors, spacing } from '@/theme-redesign';
 import { RootStackParamList, MainTabParamList } from '@/types';
@@ -14,8 +15,6 @@ import { log } from '@/utils/debug';
 import { LocationProvider } from '@/contexts/LocationContext';
 import ScreenLoader from '@/components/ScreenLoader';
 import { addNotificationResponseListener } from '@/services/notifications';
-import { fetchMessageById } from '@/services/messages';
-import { supabase } from '@/services/supabase';
 import { checkForAppUpdate } from '@/services/appUpdater';
 import { setupGlobalErrorHandler } from '@/services/errorReporting';
 import { navigationRef } from '@/services/navigationRef';
@@ -218,35 +217,39 @@ export default function App() {
     checkForAppUpdate();
   }, []);
 
-  useEffect(() => {
-    const subscription = addNotificationResponseListener(async (messageId) => {
-      if (!navigationRef.current?.isReady()) return;
+  // Pending notification messageId — used when a notification opens the app
+  // but the navigator isn't ready yet (cold start)
+  const pendingNotificationRef = useRef<string | null>(null);
 
-      const message = await fetchMessageById(messageId);
-      if (!message) {
-        navigationRef.current.navigate('Main', { screen: 'Map', params: { refresh: Date.now() } });
+  useEffect(() => {
+    const navigateToFlag = (messageId: string) => {
+      if (!navigationRef.current?.isReady()) {
+        // Navigator not ready yet (cold start) — queue it
+        log('App', 'Navigation not ready, queuing notification for messageId:', messageId);
+        pendingNotificationRef.current = messageId;
         return;
       }
+      log('App', 'Notification tap → navigating to Map with messageId:', messageId);
+      navigationRef.current.navigate('Main', {
+        screen: 'Map',
+        params: { messageId, refresh: Date.now() },
+      });
+    };
 
-      const { data: { user } } = await supabase.auth.getUser();
-      const currentUserId = user?.id;
+    // Listen for notification taps while app is running
+    const subscription = addNotificationResponseListener(navigateToFlag);
 
-      // Public flags and own messages (discovered / reacted) → show on map
-      if (message.is_public || message.sender_id === currentUserId) {
-        navigationRef.current.navigate('Main', {
-          screen: 'Map',
-          params: { messageId },
-        });
-      } else {
-        // Private message where current user is recipient → open conversation
-        navigationRef.current.navigate('Conversation', {
-          otherUserId: message.sender.id,
-          otherUserName: message.sender.display_name as string,
-          otherUserAvatarUrl: message.sender.avatar_url ?? undefined,
-          scrollToMessageId: messageId,
-        });
+    // Handle cold start — notification that opened the app
+    Notifications.getLastNotificationResponseAsync().then((response) => {
+      if (response) {
+        const messageId = response.notification.request.content.data?.messageId;
+        if (messageId) {
+          log('App', 'Cold start notification detected, messageId:', messageId);
+          navigateToFlag(messageId as string);
+        }
       }
     });
+
     return () => subscription.remove();
   }, []);
 
@@ -254,7 +257,21 @@ export default function App() {
     <SafeAreaProvider>
       <AuthProvider>
         <LocationProvider>
-          <NavigationContainer ref={navigationRef}>
+          <NavigationContainer
+            ref={navigationRef}
+            onReady={() => {
+              // Flush pending notification that arrived before navigation was ready
+              const pending = pendingNotificationRef.current;
+              if (pending) {
+                pendingNotificationRef.current = null;
+                log('App', 'Navigation ready — flushing pending notification:', pending);
+                navigationRef.current?.navigate('Main', {
+                  screen: 'Map',
+                  params: { messageId: pending, refresh: Date.now() },
+                });
+              }
+            }}
+          >
             <AppNavigator />
             <StatusBar style="light" />
           </NavigationContainer>

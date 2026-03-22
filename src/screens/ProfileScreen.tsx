@@ -4,7 +4,6 @@ import {
   Text,
   TouchableOpacity,
   StyleSheet,
-  Modal,
   FlatList,
   RefreshControl,
   Animated,
@@ -21,9 +20,6 @@ import { colors, shadows, radius, spacing, typography } from '@/theme-redesign';
 import { fetchFollowerCount } from '@/services/subscriptions';
 import { fetchReceivedRequestsCount } from '@/services/followRequests';
 import { Message, MainTabParamList, RootStackParamList } from '@/types';
-import GlassCard from '@/components/redesign/GlassCard';
-import GlassInput from '@/components/redesign/GlassInput';
-import PremiumButton from '@/components/redesign/PremiumButton';
 import PremiumAvatar from '@/components/redesign/PremiumAvatar';
 import GridCell from '@/components/profile/GridCell';
 import ProfileStatsRow from '@/components/profile/ProfileStatsRow';
@@ -40,11 +36,8 @@ type Props = Omit<BottomTabScreenProps<MainTabParamList, 'Profile'>, 'navigation
 
 export default function ProfileScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets();
-  const { user, updateAvatar, updateDisplayName } = useAuth();
+  const { user, updateAvatar } = useAuth();
   const [uploading, setUploading] = useState(false);
-  const [editNameVisible, setEditNameVisible] = useState(false);
-  const [newName, setNewName] = useState('');
-  const [savingName, setSavingName] = useState(false);
 
   const { messages, commentCounts, loading: messagesLoading, refreshing: messagesRefreshing, onRefresh: refreshMessages } = useProfileMessages();
   const [followerCount, setFollowerCount] = useState(0);
@@ -96,14 +89,6 @@ export default function ProfileScreen({ navigation }: Props) {
       await updateAvatar(result.assets[0].uri);
       setUploading(false);
     }
-  };
-
-  const handleSaveName = async () => {
-    if (!newName.trim()) return;
-    setSavingName(true);
-    await updateDisplayName(newName.trim());
-    setSavingName(false);
-    setEditNameVisible(false);
   };
 
   const handleCellPress = useCallback((message: Message) => {
@@ -169,15 +154,7 @@ export default function ProfileScreen({ navigation }: Props) {
         </TouchableOpacity>
 
         <View style={styles.profileInfo}>
-          <TouchableOpacity
-            onPress={() => { setNewName(user?.display_name || ''); setEditNameVisible(true); }}
-            style={styles.nameContainer}
-          >
-            <Text style={styles.displayName}>{user?.display_name || 'Utilisateur'}</Text>
-            <View style={styles.editBadge}>
-              <Ionicons name="pencil" size={12} color={colors.text.primary} />
-            </View>
-          </TouchableOpacity>
+          <Text style={styles.displayName}>{user?.display_name || 'Utilisateur'}</Text>
           <Text style={styles.identifier}>{user?.phone || ''}</Text>
         </View>
       </View>
@@ -213,30 +190,6 @@ export default function ProfileScreen({ navigation }: Props) {
           columnWrapperStyle={styles.gridRow}
         />
       )}
-
-      <Modal visible={editNameVisible} transparent animationType="fade" onRequestClose={() => setEditNameVisible(false)}>
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalBlur} />
-          <GlassCard style={styles.modalCard} withBorder withGlow glowColor="cyan">
-            <Text style={styles.modalTitle}>Modifier le nom</Text>
-            <View style={styles.inputContainer}>
-              <GlassInput
-                style={styles.modalInput}
-                value={newName}
-                onChangeText={setNewName}
-                placeholder="Votre nom"
-                borderVariant="accent"
-                autoFocus
-                maxLength={50}
-              />
-            </View>
-            <View style={styles.modalButtons}>
-              <PremiumButton title="Annuler" variant="ghost" onPress={() => setEditNameVisible(false)} disabled={savingName} style={styles.modalButton} />
-              <PremiumButton title="Enregistrer" variant="gradient" onPress={handleSaveName} loading={savingName} disabled={savingName} style={styles.modalButton} withGlow />
-            </View>
-          </GlassCard>
-        </View>
-      </Modal>
 
     </View>
   );
@@ -314,24 +267,10 @@ const styles = StyleSheet.create({
     flex: 1,
     gap: spacing.xs,
   },
-  nameContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-  },
   displayName: {
     fontSize: typography.sizes.xl,
     fontWeight: '700',
     color: colors.text.primary,
-  },
-  editBadge: {
-    width: 24,
-    height: 24,
-    borderRadius: radius.full,
-    backgroundColor: colors.primary.cyan,
-    justifyContent: 'center',
-    alignItems: 'center',
-    ...shadows.glow,
   },
   identifier: {
     fontSize: typography.sizes.sm,
@@ -346,41 +285,5 @@ const styles = StyleSheet.create({
   },
   gridRow: {
     gap: 2,
-  },
-  modalOverlay: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: colors.overlay.dark,
-  },
-  modalBlur: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0, 0, 0, 0.8)',
-  },
-  modalCard: {
-    width: '85%',
-    maxWidth: 400,
-    padding: spacing.xxl,
-  },
-  modalTitle: {
-    fontSize: typography.sizes.xl,
-    fontWeight: '700',
-    color: colors.text.primary,
-    marginBottom: spacing.xl,
-    textAlign: 'center',
-  },
-  inputContainer: {
-    marginBottom: spacing.xl,
-  },
-  modalInput: {
-    backgroundColor: colors.surface.glassDark,
-    padding: spacing.lg,
-  },
-  modalButtons: {
-    flexDirection: 'row',
-    gap: spacing.md,
-  },
-  modalButton: {
-    flex: 1,
   },
 });

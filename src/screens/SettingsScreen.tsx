@@ -1,24 +1,39 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
   TouchableOpacity,
   StyleSheet,
   Alert,
+  Modal,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Application from 'expo-application';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '@/contexts/AuthContext';
-import { colors } from '@/theme-redesign';
+import { colors, spacing, typography, radius } from '@/theme-redesign';
 import { RootStackParamList } from '@/types';
+import GlassCard from '@/components/redesign/GlassCard';
+import GlassInput from '@/components/redesign/GlassInput';
+import PremiumButton from '@/components/redesign/PremiumButton';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Settings'>;
 
 export default function SettingsScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets();
-  const { signOut } = useAuth();
+  const { user, signOut, updateDisplayName } = useAuth();
+  const [editNameVisible, setEditNameVisible] = useState(false);
+  const [newName, setNewName] = useState('');
+  const [savingName, setSavingName] = useState(false);
+
+  const handleSaveName = async () => {
+    if (!newName.trim()) return;
+    setSavingName(true);
+    await updateDisplayName(newName.trim());
+    setSavingName(false);
+    setEditNameVisible(false);
+  };
 
   const handleSignOut = () => {
     Alert.alert(
@@ -42,9 +57,9 @@ export default function SettingsScreen({ navigation }: Props) {
       </View>
 
       <View style={styles.menuSection}>
-        <TouchableOpacity style={styles.menuItem}>
+        <TouchableOpacity style={styles.menuItem} onPress={() => { setNewName(user?.display_name || ''); setEditNameVisible(true); }}>
           <Ionicons name="person-outline" size={24} color={colors.text.primary} />
-          <Text style={styles.menuText}>Modifier le profil</Text>
+          <Text style={styles.menuText}>Modifier le nom</Text>
           <Ionicons name="chevron-forward" size={20} color={colors.text.tertiary} />
         </TouchableOpacity>
 
@@ -75,6 +90,30 @@ export default function SettingsScreen({ navigation }: Props) {
       <Text style={[styles.version, { paddingBottom: Math.max(insets.bottom, 16) }]}>
         Fläag v{Application.nativeApplicationVersion ?? '—'}
       </Text>
+
+      <Modal visible={editNameVisible} transparent animationType="fade" onRequestClose={() => setEditNameVisible(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalBlur} />
+          <GlassCard style={styles.modalCard} withBorder withGlow glowColor="cyan">
+            <Text style={styles.modalTitle}>Modifier le nom</Text>
+            <View style={styles.inputContainer}>
+              <GlassInput
+                style={styles.modalInput}
+                value={newName}
+                onChangeText={setNewName}
+                placeholder="Votre nom"
+                borderVariant="accent"
+                autoFocus
+                maxLength={50}
+              />
+            </View>
+            <View style={styles.modalButtons}>
+              <PremiumButton title="Annuler" variant="ghost" onPress={() => setEditNameVisible(false)} disabled={savingName} style={styles.modalButton} />
+              <PremiumButton title="Enregistrer" variant="gradient" onPress={handleSaveName} loading={savingName} disabled={savingName} style={styles.modalButton} withGlow />
+            </View>
+          </GlassCard>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -136,5 +175,41 @@ const styles = StyleSheet.create({
     fontSize: 12,
     marginTop: 'auto',
     paddingBottom: 16,
+  },
+  modalOverlay: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: colors.overlay.dark,
+  },
+  modalBlur: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+  },
+  modalCard: {
+    width: '85%',
+    maxWidth: 400,
+    padding: spacing.xxl,
+  },
+  modalTitle: {
+    fontSize: typography.sizes.xl,
+    fontWeight: '700',
+    color: colors.text.primary,
+    marginBottom: spacing.xl,
+    textAlign: 'center',
+  },
+  inputContainer: {
+    marginBottom: spacing.xl,
+  },
+  modalInput: {
+    backgroundColor: colors.surface.glassDark,
+    padding: spacing.lg,
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    gap: spacing.md,
+  },
+  modalButton: {
+    flex: 1,
   },
 });

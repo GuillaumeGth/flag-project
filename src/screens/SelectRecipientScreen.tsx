@@ -14,7 +14,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { fetchFollowedUsers, FLAG_BOT_ID } from '@/services/messages';
 import { User, RootStackParamList } from '@/types';
 import { colors } from '@/theme-redesign';
-import { maskEmail } from '@/utils/privacy';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'SelectRecipient'>;
 
@@ -47,7 +46,7 @@ export default function SelectRecipientScreen({ navigation, route }: Props) {
   const confirmSelection = () => {
     const recipients = selectedUsers.map((u) => ({
       id: u.id,
-      name: u.display_name || (u.email ? maskEmail(u.email) : null) || u.phone || 'Utilisateur',
+      name: u.display_name || u.phone || 'Utilisateur',
     }));
     navigation.navigate('CreateMessage', { recipients });
   };
@@ -56,7 +55,7 @@ export default function SelectRecipientScreen({ navigation, route }: Props) {
     if (mode === 'flag') {
       toggleUser(user);
     } else {
-      const displayName = user.display_name || (user.email ? maskEmail(user.email) : null) || user.phone || 'Utilisateur';
+      const displayName = user.display_name || user.phone || 'Utilisateur';
       navigation.navigate('Conversation', {
         otherUserId: user.id,
         otherUserName: displayName,
@@ -67,7 +66,7 @@ export default function SelectRecipientScreen({ navigation, route }: Props) {
 
   const renderUser = ({ item }: { item: User }) => {
     const isBot = item.id === FLAG_BOT_ID;
-    const displayName = item.display_name || (item.email ? maskEmail(item.email) : null) || item.phone || 'Utilisateur';
+    const displayName = item.display_name || item.phone || 'Utilisateur';
     const isSelected = selectedUsers.some((u) => u.id === item.id);
 
     return (

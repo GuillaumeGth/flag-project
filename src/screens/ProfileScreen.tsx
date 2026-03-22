@@ -4,9 +4,6 @@ import {
   Text,
   TouchableOpacity,
   StyleSheet,
-  Modal,
-  KeyboardAvoidingView,
-  Platform,
   FlatList,
   RefreshControl,
   Animated,
@@ -20,18 +17,14 @@ import { BottomTabNavigationProp, BottomTabScreenProps } from '@react-navigation
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useAuth } from '@/contexts/AuthContext';
 import { colors, shadows, radius, spacing, typography } from '@/theme-redesign';
-import { fetchMyPublicMessages } from '@/services/messages';
 import { fetchFollowerCount } from '@/services/subscriptions';
 import { fetchReceivedRequestsCount } from '@/services/followRequests';
-import { fetchCommentCounts } from '@/services/comments';
 import { Message, MainTabParamList, RootStackParamList } from '@/types';
-import { maskEmail } from '@/utils/privacy';
-import GlassCard from '@/components/redesign/GlassCard';
-import GlassInput from '@/components/redesign/GlassInput';
-import PremiumButton from '@/components/redesign/PremiumButton';
 import PremiumAvatar from '@/components/redesign/PremiumAvatar';
 import GridCell from '@/components/profile/GridCell';
 import ProfileStatsRow from '@/components/profile/ProfileStatsRow';
+import EmptyState from '@/components/EmptyState';
+import { useProfileMessages } from '@/hooks/useProfileMessages';
 
 type ProfileNavigationProp = CompositeNavigationProp<
   BottomTabNavigationProp<MainTabParamList, 'Profile'>,
@@ -43,18 +36,15 @@ type Props = Omit<BottomTabScreenProps<MainTabParamList, 'Profile'>, 'navigation
 
 export default function ProfileScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets();
-  const { user, updateAvatar, updateDisplayName } = useAuth();
+  const { user, updateAvatar } = useAuth();
   const [uploading, setUploading] = useState(false);
-  const [editNameVisible, setEditNameVisible] = useState(false);
-  const [newName, setNewName] = useState('');
-  const [savingName, setSavingName] = useState(false);
 
-  const [messages, setMessages] = useState<Message[]>([]);
+  const { messages, commentCounts, loading: messagesLoading, refreshing: messagesRefreshing, onRefresh: refreshMessages } = useProfileMessages();
   const [followerCount, setFollowerCount] = useState(0);
   const [pendingRequestsCount, setPendingRequestsCount] = useState(0);
-  const [commentCounts, setCommentCounts] = useState<Record<string, number>>({});
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
+  const [extraLoading, setExtraLoading] = useState(true);
+
+  const loading = messagesLoading || extraLoading;
 
   const [fadeAnim] = useState(new Animated.Value(0));
   const [slideAnim] = useState(new Animated.Value(30));
@@ -64,15 +54,6 @@ export default function ProfileScreen({ navigation }: Props) {
       Animated.timing(fadeAnim, { toValue: 1, duration: 400, useNativeDriver: true }),
       Animated.timing(slideAnim, { toValue: 0, duration: 400, useNativeDriver: true }),
     ]).start();
-  }, []);
-
-  const loadMessages = useCallback(async () => {
-    const data = await fetchMyPublicMessages();
-    setMessages(data);
-    if (data.length > 0) {
-      const counts = await fetchCommentCounts(data.map(m => m.id));
-      setCommentCounts(counts);
-    }
   }, []);
 
   const loadFollowerCount = useCallback(async () => {
@@ -87,14 +68,12 @@ export default function ProfileScreen({ navigation }: Props) {
   }, []);
 
   useEffect(() => {
-    Promise.all([loadMessages(), loadFollowerCount(), loadPendingRequests()]).finally(() => setLoading(false));
-  }, [loadMessages, loadFollowerCount, loadPendingRequests]);
+    Promise.all([loadFollowerCount(), loadPendingRequests()]).finally(() => setExtraLoading(false));
+  }, [loadFollowerCount, loadPendingRequests]);
 
   const onRefresh = useCallback(async () => {
-    setRefreshing(true);
-    await Promise.all([loadMessages(), loadFollowerCount(), loadPendingRequests()]);
-    setRefreshing(false);
-  }, [loadMessages, loadFollowerCount, loadPendingRequests]);
+    await Promise.all([refreshMessages(), loadFollowerCount(), loadPendingRequests()]);
+  }, [refreshMessages, loadFollowerCount, loadPendingRequests]);
 
   const handleChangeAvatar = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -110,14 +89,6 @@ export default function ProfileScreen({ navigation }: Props) {
       await updateAvatar(result.assets[0].uri);
       setUploading(false);
     }
-  };
-
-  const handleSaveName = async () => {
-    if (!newName.trim()) return;
-    setSavingName(true);
-    await updateDisplayName(newName.trim());
-    setSavingName(false);
-    setEditNameVisible(false);
   };
 
   const handleCellPress = useCallback((message: Message) => {
@@ -137,13 +108,11 @@ export default function ProfileScreen({ navigation }: Props) {
   const renderEmpty = () => {
     if (loading) return null;
     return (
-      <View style={styles.emptyContainer}>
-        <View style={styles.emptyIconContainer}>
-          <Ionicons name="albums-outline" size={56} color={colors.primary.violet} />
-        </View>
-        <Text style={styles.emptyText}>Aucun message public</Text>
-        <Text style={styles.emptySubtext}>Partagez votre premier message avec le monde</Text>
-      </View>
+      <EmptyState
+        icon="albums-outline"
+        title="Aucun message public"
+        subtitle="Partagez votre premier message avec le monde"
+      />
     );
   };
 
@@ -185,16 +154,8 @@ export default function ProfileScreen({ navigation }: Props) {
         </TouchableOpacity>
 
         <View style={styles.profileInfo}>
-          <TouchableOpacity
-            onPress={() => { setNewName(user?.display_name || ''); setEditNameVisible(true); }}
-            style={styles.nameContainer}
-          >
-            <Text style={styles.displayName}>{user?.display_name || 'Utilisateur'}</Text>
-            <View style={styles.editBadge}>
-              <Ionicons name="pencil" size={12} color={colors.text.primary} />
-            </View>
-          </TouchableOpacity>
-          <Text style={styles.identifier}>{user?.phone || (user?.email ? maskEmail(user.email) : '')}</Text>
+          <Text style={styles.displayName}>{user?.display_name || 'Utilisateur'}</Text>
+          <Text style={styles.identifier}>{user?.phone || ''}</Text>
         </View>
       </View>
 
@@ -223,36 +184,12 @@ export default function ProfileScreen({ navigation }: Props) {
           ListHeaderComponent={renderHeader}
           ListEmptyComponent={renderEmpty}
           refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary.cyan} />
+            <RefreshControl refreshing={messagesRefreshing} onRefresh={onRefresh} tintColor={colors.primary.cyan} />
           }
           contentContainerStyle={styles.listContent}
           columnWrapperStyle={styles.gridRow}
         />
       )}
-
-      <Modal visible={editNameVisible} transparent animationType="fade" onRequestClose={() => setEditNameVisible(false)}>
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.modalOverlay}>
-          <View style={styles.modalBlur} />
-          <GlassCard style={styles.modalCard} withBorder withGlow glowColor="cyan">
-            <Text style={styles.modalTitle}>Modifier le nom</Text>
-            <View style={styles.inputContainer}>
-              <GlassInput
-                style={styles.modalInput}
-                value={newName}
-                onChangeText={setNewName}
-                placeholder="Votre nom"
-                borderVariant="accent"
-                autoFocus
-                maxLength={50}
-              />
-            </View>
-            <View style={styles.modalButtons}>
-              <PremiumButton title="Annuler" variant="ghost" onPress={() => setEditNameVisible(false)} disabled={savingName} style={styles.modalButton} />
-              <PremiumButton title="Enregistrer" variant="gradient" onPress={handleSaveName} loading={savingName} disabled={savingName} style={styles.modalButton} withGlow />
-            </View>
-          </GlassCard>
-        </KeyboardAvoidingView>
-      </Modal>
 
     </View>
   );
@@ -330,24 +267,10 @@ const styles = StyleSheet.create({
     flex: 1,
     gap: spacing.xs,
   },
-  nameContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-  },
   displayName: {
     fontSize: typography.sizes.xl,
     fontWeight: '700',
     color: colors.text.primary,
-  },
-  editBadge: {
-    width: 24,
-    height: 24,
-    borderRadius: radius.full,
-    backgroundColor: colors.primary.cyan,
-    justifyContent: 'center',
-    alignItems: 'center',
-    ...shadows.glow,
   },
   identifier: {
     fontSize: typography.sizes.sm,
@@ -362,68 +285,5 @@ const styles = StyleSheet.create({
   },
   gridRow: {
     gap: 2,
-  },
-  emptyContainer: {
-    alignItems: 'center',
-    paddingTop: 60,
-    paddingHorizontal: spacing.xxxl,
-  },
-  emptyIconContainer: {
-    width: 80,
-    height: 80,
-    borderRadius: radius.full,
-    backgroundColor: colors.surface.glass,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: spacing.lg,
-    ...shadows.glowViolet,
-  },
-  emptyText: {
-    fontSize: typography.sizes.lg,
-    fontWeight: '600',
-    color: colors.text.primary,
-    marginTop: spacing.md,
-  },
-  emptySubtext: {
-    fontSize: typography.sizes.sm,
-    color: colors.text.secondary,
-    textAlign: 'center',
-    marginTop: spacing.sm,
-  },
-  modalOverlay: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: colors.overlay.dark,
-  },
-  modalBlur: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0, 0, 0, 0.8)',
-  },
-  modalCard: {
-    width: '85%',
-    maxWidth: 400,
-    padding: spacing.xxl,
-  },
-  modalTitle: {
-    fontSize: typography.sizes.xl,
-    fontWeight: '700',
-    color: colors.text.primary,
-    marginBottom: spacing.xl,
-    textAlign: 'center',
-  },
-  inputContainer: {
-    marginBottom: spacing.xl,
-  },
-  modalInput: {
-    backgroundColor: colors.surface.glassDark,
-    padding: spacing.lg,
-  },
-  modalButtons: {
-    flexDirection: 'row',
-    gap: spacing.md,
-  },
-  modalButton: {
-    flex: 1,
   },
 });

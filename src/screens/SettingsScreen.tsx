@@ -14,6 +14,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '@/contexts/AuthContext';
 import { colors, spacing, typography, radius } from '@/theme-redesign';
 import { RootStackParamList } from '@/types';
+import BirthdayScreen from '@/screens/BirthdayScreen';
 import GlassCard from '@/components/redesign/GlassCard';
 import GlassInput from '@/components/redesign/GlassInput';
 import PremiumButton from '@/components/redesign/PremiumButton';
@@ -23,6 +24,7 @@ type Props = NativeStackScreenProps<RootStackParamList, 'Settings'>;
 export default function SettingsScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets();
   const { user, signOut, updateDisplayName } = useAuth();
+  const [birthdayPreviewVisible, setBirthdayPreviewVisible] = useState(false);
   const [editNameVisible, setEditNameVisible] = useState(false);
   const [newName, setNewName] = useState('');
   const [savingName, setSavingName] = useState(false);
@@ -81,6 +83,21 @@ export default function SettingsScreen({ navigation }: Props) {
           <Ionicons name="chevron-forward" size={20} color={colors.text.tertiary} />
         </TouchableOpacity>
       </View>
+
+      {user?.is_admin && (
+        <View style={styles.adminSection}>
+          <Text style={styles.adminSectionLabel}>Admin</Text>
+          <TouchableOpacity style={styles.menuItem} onPress={() => setBirthdayPreviewVisible(true)}>
+            <Text style={styles.birthdayIcon}>🎂</Text>
+            <Text style={styles.menuText}>Aperçu écran anniversaire</Text>
+            <Ionicons name="chevron-forward" size={20} color={colors.text.tertiary} />
+          </TouchableOpacity>
+        </View>
+      )}
+
+      <Modal visible={birthdayPreviewVisible} animationType="slide" statusBarTranslucent>
+        <BirthdayScreen onComplete={() => setBirthdayPreviewVisible(false)} />
+      </Modal>
 
       <TouchableOpacity style={styles.signOutButton} onPress={handleSignOut}>
         <Ionicons name="log-out-outline" size={24} color={colors.error} />
@@ -156,6 +173,26 @@ const styles = StyleSheet.create({
     marginLeft: 16,
     fontSize: 16,
     color: colors.text.primary,
+  },
+  adminSection: {
+    marginTop: 24,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: 'rgba(255, 215, 0, 0.25)',
+    paddingTop: 8,
+  },
+  adminSectionLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#FFD700',
+    paddingHorizontal: 16,
+    paddingVertical: 4,
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+  },
+  birthdayIcon: {
+    fontSize: 22,
+    width: 24,
+    textAlign: 'center',
   },
   signOutButton: {
     flexDirection: 'row',

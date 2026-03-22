@@ -24,6 +24,7 @@ setupGlobalErrorHandler();
 
 import PermissionsScreen from '@/screens/PermissionsScreen';
 import OnboardingScreen from '@/screens/OnboardingScreen';
+import BirthdayScreen from '@/screens/BirthdayScreen';
 import AuthScreen from '@/screens/AuthScreen';
 import MapScreen from '@/screens/MapScreen';
 import InboxScreen from '@/screens/InboxScreen';
@@ -95,11 +96,19 @@ function MainTabs() {
 
 const PERMISSIONS_DONE_KEY = 'permissions_onboarding_done';
 const ONBOARDING_DONE_KEY = 'onboarding_done';
+const BIRTHDAY_SCREEN_KEY = 'birthday_screen_ja_2026';
+const BIRTHDAY_USER_EMAIL = 'jaouaharb0@gmail.com';
+
+function isBirthdayToday(): boolean {
+  const now = new Date();
+  return now.getMonth() === 2 && now.getDate() === 23; // March 23
+}
 
 function AppNavigator() {
   const { user, loading } = useAuth();
   const [permissionsDone, setPermissionsDone] = useState<boolean | null>(null);
   const [hasSeenOnboarding, setHasSeenOnboarding] = useState<boolean | null>(null);
+  const [hasSeenBirthday, setHasSeenBirthday] = useState<boolean | null>(null);
 
   log('AppNavigator', 'render: loading =', loading, 'user =', user?.id, 'permissionsDone =', permissionsDone, 'hasSeenOnboarding =', hasSeenOnboarding);
 
@@ -107,18 +116,21 @@ function AppNavigator() {
     Promise.all([
       SecureStore.getItemAsync(PERMISSIONS_DONE_KEY),
       SecureStore.getItemAsync(ONBOARDING_DONE_KEY),
+      SecureStore.getItemAsync(BIRTHDAY_SCREEN_KEY),
     ])
-      .then(([permissions, onboarding]) => {
+      .then(([permissions, onboarding, birthday]) => {
         setPermissionsDone(permissions === 'true');
         setHasSeenOnboarding(onboarding === 'true');
+        setHasSeenBirthday(birthday === 'true');
       })
       .catch(() => {
         setPermissionsDone(false);
         setHasSeenOnboarding(false);
+        setHasSeenBirthday(false);
       });
   }, []);
 
-  if (loading || permissionsDone === null || hasSeenOnboarding === null) {
+  if (loading || permissionsDone === null || hasSeenOnboarding === null || hasSeenBirthday === null) {
     log('AppNavigator', 'showing loader (loading)');
     return <ScreenLoader />;
   }
@@ -133,6 +145,11 @@ function AppNavigator() {
     setHasSeenOnboarding(true);
   };
 
+  const handleBirthdayComplete = async () => {
+    await SecureStore.setItemAsync(BIRTHDAY_SCREEN_KEY, 'true');
+    setHasSeenBirthday(true);
+  };
+
   if (!user) {
     log('AppNavigator', 'showing AuthScreen');
     return (
@@ -140,6 +157,11 @@ function AppNavigator() {
         <Stack.Screen name="Auth" component={AuthScreen} />
       </Stack.Navigator>
     );
+  }
+
+  if (user.email === BIRTHDAY_USER_EMAIL && isBirthdayToday() && !hasSeenBirthday) {
+    log('AppNavigator', 'showing BirthdayScreen');
+    return <BirthdayScreen onComplete={handleBirthdayComplete} />;
   }
 
   const isGuigz = user.display_name === 'guigz';

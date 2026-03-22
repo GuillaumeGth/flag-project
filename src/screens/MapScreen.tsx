@@ -103,6 +103,7 @@ export default function MapScreen({ navigation, route }: Props) {
       // For private flags, show the recipient's identity (id + name) so the marker
       // displays their initials/color. For public flags, show the sender's own identity.
       is_admin_placed: flag.is_admin_placed,
+      custom_marker_avatar_url: flag.custom_marker_avatar_url ?? null,
       sender: {
         id: (!flag.is_public && flag.recipient?.id) ? flag.recipient.id : user?.id ?? '',
         display_name: (!flag.is_public && flag.recipient?.display_name)
@@ -586,7 +587,7 @@ export default function MapScreen({ navigation, route }: Props) {
         {/* Explore mode markers */}
         {mapMode === 'explore' && clusters.map((cluster) => {
           const captureKey = `${cluster.id}:${cluster.messages.length}`;
-          const capturedImage = avatarImages[captureKey];
+          const capturedImage = avatarImages[captureKey] ?? cluster.customMarkerAvatarUrl ?? null;
           if (!capturedImage) return null;
           return (
             <MessageMarker
@@ -608,7 +609,7 @@ export default function MapScreen({ navigation, route }: Props) {
         {/* Mine mode markers */}
         {mapMode === 'mine' && ownClusters.map((cluster) => {
           const captureKey = `${cluster.id}:${cluster.messages.length}`;
-          const capturedImage = avatarImages[captureKey];
+          const capturedImage = avatarImages[captureKey] ?? cluster.customMarkerAvatarUrl ?? null;
           if (!capturedImage) return null;
           return (
             <MessageMarker
@@ -640,7 +641,7 @@ export default function MapScreen({ navigation, route }: Props) {
       <View style={styles.captureContainer} pointerEvents="none">
         {(mapMode === 'explore' ? clusters : ownClusters).map((cluster) => {
           const captureKey = `${cluster.id}:${cluster.messages.length}`;
-          if (avatarImages[captureKey]) return null;
+          if (avatarImages[captureKey] || cluster.customMarkerAvatarUrl) return null;
           const count = cluster.messages.length;
           // In mine mode: violet for public, blue if any private message is unread, green if all read
           const isClusterOpened = mapMode === 'mine' && !cluster.isPublic

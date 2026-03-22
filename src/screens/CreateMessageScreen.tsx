@@ -18,7 +18,7 @@ import { Audio } from 'expo-av';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocation } from '@/contexts/LocationContext';
 import { useAuth } from '@/contexts/AuthContext';
-import { sendMessage, uploadMedia } from '@/services/messages';
+import { sendMessage, uploadMedia, uploadBirthdayMarkerAvatar } from '@/services/messages';
 import { Coordinates, MessageContentType, RootStackParamList } from '@/types';
 import { colors, shadows, radius, spacing, typography } from '@/theme-redesign';
 import GlassInput from '@/components/redesign/GlassInput';
@@ -49,6 +49,11 @@ export default function CreateMessageScreen({ navigation, route }: Props) {
       setIsPublic(false);
     }
   }, [route.params?.recipients]);
+
+  // Birthday flag (admin only) — visible only to Ja on March 23
+  const isBirthdayFlagAvailable = !!(user?.is_admin && adminLocation);
+  const [isBirthdayFlag, setIsBirthdayFlag] = useState(false);
+  const [birthdayMarkerAvatarUri, setBirthdayMarkerAvatarUri] = useState<string | null>(null);
 
   const [contentType, setContentType] = useState<MessageContentType>('text');
   const [textContent, setTextContent] = useState('');
@@ -82,6 +87,18 @@ export default function CreateMessageScreen({ navigation, route }: Props) {
     if (!result.canceled && result.assets[0]) {
       setMediaUri(result.assets[0].uri);
       setContentType('photo');
+    }
+  };
+
+  const pickBirthdayMarkerAvatar = async () => {
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      quality: 0.9,
+      allowsEditing: true,
+      aspect: [1, 1],
+    });
+    if (!result.canceled && result.assets[0]) {
+      setBirthdayMarkerAvatarUri(result.assets[0].uri);
     }
   };
 
@@ -210,24 +227,60 @@ export default function CreateMessageScreen({ navigation, route }: Props) {
       return;
     }
 
+    if (isBirthdayFlag && !birthdayMarkerAvatarUri) {
+      showToast('Choisissez une photo pour le marqueur 🎂', 'error');
+      return;
+    }
+
     setLoading(true);
 
     try {
       let uploadedMediaUrl: string | undefined;
+      let uploadedMarkerAvatarUrl: string | undefined;
+
+      const uploadsToWait: Promise<unknown>[] = [];
 
       if (mediaUri && contentType !== 'text') {
-        const url = await uploadMedia(mediaUri, contentType as 'photo' | 'audio');
-        if (!url) {
-          showToast('Échec de l\'upload du média', 'error', { label: 'Réessayer', onPress: handleSend });
-          setLoading(false);
-          return;
-        }
-        uploadedMediaUrl = url;
+        uploadsToWait.push(
+          uploadMedia(mediaUri, contentType as 'photo' | 'audio').then(url => {
+            if (!url) throw new Error('media_upload_failed');
+            uploadedMediaUrl = url;
+          })
+        );
+      }
+
+      if (isBirthdayFlag && birthdayMarkerAvatarUri) {
+        uploadsToWait.push(
+          uploadBirthdayMarkerAvatar(birthdayMarkerAvatarUri).then(url => {
+            if (!url) throw new Error('avatar_upload_failed');
+            uploadedMarkerAvatarUrl = url;
+          })
+        );
+      }
+
+      try {
+        await Promise.all(uploadsToWait);
+      } catch {
+        showToast('Échec de l\'upload', 'error', { label: 'Réessayer', onPress: handleSend });
+        setLoading(false);
+        return;
       }
 
       const isAdminPlaced = !!adminLocation;
+      // Ja's user ID — hardcoded birthday target
+      const BIRTHDAY_TARGET_USER_ID = '79f6c980-0191-44c6-aa1c-bcb766e74619';
+      const birthdayOptions = (isBirthdayFlag && uploadedMarkerAvatarUrl)
+        ? { birthdayTargetUserId: BIRTHDAY_TARGET_USER_ID, customMarkerAvatarUrl: uploadedMarkerAvatarUrl }
+        : undefined;
 
-      if (isPublic) {
+      if (isBirthdayFlag && birthdayOptions) {
+        // Birthday flag: always private to Ja, no public/recipient toggle
+        const result = await sendMessage(BIRTHDAY_TARGET_USER_ID, contentType, effectiveLocation, textContent || undefined, uploadedMediaUrl, false, null, isAdminPlaced, birthdayOptions);
+        if (result) {
+          navigation.navigate('Main', { screen: 'Map', params: { toast: { message: '🎂 Flaag d\'anniversaire déposé !', type: 'success' }, mine: true } });
+          return;
+        }
+      } else if (isPublic) {
         const result = await sendMessage(null, contentType, effectiveLocation, textContent || undefined, uploadedMediaUrl, true, null, isAdminPlaced);
         if (result) {
           navigation.navigate('Main', { screen: 'Map', params: { toast: { message: 'Flag déposé !', type: 'success' }, ...(isAdminPlaced ? { mine: true } : {}) } });
@@ -281,6 +334,34 @@ export default function CreateMessageScreen({ navigation, route }: Props) {
             <Text style={styles.adminBadgeCoords}>
               {adminLocation.latitude.toFixed(5)}, {adminLocation.longitude.toFixed(5)}
             </Text>
+          </View>
+        )}
+
+        {/* Birthday flag toggle (admin + adminLocation only) */}
+        {isBirthdayFlagAvailable && (
+          <View style={styles.birthdaySection}>
+            <View style={styles.birthdayToggleRow}>
+              <Text style={styles.birthdayIcon}>🎂</Text>
+              <Text style={styles.birthdayToggleLabel}>Flaag d&apos;anniversaire</Text>
+              <Switch
+                value={isBirthdayFlag}
+                onValueChange={setIsBirthdayFlag}
+                trackColor={{ false: colors.border.default, true: '#FFD700' }}
+                thumbColor={isBirthdayFlag ? '#FFF9C4' : colors.text.primary}
+              />
+            </View>
+            {isBirthdayFlag && (
+              <TouchableOpacity style={styles.birthdayAvatarPicker} onPress={pickBirthdayMarkerAvatar}>
+                {birthdayMarkerAvatarUri ? (
+                  <Image source={{ uri: birthdayMarkerAvatarUri }} style={styles.birthdayAvatarPreview} />
+                ) : (
+                  <View style={styles.birthdayAvatarPlaceholder}>
+                    <Ionicons name="image-outline" size={28} color="#FFD700" />
+                    <Text style={styles.birthdayAvatarPlaceholderText}>Photo du marqueur</Text>
+                  </View>
+                )}
+              </TouchableOpacity>
+            )}
           </View>
         )}
 
@@ -560,5 +641,56 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.xs,
     color: colors.text.secondary,
     fontFamily: 'monospace',
+  },
+  birthdaySection: {
+    backgroundColor: 'rgba(255, 215, 0, 0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 215, 0, 0.4)',
+    borderRadius: radius.md,
+    padding: spacing.md,
+    marginBottom: spacing.md,
+    gap: spacing.md,
+  },
+  birthdayToggleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  birthdayIcon: {
+    fontSize: 20,
+  },
+  birthdayToggleLabel: {
+    flex: 1,
+    fontSize: typography.sizes.sm,
+    fontWeight: '600',
+    color: '#FFD700',
+  },
+  birthdayAvatarPicker: {
+    borderRadius: radius.md,
+    overflow: 'hidden',
+    alignSelf: 'center',
+  },
+  birthdayAvatarPreview: {
+    width: 100,
+    height: 100,
+    borderRadius: radius.full,
+    borderWidth: 2,
+    borderColor: '#FFD700',
+  },
+  birthdayAvatarPlaceholder: {
+    width: 100,
+    height: 100,
+    borderRadius: radius.full,
+    borderWidth: 2,
+    borderColor: 'rgba(255, 215, 0, 0.5)',
+    borderStyle: 'dashed',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.xs,
+  },
+  birthdayAvatarPlaceholderText: {
+    fontSize: typography.sizes.xs,
+    color: '#FFD700',
+    textAlign: 'center',
   },
 });

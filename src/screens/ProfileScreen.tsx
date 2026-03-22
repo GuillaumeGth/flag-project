@@ -5,8 +5,6 @@ import {
   TouchableOpacity,
   StyleSheet,
   Modal,
-  KeyboardAvoidingView,
-  Platform,
   FlatList,
   RefreshControl,
   Animated,
@@ -20,10 +18,8 @@ import { BottomTabNavigationProp, BottomTabScreenProps } from '@react-navigation
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useAuth } from '@/contexts/AuthContext';
 import { colors, shadows, radius, spacing, typography } from '@/theme-redesign';
-import { fetchMyPublicMessages } from '@/services/messages';
 import { fetchFollowerCount } from '@/services/subscriptions';
 import { fetchReceivedRequestsCount } from '@/services/followRequests';
-import { fetchCommentCounts } from '@/services/comments';
 import { Message, MainTabParamList, RootStackParamList } from '@/types';
 import GlassCard from '@/components/redesign/GlassCard';
 import GlassInput from '@/components/redesign/GlassInput';
@@ -31,6 +27,8 @@ import PremiumButton from '@/components/redesign/PremiumButton';
 import PremiumAvatar from '@/components/redesign/PremiumAvatar';
 import GridCell from '@/components/profile/GridCell';
 import ProfileStatsRow from '@/components/profile/ProfileStatsRow';
+import EmptyState from '@/components/EmptyState';
+import { useProfileMessages } from '@/hooks/useProfileMessages';
 
 type ProfileNavigationProp = CompositeNavigationProp<
   BottomTabNavigationProp<MainTabParamList, 'Profile'>,
@@ -48,12 +46,12 @@ export default function ProfileScreen({ navigation }: Props) {
   const [newName, setNewName] = useState('');
   const [savingName, setSavingName] = useState(false);
 
-  const [messages, setMessages] = useState<Message[]>([]);
+  const { messages, commentCounts, loading: messagesLoading, refreshing: messagesRefreshing, onRefresh: refreshMessages } = useProfileMessages();
   const [followerCount, setFollowerCount] = useState(0);
   const [pendingRequestsCount, setPendingRequestsCount] = useState(0);
-  const [commentCounts, setCommentCounts] = useState<Record<string, number>>({});
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
+  const [extraLoading, setExtraLoading] = useState(true);
+
+  const loading = messagesLoading || extraLoading;
 
   const [fadeAnim] = useState(new Animated.Value(0));
   const [slideAnim] = useState(new Animated.Value(30));
@@ -63,15 +61,6 @@ export default function ProfileScreen({ navigation }: Props) {
       Animated.timing(fadeAnim, { toValue: 1, duration: 400, useNativeDriver: true }),
       Animated.timing(slideAnim, { toValue: 0, duration: 400, useNativeDriver: true }),
     ]).start();
-  }, []);
-
-  const loadMessages = useCallback(async () => {
-    const data = await fetchMyPublicMessages();
-    setMessages(data);
-    if (data.length > 0) {
-      const counts = await fetchCommentCounts(data.map(m => m.id));
-      setCommentCounts(counts);
-    }
   }, []);
 
   const loadFollowerCount = useCallback(async () => {
@@ -86,14 +75,12 @@ export default function ProfileScreen({ navigation }: Props) {
   }, []);
 
   useEffect(() => {
-    Promise.all([loadMessages(), loadFollowerCount(), loadPendingRequests()]).finally(() => setLoading(false));
-  }, [loadMessages, loadFollowerCount, loadPendingRequests]);
+    Promise.all([loadFollowerCount(), loadPendingRequests()]).finally(() => setExtraLoading(false));
+  }, [loadFollowerCount, loadPendingRequests]);
 
   const onRefresh = useCallback(async () => {
-    setRefreshing(true);
-    await Promise.all([loadMessages(), loadFollowerCount(), loadPendingRequests()]);
-    setRefreshing(false);
-  }, [loadMessages, loadFollowerCount, loadPendingRequests]);
+    await Promise.all([refreshMessages(), loadFollowerCount(), loadPendingRequests()]);
+  }, [refreshMessages, loadFollowerCount, loadPendingRequests]);
 
   const handleChangeAvatar = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -136,13 +123,11 @@ export default function ProfileScreen({ navigation }: Props) {
   const renderEmpty = () => {
     if (loading) return null;
     return (
-      <View style={styles.emptyContainer}>
-        <View style={styles.emptyIconContainer}>
-          <Ionicons name="albums-outline" size={56} color={colors.primary.violet} />
-        </View>
-        <Text style={styles.emptyText}>Aucun message public</Text>
-        <Text style={styles.emptySubtext}>Partagez votre premier message avec le monde</Text>
-      </View>
+      <EmptyState
+        icon="albums-outline"
+        title="Aucun message public"
+        subtitle="Partagez votre premier message avec le monde"
+      />
     );
   };
 
@@ -222,7 +207,7 @@ export default function ProfileScreen({ navigation }: Props) {
           ListHeaderComponent={renderHeader}
           ListEmptyComponent={renderEmpty}
           refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary.cyan} />
+            <RefreshControl refreshing={messagesRefreshing} onRefresh={onRefresh} tintColor={colors.primary.cyan} />
           }
           contentContainerStyle={styles.listContent}
           columnWrapperStyle={styles.gridRow}
@@ -230,7 +215,7 @@ export default function ProfileScreen({ navigation }: Props) {
       )}
 
       <Modal visible={editNameVisible} transparent animationType="fade" onRequestClose={() => setEditNameVisible(false)}>
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.modalOverlay}>
+        <View style={styles.modalOverlay}>
           <View style={styles.modalBlur} />
           <GlassCard style={styles.modalCard} withBorder withGlow glowColor="cyan">
             <Text style={styles.modalTitle}>Modifier le nom</Text>
@@ -250,7 +235,7 @@ export default function ProfileScreen({ navigation }: Props) {
               <PremiumButton title="Enregistrer" variant="gradient" onPress={handleSaveName} loading={savingName} disabled={savingName} style={styles.modalButton} withGlow />
             </View>
           </GlassCard>
-        </KeyboardAvoidingView>
+        </View>
       </Modal>
 
     </View>
@@ -361,33 +346,6 @@ const styles = StyleSheet.create({
   },
   gridRow: {
     gap: 2,
-  },
-  emptyContainer: {
-    alignItems: 'center',
-    paddingTop: 60,
-    paddingHorizontal: spacing.xxxl,
-  },
-  emptyIconContainer: {
-    width: 80,
-    height: 80,
-    borderRadius: radius.full,
-    backgroundColor: colors.surface.glass,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: spacing.lg,
-    ...shadows.glowViolet,
-  },
-  emptyText: {
-    fontSize: typography.sizes.lg,
-    fontWeight: '600',
-    color: colors.text.primary,
-    marginTop: spacing.md,
-  },
-  emptySubtext: {
-    fontSize: typography.sizes.sm,
-    color: colors.text.secondary,
-    textAlign: 'center',
-    marginTop: spacing.sm,
   },
   modalOverlay: {
     flex: 1,

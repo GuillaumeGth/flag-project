@@ -28,6 +28,7 @@ interface MessageFeedItemProps {
   onUserPress?: (userId: string) => void;
   onInputFocus?: () => void;
   onMapPress?: () => void;
+  onDelete?: (messageId: string) => void;
 }
 
 export default function MessageFeedItem({
@@ -38,6 +39,7 @@ export default function MessageFeedItem({
   onUserPress,
   onInputFocus,
   onMapPress,
+  onDelete,
 }: MessageFeedItemProps) {
   const { user } = useAuth();
   const [comments, setComments] = useState<CommentWithReplies[]>([]);
@@ -233,6 +235,15 @@ export default function MessageFeedItem({
             <TouchableOpacity style={styles.actionItem} onPress={onMapPress} activeOpacity={0.7}>
               <Ionicons name="location-outline" size={20} color={colors.text.secondary} />
             </TouchableOpacity>
+            {onDelete && user?.id === message.sender_id && (
+              <TouchableOpacity
+                style={[styles.actionItem, styles.actionItemRight]}
+                onPress={() => onDelete(message.id)}
+                activeOpacity={0.7}
+              >
+                <Ionicons name="ellipsis-horizontal" size={20} color={colors.text.secondary} />
+              </TouchableOpacity>
+            )}
           </View>
         )}
       />
@@ -293,6 +304,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.xs,
+  },
+  actionItemRight: {
+    marginLeft: 'auto',
   },
   actionCount: {
     fontSize: typography.sizes.sm,

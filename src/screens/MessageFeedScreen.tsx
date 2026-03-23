@@ -12,10 +12,11 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, spacing, typography } from '@/theme-redesign';
 import { supabase } from '@/services/supabase';
-import { fetchUserPublicMessages, fetchMyPublicMessages, fetchDiscoveredPublicMessageIds } from '@/services/messages';
+import { fetchUserPublicMessages, fetchMyPublicMessages, fetchDiscoveredPublicMessageIds, deletePublicMessage } from '@/services/messages';
 import { useAuth } from '@/contexts/AuthContext';
 import { Message, User, RootStackParamList } from '@/types';
 import MessageFeedItem from '@/components/comments/MessageFeedItem';
+import OptionsModal, { OptionsModalOption } from '@/components/OptionsModal';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'MessageFeed'>;
 
@@ -30,6 +31,7 @@ export default function MessageFeedScreen({ navigation, route }: Props) {
   const [userProfile, setUserProfile] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [scrolledToInitial, setScrolledToInitial] = useState(false);
+  const [deletingMessageId, setDeletingMessageId] = useState<string | null>(null);
 
   const isOwnProfile = user?.id === userId;
 
@@ -71,6 +73,19 @@ export default function MessageFeedScreen({ navigation, route }: Props) {
     }
   }, [navigation, userId]);
 
+  const handleDeletePress = useCallback((messageId: string) => {
+    setDeletingMessageId(messageId);
+  }, []);
+
+  const handleConfirmDelete = useCallback(async () => {
+    if (!deletingMessageId) return;
+    setDeletingMessageId(null);
+    const ok = await deletePublicMessage(deletingMessageId);
+    if (ok) {
+      setMessages(prev => prev.filter(m => m.id !== deletingMessageId));
+    }
+  }, [deletingMessageId]);
+
   const handleMapPress = useCallback((message: Message) => {
     const { latitude, longitude } = message.location;
     navigation.navigate('Main', {
@@ -78,6 +93,15 @@ export default function MessageFeedScreen({ navigation, route }: Props) {
       params: { focusLocation: { latitude, longitude } },
     });
   }, [navigation]);
+
+  const deleteOptions: OptionsModalOption[] = [
+    {
+      label: 'Supprimer ce fläag',
+      icon: 'trash-outline',
+      destructive: true,
+      onPress: handleConfirmDelete,
+    },
+  ];
 
   const renderItem = useCallback(({ item }: { item: Message }) => (
     <MessageFeedItem
@@ -87,8 +111,9 @@ export default function MessageFeedScreen({ navigation, route }: Props) {
       isDiscovered={isOwnProfile ? undefined : discoveredIds.has(item.id)}
       onUserPress={handleUserPress}
       onMapPress={() => handleMapPress(item)}
+      onDelete={isOwnProfile ? handleDeletePress : undefined}
     />
-  ), [userProfile, discoveredIds, isOwnProfile, handleUserPress, handleMapPress]);
+  ), [userProfile, discoveredIds, isOwnProfile, handleUserPress, handleMapPress, handleDeletePress]);
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
@@ -121,6 +146,12 @@ export default function MessageFeedScreen({ navigation, route }: Props) {
           }}
         />
       )}
+
+      <OptionsModal
+        visible={!!deletingMessageId}
+        options={deleteOptions}
+        onClose={() => setDeletingMessageId(null)}
+      />
     </View>
   );
 }

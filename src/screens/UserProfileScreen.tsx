@@ -3,7 +3,6 @@ import {
   View,
   Text,
   TouchableOpacity,
-  StyleSheet,
   ActivityIndicator,
   FlatList,
   RefreshControl,
@@ -13,7 +12,8 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { colors, spacing, radius, typography } from '@/theme-redesign';
+import { colors } from '@/theme-redesign';
+import styles from './UserProfileScreen.styles';
 import { supabase } from '@/services/supabase';
 import {
   follow,
@@ -317,131 +317,3 @@ export default function UserProfileScreen({ navigation, route }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background.primary,
-  },
-  headerSpacer: {},
-  backButton: {
-    padding: 4,
-    marginRight: 4,
-    marginTop: 10,
-  },
-  profileSection: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border.default,
-  },
-  profileTopRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    marginBottom: 10,
-  },
-  profileInfo: {
-    flex: 1,
-  },
-  displayName: {
-    fontSize: 17,
-    fontWeight: '600',
-    color: colors.text.primary,
-  },
-  followButton: {
-    paddingHorizontal: 20,
-    paddingVertical: 8,
-    borderRadius: 20,
-    backgroundColor: colors.primary.violet,
-    minWidth: 100,
-    alignItems: 'center',
-  },
-  followButtonActive: {
-    backgroundColor: 'transparent',
-    borderWidth: 1,
-    borderColor: colors.primary.violet,
-  },
-  followButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: colors.text.primary,
-  },
-  followButtonTextActive: {
-    color: colors.primary.violet,
-  },
-  divider: {
-    height: 1,
-    backgroundColor: colors.border.default,
-    marginHorizontal: spacing.xl,
-    marginTop: spacing.lg,
-    marginBottom: spacing.md,
-  },
-  profileActions: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  bellButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    borderWidth: 1,
-    borderColor: colors.primary.violet,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  messageButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    borderWidth: 1,
-    borderColor: colors.primary.violet,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  notifModalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 24,
-  },
-  notifModalCard: {
-    width: '100%',
-    backgroundColor: colors.surface.elevated,
-    borderRadius: radius.xl,
-    padding: spacing.lg,
-  },
-  notifModalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: spacing.lg,
-  },
-  notifModalTitle: {
-    fontSize: typography.sizes.lg,
-    fontWeight: '700',
-    color: colors.text.primary,
-  },
-  notifRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: spacing.sm,
-  },
-  notifRowInfo: {
-    flex: 1,
-    marginRight: spacing.md,
-  },
-  notifRowLabel: {
-    fontSize: typography.sizes.md,
-    fontWeight: '600',
-    color: colors.text.primary,
-  },
-  notifDivider: {
-    height: 1,
-    backgroundColor: colors.border.default,
-    marginVertical: spacing.sm,
-  },
-});

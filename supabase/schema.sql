@@ -138,8 +138,8 @@ CREATE POLICY "Users can view own messages" ON public.messages
             -- Birthday flags: only the target user, only on March 23
             birthday_visible_only = true
             AND birthday_target_user_id = auth.uid()
-            AND EXTRACT(MONTH FROM NOW()) = 3
-            AND EXTRACT(DAY FROM NOW()) = 23
+            AND EXTRACT(MONTH FROM NOW() AT TIME ZONE 'Europe/Paris') = 3
+            AND EXTRACT(DAY FROM NOW() AT TIME ZONE 'Europe/Paris') = 23
         )
     );
 
@@ -286,7 +286,7 @@ BEGIN
 
     -- Birthday flags: no notification until March 23
     IF NEW.birthday_visible_only = TRUE AND NOT (
-        EXTRACT(MONTH FROM NOW()) = 3 AND EXTRACT(DAY FROM NOW()) = 23
+        EXTRACT(MONTH FROM NOW() AT TIME ZONE 'Europe/Paris') = 3 AND EXTRACT(DAY FROM NOW() AT TIME ZONE 'Europe/Paris') = 23
     ) THEN
         RETURN NEW;
     END IF;

@@ -587,7 +587,7 @@ export default function MapScreen({ navigation, route }: Props) {
         {/* Explore mode markers */}
         {mapMode === 'explore' && clusters.map((cluster) => {
           const captureKey = `${cluster.id}:${cluster.messages.length}`;
-          const capturedImage = avatarImages[captureKey] ?? cluster.customMarkerAvatarUrl ?? null;
+          const capturedImage = avatarImages[captureKey] ?? null;
           if (!capturedImage) return null;
           return (
             <MessageMarker
@@ -609,7 +609,7 @@ export default function MapScreen({ navigation, route }: Props) {
         {/* Mine mode markers */}
         {mapMode === 'mine' && ownClusters.map((cluster) => {
           const captureKey = `${cluster.id}:${cluster.messages.length}`;
-          const capturedImage = avatarImages[captureKey] ?? cluster.customMarkerAvatarUrl ?? null;
+          const capturedImage = avatarImages[captureKey] ?? null;
           if (!capturedImage) return null;
           return (
             <MessageMarker
@@ -641,7 +641,7 @@ export default function MapScreen({ navigation, route }: Props) {
       <View style={styles.captureContainer} pointerEvents="none">
         {(mapMode === 'explore' ? clusters : ownClusters).map((cluster) => {
           const captureKey = `${cluster.id}:${cluster.messages.length}`;
-          if (avatarImages[captureKey] || cluster.customMarkerAvatarUrl) return null;
+          if (avatarImages[captureKey]) return null;
           const count = cluster.messages.length;
           // In mine mode: violet for public, blue if any private message is unread, green if all read
           const isClusterOpened = mapMode === 'mine' && !cluster.isPublic
@@ -655,9 +655,11 @@ export default function MapScreen({ navigation, route }: Props) {
           const isAdminCluster = cluster.isAdminPlaced;
 
           // Inner avatar shared between all border styles
-          const avatarContent = cluster.senderAvatarUrl ? (
+          // Birthday flags use customMarkerAvatarUrl instead of sender avatar
+          const avatarUrl = cluster.customMarkerAvatarUrl ?? cluster.senderAvatarUrl;
+          const avatarContent = avatarUrl ? (
             <Image
-              source={{ uri: cluster.senderAvatarUrl }}
+              source={{ uri: avatarUrl }}
               style={styles.captureAvatarImage}
               fadeDuration={0}
               onLoad={() => {
@@ -676,7 +678,7 @@ export default function MapScreen({ navigation, route }: Props) {
               ref={(ref) => { avatarRefs.current[captureKey] = ref; }}
               collapsable={false}
               style={styles.captureAvatarWrapper}
-              onLayout={cluster.senderAvatarUrl ? undefined : () => {
+              onLayout={avatarUrl ? undefined : () => {
                 requestAnimationFrame(() => requestAnimationFrame(() => captureAvatar(captureKey)));
               }}
             >

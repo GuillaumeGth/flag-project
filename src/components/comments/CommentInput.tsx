@@ -44,7 +44,6 @@ export default function CommentInput({ onSubmit, replyingTo, onCancelReply, onFo
           multiline
           maxLength={2000}
           onFocus={onFocus}
-          disableKeyboardAvoidance
         />
         {text.trim().length > 0 && (
           <TouchableOpacity style={styles.sendButton} onPress={handleSend}>

@@ -3,11 +3,9 @@ import {
   View,
   Text,
   TouchableOpacity,
-  StyleSheet,
   Image,
   ActivityIndicator,
   FlatList,
-  Dimensions,
   RefreshControl,
   Modal,
   Switch,
@@ -15,9 +13,12 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { colors, spacing, radius, typography, shadows } from '@/theme-redesign';
+import { colors } from '@/theme-redesign';
+import styles, { CELL_SIZE } from './UserProfileScreen.styles';
 import { supabase } from '@/services/supabase';
-import { fetchUserPublicMessages, fetchDiscoveredPublicMessageIds } from '@/services/messages';
+import { fetchUserPublicMessages, fetchDiscoveredPublicMessageIds, deletePublicMessage } from '@/services/messages';
+import { fetchReactionsForMessages, toggleReaction } from '@/services/reactions';
+import { ReactionSummary } from '@/types/reactions';
 import {
   follow,
   unfollow,
@@ -33,14 +34,16 @@ import {
   fetchSentRequestStatus,
 } from '@/services/followRequests';
 import { Message, User, RootStackParamList } from '@/types';
+import { useAuth } from '@/contexts/AuthContext';
+import Toast from '@/components/Toast';
+import OptionsModal from '@/components/OptionsModal';
 
-const SCREEN_WIDTH = Dimensions.get('window').width;
-const CELL_SIZE = SCREEN_WIDTH / 3;
 
 type Props = NativeStackScreenProps<RootStackParamList, 'UserProfile'>;
 
 export default function UserProfileScreen({ navigation, route }: Props) {
   const insets = useSafeAreaInsets();
+  const { user: currentUser } = useAuth();
   const { userId } = route.params;
 
   const [userProfile, setUserProfile] = useState<User | null>(null);
@@ -53,6 +56,9 @@ export default function UserProfileScreen({ navigation, route }: Props) {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [viewingMessage, setViewingMessage] = useState<Message | null>(null);
+  const [viewingReactions, setViewingReactions] = useState<ReactionSummary[]>([]);
+  const [showOptionsModal, setShowOptionsModal] = useState(false);
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'warning' } | null>(null);
   const [notifPrefs, setNotifPrefs] = useState<NotificationPrefs>({ notifyPrivateFlags: true, notifyPublicFlags: false });
   const [showNotifModal, setShowNotifModal] = useState(false);
 
@@ -136,6 +142,45 @@ export default function UserProfileScreen({ navigation, route }: Props) {
     setFollowLoading(false);
   };
 
+  const handleOpenMessage = useCallback(async (msg: Message) => {
+    setViewingMessage(msg);
+    setViewingReactions([]);
+    if (!currentUser?.id) return;
+    const map = await fetchReactionsForMessages([msg.id], currentUser.id);
+    setViewingReactions(map[msg.id] ?? []);
+  }, [currentUser?.id]);
+
+  const handleLikeViewing = useCallback(async () => {
+    if (!viewingMessage || !currentUser?.id) return;
+    const heart = viewingReactions.find(r => r.emoji === '❤️');
+    const hasReacted = heart?.has_reacted ?? false;
+    setViewingReactions(prev => {
+      const idx = prev.findIndex(r => r.emoji === '❤️');
+      if (idx === -1) {
+        return [...prev, { emoji: '❤️', count: 1, has_reacted: true, user_ids: [currentUser.id] }];
+      }
+      const entry = prev[idx];
+      const updated = [...prev];
+      updated[idx] = hasReacted
+        ? { ...entry, count: entry.count - 1, has_reacted: false, user_ids: entry.user_ids.filter(id => id !== currentUser.id) }
+        : { ...entry, count: entry.count + 1, has_reacted: true, user_ids: [...entry.user_ids, currentUser.id] };
+      return updated;
+    });
+    await toggleReaction(viewingMessage.id, '❤️', currentUser.id, hasReacted);
+  }, [viewingMessage, viewingReactions, currentUser?.id]);
+
+  const handleDeleteViewing = useCallback(async () => {
+    if (!viewingMessage) return;
+    setShowOptionsModal(false);
+    const ok = await deletePublicMessage(viewingMessage.id);
+    if (ok) {
+      setMessages(prev => prev.filter(m => m.id !== viewingMessage.id));
+      setViewingMessage(null);
+    } else {
+      setToast({ message: 'Impossible de supprimer ce message.', type: 'error' });
+    }
+  }, [viewingMessage]);
+
   const renderCell = ({ item }: { item: Message }) => {
     const isDiscovered = discoveredIds.has(item.id);
 
@@ -173,7 +218,7 @@ export default function UserProfileScreen({ navigation, route }: Props) {
 
     if (item.content_type === 'photo') {
       return (
-        <TouchableOpacity style={styles.cell} onPress={() => setViewingMessage(item)}>
+        <TouchableOpacity style={styles.cell} onPress={() => handleOpenMessage(item)}>
           <Image source={{ uri: item.media_url }} style={styles.cellImage} />
         </TouchableOpacity>
       );
@@ -186,7 +231,7 @@ export default function UserProfileScreen({ navigation, route }: Props) {
       );
     }
     return (
-      <TouchableOpacity style={[styles.cell, styles.cellPlaceholder]} onPress={() => setViewingMessage(item)}>
+      <TouchableOpacity style={[styles.cell, styles.cellPlaceholder]} onPress={() => handleOpenMessage(item)}>
         <Text style={styles.cellText} numberOfLines={4}>
           {item.text_content}
         </Text>
@@ -305,6 +350,12 @@ export default function UserProfileScreen({ navigation, route }: Props) {
 
   return (
     <View style={styles.container}>
+      <Toast
+        visible={!!toast}
+        message={toast?.message ?? ''}
+        type={toast?.type ?? 'error'}
+        onHide={() => setToast(null)}
+      />
       <View style={[styles.headerSpacer, { paddingTop: insets.top }]} />
 
       {loading ? (
@@ -420,296 +471,39 @@ export default function UserProfileScreen({ navigation, route }: Props) {
               <Text style={styles.photoViewerLocationText}>Voir sur la carte</Text>
             </TouchableOpacity>
           )}
+          {/* Like + ellipsis footer */}
+          <View style={[styles.viewerFooter, { bottom: (viewingMessage?.location ? 80 : 32) + insets.bottom }]}>
+            <TouchableOpacity style={styles.viewerLikeButton} onPress={handleLikeViewing}>
+              <Ionicons
+                name={viewingReactions.find(r => r.emoji === '❤️')?.has_reacted ? 'heart' : 'heart-outline'}
+                size={26}
+                color={viewingReactions.find(r => r.emoji === '❤️')?.has_reacted ? '#FF5C7C' : colors.text.primary}
+              />
+              {(viewingReactions.find(r => r.emoji === '❤️')?.count ?? 0) > 0 && (
+                <Text style={[
+                  styles.viewerLikeCount,
+                  viewingReactions.find(r => r.emoji === '❤️')?.has_reacted && styles.viewerLikeCountActive,
+                ]}>
+                  {viewingReactions.find(r => r.emoji === '❤️')?.count}
+                </Text>
+              )}
+            </TouchableOpacity>
+            {currentUser?.id === userId && (
+              <TouchableOpacity style={styles.viewerEllipsisButton} onPress={() => setShowOptionsModal(true)}>
+                <Ionicons name="ellipsis-horizontal" size={22} color={colors.text.primary} />
+              </TouchableOpacity>
+            )}
+          </View>
         </View>
       </Modal>
+      <OptionsModal
+        visible={showOptionsModal}
+        onClose={() => setShowOptionsModal(false)}
+        options={[
+          { label: 'Supprimer', icon: 'trash-outline', destructive: true, onPress: handleDeleteViewing },
+        ]}
+      />
     </View>
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background.primary,
-  },
-  headerSpacer: {},
-  backButton: {
-    padding: 4,
-    marginRight: 4,
-    marginTop: 10,
-  },
-  profileSection: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border.default,
-  },
-  profileTopRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    marginBottom: 10,
-  },
-  avatar: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    backgroundColor: colors.surface.elevated,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  avatarImage: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-  },
-  profileInfo: {
-    flex: 1,
-  },
-  displayName: {
-    fontSize: 17,
-    fontWeight: '600',
-    color: colors.text.primary,
-  },
-  followerCount: {
-    fontSize: 13,
-    color: colors.text.secondary,
-    marginTop: 2,
-  },
-  followButton: {
-    paddingHorizontal: 20,
-    paddingVertical: 8,
-    borderRadius: 20,
-    backgroundColor: colors.primary.violet,
-    minWidth: 100,
-    alignItems: 'center',
-  },
-  followButtonActive: {
-    backgroundColor: 'transparent',
-    borderWidth: 1,
-    borderColor: colors.primary.violet,
-  },
-  followButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: colors.text.primary,
-  },
-  followButtonTextActive: {
-    color: colors.primary.violet,
-  },
-  statsRow: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: spacing.md,
-    marginTop: spacing.lg,
-    paddingHorizontal: spacing.lg,
-  },
-  statCard: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.sm,
-    gap: 6,
-    backgroundColor: colors.surface.glass,
-    borderRadius: radius.lg,
-  },
-  statNumber: {
-    fontSize: typography.sizes.lg,
-    fontWeight: '700',
-    color: colors.text.primary,
-  },
-  divider: {
-    height: 1,
-    backgroundColor: colors.border.default,
-    marginHorizontal: spacing.xl,
-    marginTop: spacing.lg,
-    marginBottom: spacing.md,
-  },
-  gridTitle: {
-    fontSize: typography.sizes.md,
-    fontWeight: '600',
-    color: colors.text.primary,
-    paddingHorizontal: spacing.lg,
-    marginBottom: spacing.sm,
-  },
-  cell: {
-    width: CELL_SIZE,
-    height: CELL_SIZE,
-    borderWidth: 0.5,
-    borderColor: colors.border.default,
-  },
-  cellImage: {
-    width: '100%',
-    height: '100%',
-  },
-  cellImageBlurred: {
-    ...StyleSheet.absoluteFillObject,
-    width: '100%',
-    height: '100%',
-  },
-  cellUndiscovered: {
-    backgroundColor: colors.surface.elevated,
-    justifyContent: 'center',
-    alignItems: 'center',
-    overflow: 'hidden',
-  },
-  lockOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.4)',
-  },
-  cellPlaceholder: {
-    backgroundColor: colors.surface.elevated,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 8,
-  },
-  cellText: {
-    color: colors.text.secondary,
-    fontSize: 12,
-    textAlign: 'center',
-  },
-  cellTextBlurred: {
-    color: 'rgba(107,114,128,0.3)',
-    fontSize: 12,
-    textAlign: 'center',
-  },
-  emptyContainer: {
-    alignItems: 'center',
-    paddingTop: 48,
-    gap: 12,
-  },
-  emptyText: {
-    color: colors.text.tertiary,
-    fontSize: 14,
-  },
-  photoViewerOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.95)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  photoViewerImage: {
-    width: '100%',
-    height: '100%',
-  },
-  photoViewerClose: {
-    position: 'absolute',
-    top: 50,
-    right: 20,
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  photoViewerLocationButton: {
-    position: 'absolute',
-    bottom: 60,
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(124,92,252,0.85)',
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderRadius: 24,
-    gap: 8,
-  },
-  photoViewerLocationText: {
-    color: colors.text.primary,
-    fontSize: 15,
-    fontWeight: '600',
-  },
-  nameRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  profileActions: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  bellButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    borderWidth: 1,
-    borderColor: colors.primary.violet,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  messageButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    borderWidth: 1,
-    borderColor: colors.primary.violet,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  notifModalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 24,
-  },
-  notifModalCard: {
-    width: '100%',
-    backgroundColor: colors.surface.elevated,
-    borderRadius: radius.xl,
-    padding: spacing.lg,
-  },
-  notifModalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: spacing.lg,
-  },
-  notifModalTitle: {
-    fontSize: typography.sizes.lg,
-    fontWeight: '700',
-    color: colors.text.primary,
-  },
-  notifRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: spacing.sm,
-  },
-  notifRowInfo: {
-    flex: 1,
-    marginRight: spacing.md,
-  },
-  notifRowLabel: {
-    fontSize: typography.sizes.md,
-    fontWeight: '600',
-    color: colors.text.primary,
-  },
-  notifRowDesc: {
-    fontSize: typography.sizes.sm,
-    color: colors.text.secondary,
-    marginTop: 2,
-  },
-  notifDivider: {
-    height: 1,
-    backgroundColor: colors.border.default,
-    marginVertical: spacing.sm,
-  },
-  textViewerContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: spacing.xxl,
-  },
-  textViewerContent: {
-    fontSize: typography.sizes.xl,
-    color: colors.text.primary,
-    textAlign: 'center',
-    lineHeight: 32,
-  },
-});

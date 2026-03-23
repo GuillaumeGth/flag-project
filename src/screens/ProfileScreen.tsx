@@ -22,7 +22,9 @@ import { BottomTabNavigationProp, BottomTabScreenProps } from '@react-navigation
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useAuth } from '@/contexts/AuthContext';
 import { colors, shadows, radius, spacing, typography } from '@/theme-redesign';
-import { fetchMyPublicMessages } from '@/services/messages';
+import { fetchMyPublicMessages, deletePublicMessage } from '@/services/messages';
+import { fetchReactionsForMessages, toggleReaction } from '@/services/reactions';
+import { ReactionSummary } from '@/types/reactions';
 import { fetchFollowerCount } from '@/services/subscriptions';
 import { fetchReceivedRequestsCount } from '@/services/followRequests';
 import { Message, MainTabParamList, RootStackParamList } from '@/types';
@@ -30,6 +32,8 @@ import GlassCard from '@/components/redesign/GlassCard';
 import PremiumButton from '@/components/redesign/PremiumButton';
 import PremiumAvatar from '@/components/redesign/PremiumAvatar';
 import GridCell from '@/components/profile/GridCell';
+import Toast from '@/components/Toast';
+import OptionsModal from '@/components/OptionsModal';
 
 type ProfileNavigationProp = CompositeNavigationProp<
   BottomTabNavigationProp<MainTabParamList, 'Profile'>,
@@ -53,6 +57,9 @@ export default function ProfileScreen({ navigation }: Props) {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [viewingMessage, setViewingMessage] = useState<Message | null>(null);
+  const [viewingReactions, setViewingReactions] = useState<ReactionSummary[]>([]);
+  const [showOptionsModal, setShowOptionsModal] = useState(false);
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'warning' } | null>(null);
 
   const [fadeAnim] = useState(new Animated.Value(0));
   const [slideAnim] = useState(new Animated.Value(30));
@@ -90,6 +97,46 @@ export default function ProfileScreen({ navigation }: Props) {
     setRefreshing(false);
   }, [loadMessages, loadFollowerCount, loadPendingRequests]);
 
+  const handleOpenMessage = useCallback(async (msg: Message) => {
+    setViewingMessage(msg);
+    setViewingReactions([]);
+    if (!user?.id) return;
+    const map = await fetchReactionsForMessages([msg.id], user.id);
+    setViewingReactions(map[msg.id] ?? []);
+  }, [user?.id]);
+
+  const handleLikeViewing = useCallback(async () => {
+    if (!viewingMessage || !user?.id) return;
+    const heart = viewingReactions.find(r => r.emoji === '❤️');
+    const hasReacted = heart?.has_reacted ?? false;
+    // Optimistic update
+    setViewingReactions(prev => {
+      const idx = prev.findIndex(r => r.emoji === '❤️');
+      if (idx === -1) {
+        return [...prev, { emoji: '❤️', count: 1, has_reacted: true, user_ids: [user.id] }];
+      }
+      const entry = prev[idx];
+      const updated = [...prev];
+      updated[idx] = hasReacted
+        ? { ...entry, count: entry.count - 1, has_reacted: false, user_ids: entry.user_ids.filter(id => id !== user.id) }
+        : { ...entry, count: entry.count + 1, has_reacted: true, user_ids: [...entry.user_ids, user.id] };
+      return updated;
+    });
+    await toggleReaction(viewingMessage.id, '❤️', user.id, hasReacted);
+  }, [viewingMessage, viewingReactions, user?.id]);
+
+  const handleDeleteViewing = useCallback(async () => {
+    if (!viewingMessage) return;
+    setShowOptionsModal(false);
+    const ok = await deletePublicMessage(viewingMessage.id);
+    if (ok) {
+      setMessages(prev => prev.filter(m => m.id !== viewingMessage.id));
+      setViewingMessage(null);
+    } else {
+      setToast({ message: 'Impossible de supprimer ce message.', type: 'error' });
+    }
+  }, [viewingMessage]);
+
   const handleChangeAvatar = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== 'granted') return;
@@ -115,7 +162,7 @@ export default function ProfileScreen({ navigation }: Props) {
   };
 
   const renderCell = ({ item, index }: { item: Message; index: number }) => (
-    <GridCell item={item} index={index} onPress={setViewingMessage} />
+    <GridCell item={item} index={index} onPress={handleOpenMessage} />
   );
 
   const renderEmpty = () => {
@@ -203,6 +250,12 @@ export default function ProfileScreen({ navigation }: Props) {
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
+      <Toast
+        visible={!!toast}
+        message={toast?.message ?? ''}
+        type={toast?.type ?? 'error'}
+        onHide={() => setToast(null)}
+      />
       {loading ? (
         <>
           {renderHeader()}
@@ -279,8 +332,36 @@ export default function ProfileScreen({ navigation }: Props) {
               withGlow
             />
           )}
+          {/* Like + ellipsis footer */}
+          <View style={[styles.viewerFooter, { bottom: (viewingMessage?.location ? 120 : 60) + insets.bottom }]}>
+            <TouchableOpacity style={styles.viewerLikeButton} onPress={handleLikeViewing}>
+              <Ionicons
+                name={viewingReactions.find(r => r.emoji === '❤️')?.has_reacted ? 'heart' : 'heart-outline'}
+                size={26}
+                color={viewingReactions.find(r => r.emoji === '❤️')?.has_reacted ? '#FF5C7C' : colors.text.secondary}
+              />
+              {(viewingReactions.find(r => r.emoji === '❤️')?.count ?? 0) > 0 && (
+                <Text style={[
+                  styles.viewerLikeCount,
+                  viewingReactions.find(r => r.emoji === '❤️')?.has_reacted && styles.viewerLikeCountActive,
+                ]}>
+                  {viewingReactions.find(r => r.emoji === '❤️')?.count}
+                </Text>
+              )}
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.viewerEllipsisButton} onPress={() => setShowOptionsModal(true)}>
+              <Ionicons name="ellipsis-horizontal" size={22} color={colors.text.secondary} />
+            </TouchableOpacity>
+          </View>
         </View>
       </Modal>
+      <OptionsModal
+        visible={showOptionsModal}
+        onClose={() => setShowOptionsModal(false)}
+        options={[
+          { label: 'Supprimer', icon: 'trash-outline', destructive: true, onPress: handleDeleteViewing },
+        ]}
+      />
     </View>
   );
 }
@@ -521,5 +602,37 @@ const styles = StyleSheet.create({
     color: colors.text.primary,
     textAlign: 'center',
     lineHeight: 32,
+  },
+  viewerFooter: {
+    position: 'absolute',
+    left: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  viewerLikeButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: colors.surface.glass,
+    borderRadius: radius.full,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+  },
+  viewerLikeCount: {
+    fontSize: typography.sizes.sm,
+    fontWeight: '600',
+    color: colors.text.secondary,
+  },
+  viewerLikeCountActive: {
+    color: '#FF5C7C',
+  },
+  viewerEllipsisButton: {
+    backgroundColor: colors.surface.glass,
+    borderRadius: radius.full,
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });

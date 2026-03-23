@@ -799,6 +799,20 @@ export async function deleteMessage(messageId: string, otherUserId: string, isSe
   return true;
 }
 
+// Hard-delete a public message (owner only — enforced by RLS)
+export async function deletePublicMessage(messageId: string): Promise<boolean> {
+  const { error } = await supabase
+    .from('messages')
+    .delete()
+    .eq('id', messageId);
+
+  if (error) {
+    reportError(error, 'messages.deletePublicMessage');
+    return false;
+  }
+  return true;
+}
+
 // Upload media (photo or audio)
 export async function uploadMedia(
   uri: string,

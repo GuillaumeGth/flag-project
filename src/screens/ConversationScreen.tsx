@@ -115,7 +115,7 @@ export default function ConversationScreen({ navigation, route }: Props) {
   }, [messages, user]);
 
   const checkCanSend = async () => {
-    if (isBot) { setCanSendMessages(true); return; }
+    if (isBot) { setCanSendMessages(false); return; }
     const eitherFollowing = await isEitherFollowing(otherUserId);
     setCanSendMessages(eitherFollowing);
   };
@@ -130,11 +130,8 @@ export default function ConversationScreen({ navigation, route }: Props) {
 
   const handleDeleteSelected = async () => {
     if (!selectedMessageId || !user) return;
-    const msg = messages.find((m) => m.id === selectedMessageId);
-    if (!msg) return;
-    const isSender = msg.sender_id === user.id;
     setSelectedMessageId(null);
-    await deleteMessage(selectedMessageId, otherUserId, isSender);
+    await deleteMessage(selectedMessageId, otherUserId);
     await loadMessages();
   };
 
@@ -150,7 +147,7 @@ export default function ConversationScreen({ navigation, route }: Props) {
   const handleSend = async ({ text, mediaUri, contentType }: { text: string; mediaUri: string | null; contentType: MessageContentType }) => {
     const hasText = !!text.trim();
     const hasMedia = !!mediaUri;
-    if ((!hasText && !hasMedia) || sending) return;
+    if ((!hasText && !hasMedia) || sending || isBot) return;
 
     setSending(true);
     try {
@@ -338,9 +335,9 @@ export default function ConversationScreen({ navigation, route }: Props) {
       </TouchableOpacity>
       <TouchableOpacity
         style={styles.headerProfile}
-        onPress={() => !isBot && !selectedMessageId && navigation.navigate('UserProfile', { userId: otherUserId })}
-        disabled={isBot || !!selectedMessageId}
-        activeOpacity={isBot || !!selectedMessageId ? 1 : 0.7}
+        onPress={() => !selectedMessageId && navigation.navigate('UserProfile', { userId: otherUserId })}
+        disabled={!!selectedMessageId}
+        activeOpacity={!!selectedMessageId ? 1 : 0.7}
       >
         <PremiumAvatar uri={otherUserAvatarUrl} name={otherUserName} size="small" isBot={isBot} withGlow={isBot} glowColor="cyan" />
         <Text style={styles.headerTitle}>{otherUserName}</Text>
@@ -353,9 +350,11 @@ export default function ConversationScreen({ navigation, route }: Props) {
           >
             <Ionicons name="return-up-back-outline" size={22} color={colors.primary.cyan} />
           </TouchableOpacity>
-          <TouchableOpacity onPress={handleDeleteSelected} style={styles.deleteButton}>
-            <Ionicons name="trash-outline" size={22} color={colors.primary.magenta} />
-          </TouchableOpacity>
+          {messages.find((m) => m.id === selectedMessageId)?.sender_id === user?.id && (
+            <TouchableOpacity onPress={handleDeleteSelected} style={styles.deleteButton}>
+              <Ionicons name="trash-outline" size={22} color={colors.primary.magenta} />
+            </TouchableOpacity>
+          )}
         </>
       )}
     </View>
@@ -403,6 +402,7 @@ export default function ConversationScreen({ navigation, route }: Props) {
         <MessageInput
           sending={sending}
           canSendMessages={canSendMessages}
+          isBot={isBot}
           paddingBottom={Platform.OS === 'ios' ? insets.bottom : keyboardVisible ? 0 : insets.bottom}
           replyTo={replyToMessage}
           onCancelReply={() => setReplyToMessage(null)}

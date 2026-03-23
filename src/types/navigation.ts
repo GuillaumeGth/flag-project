@@ -14,7 +14,9 @@ export type RootStackParamList = {
   ReadMessage: { messageId: string };
   SelectRecipient: { mode: 'chat' | 'flag' };
   UserProfile: { userId: string };
+  MessageFeed: { userId: string; initialMessageId: string };
   Settings: undefined;
+  Contact: undefined;
   Privacy: undefined;
   FollowRequests: undefined;
 };

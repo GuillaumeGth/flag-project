@@ -27,6 +27,7 @@ interface SelectedMessageCardProps {
   cardSlideAnim: Animated.Value;
   cardOpacityAnim: Animated.Value;
   bottomOffset: number;
+  commentCount?: number;
   onRead: () => void;
   onNavigate: () => void;
   onClose: () => void;
@@ -40,6 +41,7 @@ export default function SelectedMessageCard({
   cardSlideAnim,
   cardOpacityAnim,
   bottomOffset,
+  commentCount,
   onRead,
   onNavigate,
   onClose,
@@ -69,9 +71,17 @@ export default function SelectedMessageCard({
               <Text style={styles.senderName}>
                 {message.sender?.display_name || 'Inconnu'}
               </Text>
-              <Text style={styles.senderLabel}>
-                · {new Date(message.created_at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' })}
-              </Text>
+              <View style={styles.senderMeta}>
+                <Text style={styles.senderLabel}>
+                  · {new Date(message.created_at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' })}
+                </Text>
+                {commentCount != null && commentCount > 0 && (
+                  <View style={styles.commentCountRow}>
+                    <Ionicons name="chatbubble-outline" size={11} color={colors.text.tertiary} />
+                    <Text style={styles.commentCountText}>{commentCount}</Text>
+                  </View>
+                )}
+              </View>
             </View>
           </View>
         </View>
@@ -184,8 +194,20 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(167, 139, 250, 0.5)',
   },
   senderInfo: {
+    flexDirection: 'column',
+  },
+  senderMeta: {
     flexDirection: 'row',
-    alignItems: 'baseline',
-    gap: spacing.xs,
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  commentCountRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+  },
+  commentCountText: {
+    fontSize: typography.sizes.xs,
+    color: colors.text.tertiary,
   },
 });

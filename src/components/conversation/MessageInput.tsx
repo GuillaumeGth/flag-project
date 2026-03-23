@@ -20,6 +20,7 @@ import { reportError } from '@/services/errorReporting';
 interface MessageInputProps {
   sending: boolean;
   canSendMessages: boolean;
+  isBot?: boolean;
   paddingBottom: number;
   replyTo?: MessageWithUsers | null;
   onCancelReply?: () => void;
@@ -35,6 +36,7 @@ interface MessageInputProps {
 export default function MessageInput({
   sending,
   canSendMessages,
+  isBot = false,
   paddingBottom,
   replyTo,
   onCancelReply,
@@ -125,6 +127,8 @@ export default function MessageInput({
     setIsPlayingInputAudio(false);
   };
 
+  if (isBot) return null;
+
   return (
     <View style={[styles.inputContainer, { paddingBottom: spacing.lg + paddingBottom }]}>
       {replyTo && onCancelReply && (
@@ -174,7 +178,7 @@ export default function MessageInput({
 
             <TextInput
               style={styles.textInput}
-              placeholder="Message..."
+              placeholder="Message non géolocalisé"
               placeholderTextColor={colors.text.tertiary}
               value={inputText}
               onChangeText={setInputText}
@@ -264,7 +268,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border.accent,
   },
-  cannotSendText: {
+cannotSendText: {
     flex: 1,
     fontSize: 14,
     color: colors.text.secondary,

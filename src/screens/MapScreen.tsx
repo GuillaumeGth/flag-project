@@ -238,6 +238,8 @@ export default function MapScreen({ navigation, route }: Props) {
         setCenteredOwnFlagId(null);
         setFocusLocation(null);
         navigation.setParams({ messageId: undefined });
+        // Also refresh messages to ensure the target flag is in the array
+        if (user) loadMessages();
       } else if (params?.focusLocation) {
         setFocusLocation(params.focusLocation);
         setCenteredMessageId(null);
@@ -1002,16 +1004,12 @@ const styles = StyleSheet.create({
     top: -200,
     left: -200,
   },
-  // Wrapper circulaire : élimine les coins transparents qui deviennent blancs
-  // dans le renderer natif de la map (GMSMarker/MKAnnotationView).
-  // Le badge (top:7, right:7, 26x26) reste dans le cercle (distance au centre ≈ 34px < rayon 35).
   captureAvatarWrapper: {
     width: 70,
     height: 70,
     justifyContent: 'center',
     alignItems: 'center',
-    borderRadius: 35,
-    overflow: 'hidden',
+    backgroundColor: 'transparent',
   },
   captureAvatar: {
     width: 56,
@@ -1026,8 +1024,8 @@ const styles = StyleSheet.create({
   },
   clusterBadge: {
     position: 'absolute',
-    top: 7,
-    right: 7,
+    top: 2,
+    right: 2,
     minWidth: 26,
     height: 26,
     borderRadius: 13,
@@ -1039,8 +1037,8 @@ const styles = StyleSheet.create({
   },
   clusterBadgeSolid: {
     position: 'absolute',
-    top: 7,
-    right: 7,
+    top: 2,
+    right: 2,
     minWidth: 26,
     height: 26,
     borderRadius: 13,

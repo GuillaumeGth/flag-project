@@ -5,9 +5,9 @@ import {
   TouchableOpacity,
   StyleSheet,
   Image,
-  Alert,
   ScrollView,
 } from 'react-native';
+import ConfirmDialog from '@/components/ConfirmDialog';
 import Toast from '@/components/Toast';
 import { Ionicons } from '@expo/vector-icons';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -36,6 +36,9 @@ export default function CreateMessageScreen({ navigation, route }: Props) {
   const [recording, setRecording] = useState<Audio.Recording | null>(null);
   const [isRecording, setIsRecording] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [discardDialogVisible, setDiscardDialogVisible] = useState(false);
+  // Stores the navigation action to dispatch if user confirms discard
+  const pendingDiscardAction = useRef<Parameters<typeof navigation.dispatch>[0] | null>(null);
   const [toast, setToast] = useState<{
     visible: boolean;
     message: string;
@@ -46,26 +49,29 @@ export default function CreateMessageScreen({ navigation, route }: Props) {
   // Detect whether the user has started composing content
   const hasDraft = textContent.trim().length > 0 || mediaUri !== null;
 
-  // Warn before discarding the draft on back navigation
+  // Intercept back navigation when a draft exists — show custom dialog instead of native Alert
   useEffect(() => {
     const unsubscribe = navigation.addListener('beforeRemove', (e) => {
       if (!hasDraft) return;
       e.preventDefault();
-      Alert.alert(
-        'Abandonner ce fläag ?',
-        'Le contenu que tu as créé sera perdu.',
-        [
-          { text: 'Continuer', style: 'cancel' },
-          {
-            text: 'Abandonner',
-            style: 'destructive',
-            onPress: () => navigation.dispatch(e.data.action),
-          },
-        ]
-      );
+      pendingDiscardAction.current = e.data.action;
+      setDiscardDialogVisible(true);
     });
     return unsubscribe;
   }, [navigation, hasDraft]);
+
+  const handleDiscardConfirm = useCallback(() => {
+    setDiscardDialogVisible(false);
+    if (pendingDiscardAction.current) {
+      navigation.dispatch(pendingDiscardAction.current);
+      pendingDiscardAction.current = null;
+    }
+  }, [navigation]);
+
+  const handleDiscardCancel = useCallback(() => {
+    setDiscardDialogVisible(false);
+    pendingDiscardAction.current = null;
+  }, []);
 
   const showToast = useCallback((message: string, type: 'success' | 'warning' | 'error') => {
     setToast({ visible: true, message, type });
@@ -190,6 +196,16 @@ export default function CreateMessageScreen({ navigation, route }: Props) {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background.primary }}>
+      <ConfirmDialog
+        visible={discardDialogVisible}
+        title="Abandonner ce fläag ?"
+        message="Le contenu que tu as créé sera perdu définitivement."
+        confirmLabel="Abandonner"
+        cancelLabel="Continuer"
+        destructive
+        onConfirm={handleDiscardConfirm}
+        onCancel={handleDiscardCancel}
+      />
       <Toast
         visible={toast.visible}
         message={toast.message}

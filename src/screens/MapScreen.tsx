@@ -28,6 +28,16 @@ import SelectedMessageCard from '@/components/map/SelectedMessageCard';
 import OwnFlagCard from '@/components/map/OwnFlagCard';
 import MessageMarker from '@/components/map/MessageMarker';
 import MapModePill, { MapMode } from '@/components/map/MapModePill';
+import MapFilterModal, {
+  ExploreFilters,
+  MineFilters,
+  FilterPerson,
+  PUBLIC_FLAG_ID,
+  DEFAULT_EXPLORE_FILTERS,
+  DEFAULT_MINE_FILTERS,
+  isExploreFiltersActive,
+  isMineFiltersActive,
+} from '@/components/map/MapFilterModal';
 import ClusterPickerModal from '@/components/map/ClusterPickerModal';
 import ScreenLoader from '@/components/ScreenLoader';
 import { useMapMessages } from '@/hooks/useMapMessages';
@@ -87,15 +97,69 @@ export default function MapScreen({ navigation, route }: Props) {
     () => messages.filter(msg => msg.sender?.id !== user?.id),
     [messages, user?.id],
   );
-  const clusters = useClusteredMarkers(otherMessages, clusterRadius, false);
+
+  // --- Filter state ---
+  const [exploreFilters, setExploreFilters] = useState<ExploreFilters>(DEFAULT_EXPLORE_FILTERS);
+  const [mineFilters, setMineFilters] = useState<MineFilters>(DEFAULT_MINE_FILTERS);
+  const [filterModalVisible, setFilterModalVisible] = useState(false);
+
+  // Apply explore filters (must be before useClusteredMarkers)
+  const filteredOtherMessages = useMemo(() => {
+    if (exploreFilters.authorIds.length === 0) return otherMessages;
+    return otherMessages.filter(m => m.sender?.id && exploreFilters.authorIds.includes(m.sender.id));
+  }, [otherMessages, exploreFilters]);
+
+  const clusters = useClusteredMarkers(filteredOtherMessages, clusterRadius, false);
 
   // --- Mine mode ---
   const { flags: myFlags, loadFlags } = useMyFlags();
   const [mapMode, setMapMode] = useState<MapMode>('explore');
 
+  // Unique authors for explore mode filter
+  const exploreAuthors = useMemo<FilterPerson[]>(() => {
+    const seen = new Set<string>();
+    const result: FilterPerson[] = [];
+    for (const m of otherMessages) {
+      if (m.sender?.id && !seen.has(m.sender.id)) {
+        seen.add(m.sender.id);
+        result.push({ id: m.sender.id, display_name: m.sender.display_name });
+      }
+    }
+    return result;
+  }, [otherMessages]);
+
+  // Unique recipients for mine mode filter
+  const mineRecipients = useMemo<FilterPerson[]>(() => {
+    const seen = new Set<string>();
+    const result: FilterPerson[] = [];
+    for (const f of myFlags) {
+      if (f.recipient?.id && !seen.has(f.recipient.id)) {
+        seen.add(f.recipient.id);
+        result.push({ id: f.recipient.id, display_name: f.recipient.display_name });
+      }
+    }
+    return result;
+  }, [myFlags]);
+
+  const hasPublicFlags = useMemo(() => myFlags.some(f => f.is_public), [myFlags]);
+
+  // Apply mine filters
+  const filteredMyFlags = useMemo(() => {
+    let result = myFlags;
+    if (mineFilters.readStatus === 'read') result = result.filter(f => f.is_read);
+    else if (mineFilters.readStatus === 'unread') result = result.filter(f => !f.is_read);
+    if (mineFilters.recipientIds.length > 0) {
+      result = result.filter(f => {
+        if (f.is_public) return mineFilters.recipientIds.includes(PUBLIC_FLAG_ID);
+        return f.recipient?.id ? mineFilters.recipientIds.includes(f.recipient.id) : false;
+      });
+    }
+    return result;
+  }, [myFlags, mineFilters]);
+
   // Convert own flags to the UndiscoveredMessageMapMeta shape so we can reuse useClusteredMarkers
   const myFlagsAsMapMeta = useMemo<UndiscoveredMessageMapMeta[]>(
-    () => myFlags.map(flag => ({
+    () => filteredMyFlags.map(flag => ({
       id: flag.id,
       location: flag.location,
       created_at: flag.created_at,
@@ -114,26 +178,26 @@ export default function MapScreen({ navigation, route }: Props) {
         is_admin: flag.is_admin_placed, // drives golden border in capture container
       },
     })),
-    [myFlags, user],
+    [filteredMyFlags, user],
   );
   const ownClusters = useClusteredMarkers(myFlagsAsMapMeta, clusterRadius, true);
 
   const ownFlagLabelMap = useMemo(() => {
     const map: Record<string, string> = {};
-    for (const flag of myFlags) {
+    for (const flag of filteredMyFlags) {
       map[flag.id] = flag.recipient?.display_name ?? (flag.is_public ? 'Public' : 'Flaag');
     }
     return map;
-  }, [myFlags]);
+  }, [filteredMyFlags]);
 
   // Map flagId -> is_read to compute per-cluster open/closed state
   const ownFlagReadMap = useMemo(() => {
     const map: Record<string, boolean> = {};
-    for (const flag of myFlags) {
+    for (const flag of filteredMyFlags) {
       map[flag.id] = flag.is_read;
     }
     return map;
-  }, [myFlags]);
+  }, [filteredMyFlags]);
 
   // --- Selection state ---
   const [selectedMessage, setSelectedMessage] = useState<UndiscoveredMessageMapMeta | null>(null);
@@ -395,6 +459,8 @@ export default function MapScreen({ navigation, route }: Props) {
     setSelectedOwnFlag(null);
     setRouteCoordinates(null);
     setRouteTargetId(null);
+    setExploreFilters(DEFAULT_EXPLORE_FILTERS);
+    setMineFilters(DEFAULT_MINE_FILTERS);
     if (mode === 'mine') {
       loadFlags();
     }
@@ -561,6 +627,18 @@ export default function MapScreen({ navigation, route }: Props) {
         onChange={handleModeSwitch}
         style={{ top: insets.top + 12 }}
       />
+
+      {/* Filter button */}
+      <TouchableOpacity
+        activeOpacity={0.8}
+        onPress={() => setFilterModalVisible(true)}
+        style={[styles.filterBtn, { top: insets.top + 12 }]}
+      >
+        <Ionicons name="options-outline" size={20} color={colors.text.primary} />
+        {(mapMode === 'explore' ? isExploreFiltersActive(exploreFilters) : isMineFiltersActive(mineFilters)) && (
+          <View style={styles.filterActiveDot} />
+        )}
+      </TouchableOpacity>
 
 
 
@@ -890,6 +968,19 @@ export default function MapScreen({ navigation, route }: Props) {
         onClose={() => setSelectedCluster(null)}
         labelMap={mapMode === 'mine' ? ownFlagLabelMap : undefined}
       />
+
+      <MapFilterModal
+        visible={filterModalVisible}
+        onClose={() => setFilterModalVisible(false)}
+        mode={mapMode}
+        authors={exploreAuthors}
+        exploreFilters={exploreFilters}
+        onExploreFiltersChange={setExploreFilters}
+        recipients={mineRecipients}
+        hasPublicFlags={hasPublicFlags}
+        mineFilters={mineFilters}
+        onMineFiltersChange={setMineFilters}
+      />
     </View>
   );
 }
@@ -897,6 +988,31 @@ export default function MapScreen({ navigation, route }: Props) {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   map: { flex: 1 },
+  filterBtn: {
+    position: 'absolute',
+    right: spacing.lg,
+    width: 42,
+    height: 42,
+    borderRadius: radius.full,
+    backgroundColor: colors.surface.glass,
+    borderWidth: 1,
+    borderColor: colors.border.default,
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 10,
+    ...shadows.small,
+  },
+  filterActiveDot: {
+    position: 'absolute',
+    top: 6,
+    right: 6,
+    width: spacing.sm,
+    height: spacing.sm,
+    borderRadius: radius.xs,
+    backgroundColor: colors.primary.violet,
+    borderWidth: 1.5,
+    borderColor: colors.background.primary,
+  },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',

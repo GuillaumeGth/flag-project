@@ -1,5 +1,6 @@
 import React, { useState, useCallback } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Alert } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import ConfirmDialog from '@/components/ConfirmDialog';
 import { Ionicons } from '@expo/vector-icons';
 import { CommentWithUser, CommentWithReplies } from '@/types/comments';
 import { colors, spacing, radius, typography } from '@/theme-redesign';
@@ -38,6 +39,7 @@ export default function CommentItem({
 }: CommentItemProps) {
   const [expanded, setExpanded] = useState(false);
   const [textTruncated, setTextTruncated] = useState(false);
+  const [deleteDialogVisible, setDeleteDialogVisible] = useState(false);
 
   const isOwn = comment.user_id === currentUserId;
   const likeCount = (comment as CommentWithReplies).like_count ?? 0;
@@ -45,13 +47,26 @@ export default function CommentItem({
 
   const handleLongPress = useCallback(() => {
     if (!isOwn) return;
-    Alert.alert('Supprimer le commentaire', 'Voulez-vous supprimer ce commentaire ?', [
-      { text: 'Annuler', style: 'cancel' },
-      { text: 'Supprimer', style: 'destructive', onPress: () => onDelete?.(comment.id) },
-    ]);
-  }, [isOwn, comment.id, onDelete]);
+    setDeleteDialogVisible(true);
+  }, [isOwn]);
+
+  const handleDeleteConfirm = useCallback(() => {
+    setDeleteDialogVisible(false);
+    onDelete?.(comment.id);
+  }, [comment.id, onDelete]);
 
   return (
+    <>
+    <ConfirmDialog
+      visible={deleteDialogVisible}
+      title="Supprimer ce commentaire ?"
+      message="Cette action est irréversible."
+      confirmLabel="Supprimer"
+      cancelLabel="Annuler"
+      destructive
+      onConfirm={handleDeleteConfirm}
+      onCancel={() => setDeleteDialogVisible(false)}
+    />
     <TouchableOpacity
       activeOpacity={0.8}
       onLongPress={handleLongPress}
@@ -117,6 +132,7 @@ export default function CommentItem({
         )}
       </TouchableOpacity>
     </TouchableOpacity>
+    </>
   );
 }
 

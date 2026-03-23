@@ -4,9 +4,9 @@ import {
   Text,
   TouchableOpacity,
   StyleSheet,
-  Alert,
   Modal,
 } from 'react-native';
+import ConfirmDialog from '@/components/ConfirmDialog';
 import { Ionicons } from '@expo/vector-icons';
 import * as Application from 'expo-application';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -26,6 +26,7 @@ export default function SettingsScreen({ navigation }: Props) {
   const [editNameVisible, setEditNameVisible] = useState(false);
   const [newName, setNewName] = useState('');
   const [savingName, setSavingName] = useState(false);
+  const [signOutDialogVisible, setSignOutDialogVisible] = useState(false);
 
   const handleSaveName = async () => {
     if (!newName.trim()) return;
@@ -35,19 +36,20 @@ export default function SettingsScreen({ navigation }: Props) {
     setEditNameVisible(false);
   };
 
-  const handleSignOut = () => {
-    Alert.alert(
-      'Déconnexion',
-      'Voulez-vous vraiment vous déconnecter ?',
-      [
-        { text: 'Annuler', style: 'cancel' },
-        { text: 'Déconnexion', style: 'destructive', onPress: signOut },
-      ]
-    );
-  };
+  const handleSignOut = () => setSignOutDialogVisible(true);
 
   return (
     <View style={styles.container}>
+      <ConfirmDialog
+        visible={signOutDialogVisible}
+        title="Se déconnecter ?"
+        message="Tu devras te reconnecter pour accéder à tes fläags."
+        confirmLabel="Déconnexion"
+        cancelLabel="Annuler"
+        destructive
+        onConfirm={signOut}
+        onCancel={() => setSignOutDialogVisible(false)}
+      />
       <View style={[styles.header, { paddingTop: insets.top }]}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
           <Ionicons name="arrow-back" size={24} color={colors.text.primary} />

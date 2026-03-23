@@ -171,9 +171,9 @@ describe('useMessageLoader — realtime subscription', () => {
     const msgs = [makeMsg('msg-1')];
     mockFetchMessages.mockResolvedValue(msgs);
 
-    let capturedCallback: ((payload: any) => void) | undefined;
-    mockChannel.on.mockImplementation((_event, _filter, callback) => {
-      capturedCallback = callback;
+    const callbacks: Record<string, (payload: any) => void> = {};
+    mockChannel.on.mockImplementation((_type: string, filter: any, callback: any) => {
+      callbacks[filter.event] = callback;
       return mockChannel;
     });
 
@@ -185,9 +185,9 @@ describe('useMessageLoader — realtime subscription', () => {
 
     const callsBefore = mockFetchMessages.mock.calls.length;
 
-    // Simulate a new message from the correct sender via realtime
+    // Simulate a new message from the correct sender via realtime INSERT
     await act(async () => {
-      capturedCallback?.({ new: { sender_id: 'other-user' } });
+      callbacks['INSERT']?.({ new: { sender_id: 'other-user' } });
       // Wait for the triggered loadMessages to complete
       await Promise.resolve();
     });
@@ -196,9 +196,9 @@ describe('useMessageLoader — realtime subscription', () => {
   });
 
   it('does not reload when a message arrives from a different sender', async () => {
-    let capturedCallback: ((payload: any) => void) | undefined;
-    mockChannel.on.mockImplementation((_event, _filter, callback) => {
-      capturedCallback = callback;
+    const callbacks: Record<string, (payload: any) => void> = {};
+    mockChannel.on.mockImplementation((_type: string, filter: any, callback: any) => {
+      callbacks[filter.event] = callback;
       return mockChannel;
     });
 
@@ -211,7 +211,7 @@ describe('useMessageLoader — realtime subscription', () => {
     const callsBefore = mockFetchMessages.mock.calls.length;
 
     act(() => {
-      capturedCallback?.({ new: { sender_id: 'someone-else' } });
+      callbacks['INSERT']?.({ new: { sender_id: 'someone-else' } });
     });
 
     expect(mockFetchMessages.mock.calls.length).toBe(callsBefore);

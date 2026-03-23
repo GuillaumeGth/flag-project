@@ -29,6 +29,7 @@ import MapScreen from '@/screens/MapScreen';
 import InboxScreen from '@/screens/InboxScreen';
 import ProfileScreen from '@/screens/ProfileScreen';
 import CreateMessageScreen from '@/screens/CreateMessageScreen';
+import SendMessageScreen from '@/screens/SendMessageScreen';
 import ReadMessageScreen from '@/screens/ReadMessageScreen';
 import SelectRecipientScreen from '@/screens/SelectRecipientScreen';
 import ConversationScreen from '@/screens/ConversationScreen';
@@ -161,6 +162,11 @@ function AppNavigator() {
         name="CreateMessage"
         component={CreateMessageScreen}
         options={{ presentation: 'modal' }}
+      />
+      <Stack.Screen
+        name="SendMessage"
+        component={SendMessageScreen}
+        options={{ presentation: 'card' }}
       />
       <Stack.Screen
         name="ReadMessage"

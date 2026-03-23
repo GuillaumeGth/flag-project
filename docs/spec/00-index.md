@@ -25,6 +25,7 @@
 | [spec/clustering.md](./clustering.md) | Clustering dynamique des marqueurs carte |
 | [spec/mes-flaags.md](./mes-flaags.md) | Mode "Mes Flaags" sur la carte |
 | [spec/admin-flag-placement.md](./admin-flag-placement.md) | Placement de flags admin n'importe où |
+| [spec/map-filters.md](./map-filters.md) | Filtres carte — par auteur (explorer) et par destinataire/statut (mes flaags) |
 
 ## Specs d'écrans
 

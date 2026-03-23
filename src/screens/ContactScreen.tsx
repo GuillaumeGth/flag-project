@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -7,9 +7,9 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
-  Alert,
   Linking,
 } from 'react-native';
+import Toast from '@/components/Toast';
 import { Ionicons } from '@expo/vector-icons';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -30,10 +30,23 @@ export default function ContactScreen({ navigation }: Props) {
   const [subject, setSubject] = useState('');
   const [message, setMessage] = useState('');
   const [sending, setSending] = useState(false);
+  const [toast, setToast] = useState<{
+    visible: boolean;
+    message: string;
+    type: 'success' | 'warning' | 'error';
+  }>({ visible: false, message: '', type: 'warning' });
+
+  const showToast = useCallback((msg: string, type: 'success' | 'warning' | 'error') => {
+    setToast({ visible: true, message: msg, type });
+  }, []);
+
+  const hideToast = useCallback(() => {
+    setToast((prev) => ({ ...prev, visible: false }));
+  }, []);
 
   const handleSend = async () => {
     if (!message.trim()) {
-      Alert.alert('Message requis', 'Veuillez écrire votre message avant d\'envoyer.');
+      showToast('Écris ton message avant d\'envoyer', 'warning');
       return;
     }
 
@@ -48,10 +61,7 @@ export default function ContactScreen({ navigation }: Props) {
     try {
       const supported = await Linking.canOpenURL(mailto);
       if (!supported) {
-        Alert.alert(
-          'Pas de client email',
-          `Aucune application email n'est configurée. Vous pouvez nous écrire directement à ${CONTACT_EMAIL}`,
-        );
+        showToast(`Aucune app email configurée — écris-nous à ${CONTACT_EMAIL}`, 'warning');
         setSending(false);
         return;
       }
@@ -62,13 +72,19 @@ export default function ContactScreen({ navigation }: Props) {
         navigation.goBack();
       }, 500);
     } catch {
-      Alert.alert('Erreur', 'Impossible d\'ouvrir l\'application email.');
+      showToast("Impossible d'ouvrir l'application email", 'error');
       setSending(false);
     }
   };
 
   return (
     <View style={styles.container}>
+      <Toast
+        visible={toast.visible}
+        message={toast.message}
+        type={toast.type}
+        onHide={hideToast}
+      />
       <View style={[styles.header, { paddingTop: insets.top }]}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
           <Ionicons name="arrow-back" size={24} color={colors.text.primary} />

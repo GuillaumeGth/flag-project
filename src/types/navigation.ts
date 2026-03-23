@@ -10,7 +10,14 @@ export type RootStackParamList = {
   Auth: undefined;
   Main: { screen: keyof MainTabParamList; params?: object } | undefined;
   Conversation: { otherUserId: string; otherUserName: string; otherUserAvatarUrl?: string; scrollToMessageId?: string };
-  CreateMessage: { recipients?: { id: string; name: string }[]; adminLocation?: Coordinates } | undefined;
+  CreateMessage: { adminLocation?: Coordinates } | undefined;
+  SendMessage: {
+    contentType?: import('./index').MessageContentType;
+    textContent?: string;
+    mediaUri?: string;
+    adminLocation?: Coordinates;
+    recipients?: { id: string; name: string }[];
+  } | undefined;
   ReadMessage: { messageId: string };
   SelectRecipient: { mode: 'chat' | 'flag' };
   UserProfile: { userId: string };

@@ -1,14 +1,13 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import {
   View,
   Text,
   TouchableOpacity,
   StyleSheet,
   Image,
-  ActivityIndicator,
   ScrollView,
-  Switch,
 } from 'react-native';
+import ConfirmDialog from '@/components/ConfirmDialog';
 import Toast from '@/components/Toast';
 import { Ionicons } from '@expo/vector-icons';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -16,69 +15,77 @@ import { LinearGradient } from 'expo-linear-gradient';
 import * as ImagePicker from 'expo-image-picker';
 import { Audio } from 'expo-av';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useLocation } from '@/contexts/LocationContext';
 import { useAuth } from '@/contexts/AuthContext';
-import { sendMessage, uploadMedia } from '@/services/messages';
 import { Coordinates, MessageContentType, RootStackParamList } from '@/types';
 import { colors, shadows, radius, spacing, typography } from '@/theme-redesign';
 import GlassInput from '@/components/redesign/GlassInput';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'CreateMessage'>;
 
-type Recipient = { id: string; name: string };
-
 export default function CreateMessageScreen({ navigation, route }: Props) {
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
-  const { current: userLocation } = useLocation();
 
-  // Admin can provide a custom location (bypasses GPS restriction).
-  // Captured once at mount via useState — immune to route.params being overwritten
-  // when SelectRecipientScreen navigates back with { recipients } only.
   const [adminLocation] = useState<Coordinates | null>(
     () => (user?.is_admin && route.params?.adminLocation ? route.params.adminLocation : null)
   );
-  const effectiveLocation = adminLocation ?? userLocation;
-
-  const [recipients, setRecipients] = useState<Recipient[]>(route.params?.recipients ?? []);
-  const [isPublic, setIsPublic] = useState((route.params?.recipients ?? []).length === 0);
-
-  useEffect(() => {
-    if (route.params?.recipients) {
-      setRecipients(route.params.recipients);
-      setIsPublic(false);
-    }
-  }, [route.params?.recipients]);
 
   const [contentType, setContentType] = useState<MessageContentType>('text');
   const [textContent, setTextContent] = useState('');
   const [mediaUri, setMediaUri] = useState<string | null>(null);
   const [recording, setRecording] = useState<Audio.Recording | null>(null);
   const [isRecording, setIsRecording] = useState(false);
-  const [loading, setLoading] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [discardDialogVisible, setDiscardDialogVisible] = useState(false);
+  // Stores the navigation action to dispatch if user confirms discard
+  const pendingDiscardAction = useRef<Parameters<typeof navigation.dispatch>[0] | null>(null);
   const [toast, setToast] = useState<{
     visible: boolean;
     message: string;
     type: 'success' | 'warning' | 'error';
-    action?: { label: string; onPress: () => void };
   }>({ visible: false, message: '', type: 'success' });
   const soundRef = useRef<Audio.Sound | null>(null);
 
-  const showToast = (message: string, type: 'success' | 'warning' | 'error', action?: { label: string; onPress: () => void }) => {
-    setToast({ visible: true, message, type, action });
-  };
+  // Detect whether the user has started composing content
+  const hasDraft = textContent.trim().length > 0 || mediaUri !== null;
 
-  const hideToast = () => {
+  // Intercept back navigation when a draft exists — show custom dialog instead of native Alert
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('beforeRemove', (e) => {
+      if (!hasDraft) return;
+      e.preventDefault();
+      pendingDiscardAction.current = e.data.action;
+      setDiscardDialogVisible(true);
+    });
+    return unsubscribe;
+  }, [navigation, hasDraft]);
+
+  const handleDiscardConfirm = useCallback(() => {
+    setDiscardDialogVisible(false);
+    if (pendingDiscardAction.current) {
+      navigation.dispatch(pendingDiscardAction.current);
+      pendingDiscardAction.current = null;
+    }
+  }, [navigation]);
+
+  const handleDiscardCancel = useCallback(() => {
+    setDiscardDialogVisible(false);
+    pendingDiscardAction.current = null;
+  }, []);
+
+  const showToast = useCallback((message: string, type: 'success' | 'warning' | 'error') => {
+    setToast({ visible: true, message, type });
+  }, []);
+
+  const hideToast = useCallback(() => {
     setToast((prev) => ({ ...prev, visible: false }));
-  };
+  }, []);
 
   const pickImage = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       quality: 0.8,
     });
-
     if (!result.canceled && result.assets[0]) {
       setMediaUri(result.assets[0].uri);
       setContentType('photo');
@@ -91,9 +98,7 @@ export default function CreateMessageScreen({ navigation, route }: Props) {
       showToast('Accès à la caméra nécessaire', 'error');
       return;
     }
-
     const result = await ImagePicker.launchCameraAsync({ quality: 0.8 });
-
     if (!result.canceled && result.assets[0]) {
       setMediaUri(result.assets[0].uri);
       setContentType('photo');
@@ -107,14 +112,12 @@ export default function CreateMessageScreen({ navigation, route }: Props) {
         showToast('Accès au micro nécessaire', 'error');
         return;
       }
-
       await Audio.setAudioModeAsync({
         allowsRecordingIOS: true,
         playsInSilentModeIOS: true,
         staysActiveInBackground: false,
         playThroughEarpieceAndroid: false,
       });
-
       const { recording } = await Audio.Recording.createAsync(
         Audio.RecordingOptionsPresets.HIGH_QUALITY
       );
@@ -127,12 +130,10 @@ export default function CreateMessageScreen({ navigation, route }: Props) {
 
   const stopRecording = async () => {
     if (!recording) return;
-
     setIsRecording(false);
     await recording.stopAndUnloadAsync();
     const uri = recording.getURI();
     setRecording(null);
-
     if (uri) {
       setMediaUri(uri);
       setContentType('audio');
@@ -151,34 +152,24 @@ export default function CreateMessageScreen({ navigation, route }: Props) {
 
   const playAudio = async () => {
     if (!mediaUri) return;
-
     try {
       if (isPlaying && soundRef.current) {
         await soundRef.current.stopAsync();
         setIsPlaying(false);
         return;
       }
-
       await Audio.setAudioModeAsync({
         allowsRecordingIOS: false,
         playsInSilentModeIOS: true,
         staysActiveInBackground: false,
         playThroughEarpieceAndroid: false,
       });
-
-      if (soundRef.current) {
-        await soundRef.current.unloadAsync();
-      }
-
+      if (soundRef.current) await soundRef.current.unloadAsync();
       const { sound } = await Audio.Sound.createAsync({ uri: mediaUri });
       soundRef.current = sound;
-
       sound.setOnPlaybackStatusUpdate((status) => {
-        if (status.isLoaded && status.didJustFinish) {
-          setIsPlaying(false);
-        }
+        if (status.isLoaded && status.didJustFinish) setIsPlaying(false);
       });
-
       await sound.playAsync();
       setIsPlaying(true);
     } catch {
@@ -186,80 +177,39 @@ export default function CreateMessageScreen({ navigation, route }: Props) {
     }
   };
 
-  const handleSend = async () => {
-    if (!effectiveLocation) {
-      showToast('Position GPS non disponible', 'error');
-      return;
-    }
-
-    if (!isPublic && recipients.length === 0) {
-      showToast('Sélectionnez au moins un destinataire', 'error', {
-        label: 'Choisir',
-        onPress: () => navigation.navigate('SelectRecipient', { mode: 'flag' }),
-      });
-      return;
-    }
-
+  const handleNext = () => {
     if (contentType === 'text' && !textContent.trim()) {
-      showToast('Écrivez un message', 'error');
+      showToast('Écris un message ou ajoute un média', 'error');
       return;
     }
-
     if ((contentType === 'photo' || contentType === 'audio') && !mediaUri) {
-      showToast('Ajoutez une photo ou un audio', 'error');
+      showToast('Ajoute une photo ou un audio', 'error');
       return;
     }
-
-    setLoading(true);
-
-    try {
-      let uploadedMediaUrl: string | undefined;
-
-      if (mediaUri && contentType !== 'text') {
-        const url = await uploadMedia(mediaUri, contentType as 'photo' | 'audio');
-        if (!url) {
-          showToast('Échec de l\'upload du média', 'error', { label: 'Réessayer', onPress: handleSend });
-          setLoading(false);
-          return;
-        }
-        uploadedMediaUrl = url;
-      }
-
-      const isAdminPlaced = !!adminLocation;
-
-      if (isPublic) {
-        const result = await sendMessage(null, contentType, effectiveLocation, textContent || undefined, uploadedMediaUrl, true, null, isAdminPlaced);
-        if (result) {
-          navigation.navigate('Main', { screen: 'Map', params: { toast: { message: 'Flag déposé !', type: 'success' }, ...(isAdminPlaced ? { mine: true } : {}) } });
-          return;
-        }
-      } else {
-        const results = await Promise.all(
-          recipients.map((r) => sendMessage(r.id, contentType, effectiveLocation, textContent || undefined, uploadedMediaUrl, false, null, isAdminPlaced))
-        );
-        const successCount = results.filter(Boolean).length;
-        if (successCount > 0) {
-          const msg = successCount === recipients.length ? 'Flag privé envoyé !' : `Envoyé à ${successCount}/${recipients.length}`;
-          navigation.navigate('Main', { screen: 'Map', params: { toast: { message: msg, type: successCount === recipients.length ? 'success' : 'warning' }, ...(isAdminPlaced ? { mine: true } : {}) } });
-          return;
-        }
-      }
-
-      showToast('Échec de l\'envoi', 'error', { label: 'Réessayer', onPress: handleSend });
-    } catch {
-      showToast('Une erreur est survenue', 'error', { label: 'Réessayer', onPress: handleSend });
-    }
-
-    setLoading(false);
+    navigation.navigate('SendMessage', {
+      contentType,
+      textContent: textContent || undefined,
+      mediaUri: mediaUri ?? undefined,
+      adminLocation: adminLocation ?? undefined,
+    });
   };
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background.primary }}>
+      <ConfirmDialog
+        visible={discardDialogVisible}
+        title="Abandonner ce fläag ?"
+        message="Le contenu que tu as créé sera perdu définitivement."
+        confirmLabel="Abandonner"
+        cancelLabel="Continuer"
+        destructive
+        onConfirm={handleDiscardConfirm}
+        onCancel={handleDiscardCancel}
+      />
       <Toast
         visible={toast.visible}
         message={toast.message}
         type={toast.type}
-        action={toast.action}
         onHide={hideToast}
       />
       <ScrollView style={styles.container} contentContainerStyle={styles.content}>
@@ -284,33 +234,7 @@ export default function CreateMessageScreen({ navigation, route }: Props) {
           </View>
         )}
 
-        {/* Public / Privé toggle */}
-        <View style={styles.publicToggleRow}>
-          <Ionicons name="globe-outline" size={18} color={isPublic ? colors.primary.cyan : colors.text.secondary} />
-          <Text style={[styles.publicToggleLabel, isPublic && { color: colors.primary.cyan }]}>Public</Text>
-          <Switch
-            value={isPublic}
-            onValueChange={setIsPublic}
-            trackColor={{ false: colors.border.default, true: colors.primary.cyan }}
-            thumbColor={colors.text.primary}
-          />
-        </View>
-
-        {/* Destinataire (mode privé) */}
-        {!isPublic && (
-          <TouchableOpacity
-            style={styles.recipientRow}
-            onPress={() => navigation.navigate('SelectRecipient', { mode: 'flag' })}
-          >
-            <Text style={styles.recipientLabel}>À :</Text>
-            <Text style={styles.recipientName} numberOfLines={1}>
-              {recipients.length > 0 ? recipients.map((r) => r.name).join(', ') : 'Sélectionner'}
-            </Text>
-            <Ionicons name="chevron-forward" size={20} color={colors.text.secondary} />
-          </TouchableOpacity>
-        )}
-
-        {/* Media preview */}
+        {/* Photo preview */}
         {mediaUri && contentType === 'photo' && (
           <View style={styles.mediaPreview}>
             <Image source={{ uri: mediaUri }} style={styles.previewImage} />
@@ -320,6 +244,7 @@ export default function CreateMessageScreen({ navigation, route }: Props) {
           </View>
         )}
 
+        {/* Audio preview */}
         {mediaUri && contentType === 'audio' && (
           <View style={styles.audioPreview}>
             <TouchableOpacity onPress={playAudio} style={styles.playButton}>
@@ -374,27 +299,20 @@ export default function CreateMessageScreen({ navigation, route }: Props) {
           </TouchableOpacity>
         </View>
 
-        {/* Send button */}
+        {/* Next button */}
         <TouchableOpacity
-          style={[styles.sendButtonContainer, loading && styles.sendButtonDisabled]}
-          onPress={handleSend}
-          disabled={loading}
+          style={[styles.nextButtonContainer, !hasDraft && styles.nextButtonDisabled]}
+          onPress={handleNext}
           activeOpacity={0.8}
         >
           <LinearGradient
             colors={colors.gradients.button}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 0 }}
-            style={styles.sendButton}
+            style={styles.nextButton}
           >
-            {loading ? (
-              <ActivityIndicator color="#FFFFFF" />
-            ) : (
-              <>
-                <Ionicons name="send" size={20} color="#FFFFFF" />
-                <Text style={styles.sendButtonText}>Envoyer</Text>
-              </>
-            )}
+            <Text style={styles.nextButtonText}>Suivant</Text>
+            <Ionicons name="arrow-forward" size={20} color="#FFFFFF" />
           </LinearGradient>
         </TouchableOpacity>
       </ScrollView>
@@ -424,34 +342,6 @@ const styles = StyleSheet.create({
   title: {
     fontSize: typography.sizes.lg,
     fontWeight: '600',
-    color: colors.text.primary,
-  },
-  publicToggleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    marginBottom: spacing.md,
-  },
-  publicToggleLabel: {
-    fontSize: typography.sizes.sm,
-    color: colors.text.secondary,
-  },
-  recipientRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.surface.glass,
-    borderRadius: radius.md,
-    padding: spacing.md,
-    marginBottom: spacing.md,
-    gap: spacing.sm,
-  },
-  recipientLabel: {
-    fontSize: typography.sizes.md,
-    color: colors.text.secondary,
-  },
-  recipientName: {
-    flex: 1,
-    fontSize: typography.sizes.md,
     color: colors.text.primary,
   },
   mediaPreview: {
@@ -519,23 +409,23 @@ const styles = StyleSheet.create({
   recordingText: {
     color: colors.error,
   },
-  sendButtonContainer: {
+  nextButtonContainer: {
     borderRadius: radius.lg,
     overflow: 'hidden',
     ...shadows.medium,
   },
-  sendButton: {
+  nextButtonDisabled: {
+    opacity: 0.4,
+  },
+  nextButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: radius.lg,
     padding: spacing.lg,
+    gap: spacing.sm,
   },
-  sendButtonDisabled: {
-    opacity: 0.7,
-  },
-  sendButtonText: {
-    marginLeft: spacing.sm,
+  nextButtonText: {
     fontSize: typography.sizes.md,
     fontWeight: '600',
     color: '#FFFFFF',

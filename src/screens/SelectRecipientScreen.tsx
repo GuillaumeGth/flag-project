@@ -48,7 +48,7 @@ export default function SelectRecipientScreen({ navigation, route }: Props) {
       id: u.id,
       name: u.display_name || u.phone || 'Utilisateur',
     }));
-    navigation.navigate('CreateMessage', { recipients });
+    navigation.navigate('SendMessage', { recipients });
   };
 
   const handlePress = (user: User) => {

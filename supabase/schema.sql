@@ -99,7 +99,10 @@ CREATE TABLE IF NOT EXISTS public.messages (
     deleted_by_recipient BOOLEAN NOT NULL DEFAULT FALSE,
     reply_to_id UUID REFERENCES messages(id) ON DELETE SET NULL,
     reply_to_message_id UUID REFERENCES messages(id) ON DELETE SET NULL,
-    is_admin_placed BOOLEAN NOT NULL DEFAULT FALSE
+    is_admin_placed BOOLEAN NOT NULL DEFAULT FALSE,
+    birthday_visible_only BOOLEAN NOT NULL DEFAULT FALSE,
+    birthday_target_user_id UUID REFERENCES public.users(id) ON DELETE CASCADE,
+    custom_marker_avatar_url TEXT
 );
 
 -- Enable RLS
@@ -109,22 +112,34 @@ ALTER TABLE public.messages ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Users can view own messages" ON public.messages;
 CREATE POLICY "Users can view own messages" ON public.messages
     FOR SELECT USING (
+        -- Sender always sees their own messages (incl. birthday flags admin placed)
         auth.uid() = sender_id
-        OR auth.uid() = recipient_id
         OR (
-            is_public = true
+            -- Normal (non-birthday) messages: existing logic
+            NOT birthday_visible_only
             AND (
-                -- sender is not private
-                NOT EXISTS (
-                    SELECT 1 FROM public.users
-                    WHERE id = sender_id AND is_private = true
-                )
-                -- OR current user follows the sender
-                OR EXISTS (
-                    SELECT 1 FROM public.subscriptions
-                    WHERE follower_id = auth.uid() AND following_id = sender_id
+                auth.uid() = recipient_id
+                OR (
+                    is_public = true
+                    AND (
+                        NOT EXISTS (
+                            SELECT 1 FROM public.users
+                            WHERE id = sender_id AND is_private = true
+                        )
+                        OR EXISTS (
+                            SELECT 1 FROM public.subscriptions
+                            WHERE follower_id = auth.uid() AND following_id = sender_id
+                        )
+                    )
                 )
             )
+        )
+        OR (
+            -- Birthday flags: only the target user, only on March 23
+            birthday_visible_only = true
+            AND birthday_target_user_id = auth.uid()
+            AND EXTRACT(MONTH FROM NOW() AT TIME ZONE 'Europe/Paris') = 3
+            AND EXTRACT(DAY FROM NOW() AT TIME ZONE 'Europe/Paris') = 23
         )
     );
 
@@ -150,6 +165,11 @@ CREATE POLICY "Users can send messages" ON public.messages
                 WHERE (follower_id = auth.uid() AND following_id = recipient_id)
                    OR (follower_id = recipient_id AND following_id = auth.uid())
             )
+            -- Admin bypass: can send birthday flags to any user without subscription
+            OR (
+                birthday_visible_only = true
+                AND EXISTS (SELECT 1 FROM public.users WHERE id = auth.uid() AND is_admin = true)
+            )
         )
     );
 
@@ -166,6 +186,7 @@ ALTER PUBLICATION supabase_realtime ADD TABLE messages;
 
 -- Indexes (create if not exists)
 CREATE INDEX IF NOT EXISTS messages_recipient_idx ON public.messages(recipient_id);
+CREATE INDEX IF NOT EXISTS messages_birthday_idx ON public.messages(birthday_target_user_id) WHERE birthday_visible_only = TRUE;
 CREATE INDEX IF NOT EXISTS messages_sender_idx ON public.messages(sender_id);
 CREATE INDEX IF NOT EXISTS messages_location_idx ON public.messages USING GIST(location);
 DROP INDEX IF EXISTS messages_unread_idx;
@@ -260,6 +281,13 @@ DECLARE
 BEGIN
     -- Only notify for private messages (recipient exists)
     IF NEW.recipient_id IS NULL THEN
+        RETURN NEW;
+    END IF;
+
+    -- Birthday flags: no notification until March 23
+    IF NEW.birthday_visible_only = TRUE AND NOT (
+        EXTRACT(MONTH FROM NOW() AT TIME ZONE 'Europe/Paris') = 3 AND EXTRACT(DAY FROM NOW() AT TIME ZONE 'Europe/Paris') = 23
+    ) THEN
         RETURN NEW;
     END IF;
 

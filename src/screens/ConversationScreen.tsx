@@ -130,11 +130,8 @@ export default function ConversationScreen({ navigation, route }: Props) {
 
   const handleDeleteSelected = async () => {
     if (!selectedMessageId || !user) return;
-    const msg = messages.find((m) => m.id === selectedMessageId);
-    if (!msg) return;
-    const isSender = msg.sender_id === user.id;
     setSelectedMessageId(null);
-    await deleteMessage(selectedMessageId, otherUserId, isSender);
+    await deleteMessage(selectedMessageId, otherUserId);
     await loadMessages();
   };
 
@@ -353,9 +350,11 @@ export default function ConversationScreen({ navigation, route }: Props) {
           >
             <Ionicons name="return-up-back-outline" size={22} color={colors.primary.cyan} />
           </TouchableOpacity>
-          <TouchableOpacity onPress={handleDeleteSelected} style={styles.deleteButton}>
-            <Ionicons name="trash-outline" size={22} color={colors.primary.magenta} />
-          </TouchableOpacity>
+          {messages.find((m) => m.id === selectedMessageId)?.sender_id === user?.id && (
+            <TouchableOpacity onPress={handleDeleteSelected} style={styles.deleteButton}>
+              <Ionicons name="trash-outline" size={22} color={colors.primary.magenta} />
+            </TouchableOpacity>
+          )}
         </>
       )}
     </View>

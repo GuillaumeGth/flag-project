@@ -54,6 +54,23 @@ export function useMessageLoader(otherUserId: string): UseMessageLoaderResult {
           }
         },
       )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'messages',
+        },
+        (payload) => {
+          const updated = payload.new as { id: string; deleted_by_sender?: boolean; sender_id?: string };
+          if (updated.deleted_by_sender && (updated.sender_id === otherUserId || updated.sender_id === user.id)) {
+            log('useMessageLoader', 'realtime: message deleted in conversation', updated.id);
+            setMessages((prev) =>
+              prev.map((m) => m.id === updated.id ? { ...m, deleted_by_sender: true } : m)
+            );
+          }
+        },
+      )
       .subscribe();
 
     return () => {

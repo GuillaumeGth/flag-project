@@ -7,7 +7,7 @@ import { User as SupabaseUser } from '@supabase/supabase-js';
 import { supabase, supabaseReady } from '@/services/supabase';
 import { registerPushToken, unregisterPushToken } from '@/services/notifications';
 import { clearAllCache } from '@/services/cache';
-import { subscribeToUserProfileChanges } from '@/services/messages';
+import { subscribeToUserProfileChanges, subscribeToMessageDeletions } from '@/services/messages';
 import { reportError, setUserContext } from '@/services/errorReporting';
 import { log } from '@/utils/debug';
 import { User, AuthState } from '@/types';
@@ -215,6 +215,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Subscription to user profile changes — patches local caches in real-time
     // when any user updates their avatar or display name.
     let unsubscribeProfiles: (() => void) | null = null;
+    let unsubscribeDeletions: (() => void) | null = null;
 
     // Handle deep link for OAuth callback
     const handleDeepLink = async (event: { url: string }) => {
@@ -287,6 +288,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         log('AuthContext', 'SIGNED_OUT -> clearing state');
         unsubscribeProfiles?.();
         unsubscribeProfiles = null;
+        unsubscribeDeletions?.();
+        unsubscribeDeletions = null;
         setUserContext(null, null);
         setState({ user: null, session: null, loading: false });
         return;
@@ -322,6 +325,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             unsubscribeProfiles = subscribeToUserProfileChanges();
             log('AuthContext', 'Subscribed to user profile changes');
           }
+          // Subscribe to message deletions so deleted flags disappear from all devices
+          if (!unsubscribeDeletions) {
+            unsubscribeDeletions = subscribeToMessageDeletions();
+            log('AuthContext', 'Subscribed to message deletions');
+          }
         }
         return;
       }
@@ -341,6 +349,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       subscription.unsubscribe();
       linkingSubscription.remove();
       unsubscribeProfiles?.();
+      unsubscribeDeletions?.();
     };
   }, []);
 

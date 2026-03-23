@@ -1,9 +1,10 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import {
   fetchUndiscoveredMessagesForMap,
   getCachedMapMessages,
   fetchFollowingPublicMessages,
 } from '@/services/messages';
+import { supabase } from '@/services/supabase';
 import { UndiscoveredMessageMapMeta } from '@/types';
 import { log } from '@/utils/debug';
 
@@ -45,6 +46,28 @@ export function useMapMessages(): UseMapMessagesResult {
     log('useMapMessages', 'loadMessages: got', data.length, 'undiscovered +', followingData.length, 'following =', allMessages.length, 'total');
     setMessages(allMessages);
     setLoading(false);
+  }, []);
+
+  // Listen for message deletions in real-time and remove markers instantly
+  useEffect(() => {
+    const channel = supabase
+      .channel('map-message-deletions')
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'messages' },
+        (payload) => {
+          const updated = payload.new as { id: string; deleted_by_sender?: boolean };
+          if (updated.deleted_by_sender) {
+            log('useMapMessages', 'realtime: removing deleted marker', updated.id);
+            setMessages((prev) => prev.filter((m) => m.id !== updated.id));
+          }
+        },
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   return { messages, loading, loadMessages, setMessages };

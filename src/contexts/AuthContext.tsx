@@ -1,10 +1,11 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
 import * as WebBrowser from 'expo-web-browser';
 import * as Linking from 'expo-linking';
+import { AppState, AppStateStatus } from 'react-native';
 import { File } from 'expo-file-system/next';
 import { decode } from 'base64-arraybuffer';
-import { User as SupabaseUser } from '@supabase/supabase-js';
-import { supabase, supabaseReady } from '@/services/supabase';
+import { User as SupabaseUser, Session } from '@supabase/supabase-js';
+import { supabase } from '@/services/supabase';
 import { registerPushToken, unregisterPushToken } from '@/services/notifications';
 import { clearAllCache } from '@/services/cache';
 import { subscribeToUserProfileChanges, subscribeToMessageDeletions } from '@/services/messages';
@@ -32,6 +33,39 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     loading: true,
   });
 
+  // Ref to track current state inside async callbacks without stale closures
+  const stateRef = useRef(state);
+  stateRef.current = state;
+
+  // Prevents handleDeepLink from racing with signInWithGoogle on the same callback URL
+  const googleAuthActiveRef = useRef(false);
+
+  const mapUser = (supabaseUser: SupabaseUser): User => ({
+    id: supabaseUser.id,
+    phone: supabaseUser.phone,
+    email: supabaseUser.email,
+    display_name: supabaseUser.user_metadata?.display_name || supabaseUser.user_metadata?.full_name,
+    avatar_url: supabaseUser.user_metadata?.avatar_url,
+    created_at: supabaseUser.created_at,
+  });
+
+  // Centralized helper: apply a Supabase session to React state + run post-login side effects
+  const applySession = (session: Session, event?: string) => {
+    const mappedUser = mapUser(session.user);
+    log('AuthContext', 'applySession: userId:', mappedUser.id, 'event:', event);
+    setUserContext(
+      mappedUser.display_name ?? mappedUser.email ?? mappedUser.phone ?? null,
+      null,
+    );
+    setState((prev) => ({
+      ...prev,
+      session,
+      user: mappedUser,
+      loading: false,
+    }));
+    return mappedUser;
+  };
+
   const setSessionAndUpdateState = async (accessToken: string, refreshToken: string) => {
     log('AuthContext', 'setSessionAndUpdateState: START');
     try {
@@ -47,22 +81,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       log('AuthContext', 'setSessionAndUpdateState: session set, userId:', data.user?.id);
 
-      // Wait for Supabase client initialization to complete before allowing screens to mount
-      // This ensures getSession() won't hang in data-fetching functions
-      // Use supabaseReady (plain promise) instead of getSession() to avoid deadlock
-      log('AuthContext', 'setSessionAndUpdateState: waiting for supabaseReady...');
-      await supabaseReady;
-      log('AuthContext', 'setSessionAndUpdateState: supabaseReady resolved');
-
-      // Force state update in case onAuthStateChange doesn't fire
+      // Force state update — don't rely only on onAuthStateChange
       if (data.session) {
-        log('AuthContext', 'setSessionAndUpdateState: forcing setState with user');
-        setState((prev) => ({
-          ...prev,
-          session: data.session,
-          user: data.user ? mapUser(data.user) : null,
-          loading: false,
-        }));
+        applySession(data.session, 'setSessionAndUpdateState');
       }
 
       return { error: null };
@@ -73,14 +94,60 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const mapUser = (supabaseUser: SupabaseUser): User => ({
-    id: supabaseUser.id,
-    phone: supabaseUser.phone,
-    email: supabaseUser.email,
-    display_name: supabaseUser.user_metadata?.display_name || supabaseUser.user_metadata?.full_name,
-    avatar_url: supabaseUser.user_metadata?.avatar_url,
-    created_at: supabaseUser.created_at,
-  });
+  // Extract tokens or code from a callback URL
+  const parseCallbackUrl = (url: string) => {
+    let accessToken: string | null = null;
+    let refreshToken: string | null = null;
+    let code: string | null = null;
+
+    const hashIndex = url.indexOf('#');
+    if (hashIndex !== -1) {
+      const hashParams = new URLSearchParams(url.substring(hashIndex + 1));
+      accessToken = hashParams.get('access_token');
+      refreshToken = hashParams.get('refresh_token');
+    }
+
+    const queryIndex = url.indexOf('?');
+    if (queryIndex !== -1) {
+      const queryEnd = hashIndex !== -1 ? hashIndex : url.length;
+      const queryParams = new URLSearchParams(url.substring(queryIndex + 1, queryEnd));
+      code = queryParams.get('code');
+      if (!accessToken) accessToken = queryParams.get('access_token');
+      if (!refreshToken) refreshToken = queryParams.get('refresh_token');
+    }
+
+    return { accessToken, refreshToken, code };
+  };
+
+  // Exchange tokens or code from a callback URL → session in state
+  const processCallbackUrl = async (url: string, source: string): Promise<{ error: Error | null }> => {
+    log('AuthContext', `processCallbackUrl [${source}]:`, url);
+    const { accessToken, refreshToken, code } = parseCallbackUrl(url);
+    log('AuthContext', `[${source}] tokens: access=${!!accessToken} refresh=${!!refreshToken} code=${!!code}`);
+
+    if (accessToken && refreshToken) {
+      return setSessionAndUpdateState(accessToken, refreshToken);
+    }
+
+    if (code) {
+      log('AuthContext', `[${source}] Exchanging code for session`);
+      const { error } = await supabase.auth.exchangeCodeForSession(code);
+      if (error) {
+        log('AuthContext', `[${source}] exchangeCodeForSession error:`, error.message);
+        return { error: error as Error };
+      }
+      // exchangeCodeForSession fires onAuthStateChange, but as a safety net
+      // also explicitly fetch and apply the session
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        applySession(session, `${source}:codeExchange`);
+      }
+      return { error: null };
+    }
+
+    log('AuthContext', `[${source}] No tokens or code found in URL`);
+    return { error: null };
+  };
 
   // Ensure user exists in public.users table (fallback if trigger doesn't work)
   const ensureUserInDatabase = async (authUser: SupabaseUser) => {
@@ -199,7 +266,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   useEffect(() => {
-    // Safety timeout: if auth initialization doesn't complete in 10s (e.g. network
+    // Safety timeout: if auth initialization doesn't complete in 8s (e.g. network
     // hung on expired-token refresh), unblock the UI so the user isn't stuck on a
     // loading screen forever.
     const loadingTimeout = setTimeout(() => {
@@ -210,61 +277,48 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
         return prev;
       });
-    }, 10000);
+    }, 8000);
 
     // Subscription to user profile changes — patches local caches in real-time
     // when any user updates their avatar or display name.
     let unsubscribeProfiles: (() => void) | null = null;
     let unsubscribeDeletions: (() => void) | null = null;
 
-    // Handle deep link for OAuth callback
+    // Post-login side effects (fire-and-forget to avoid deadlock with Supabase lock)
+    const runPostLoginSetup = (session: Session) => {
+      ensureUserInDatabase(session.user).catch((e) => log('AuthContext', 'ensureUserInDatabase error:', e));
+      syncUserProfile(session.user).catch((e) => log('AuthContext', 'Sync profile error:', e));
+      updateUserWithDbProfile(session.user.id).catch((e) => log('AuthContext', 'Update profile error:', e));
+      registerPushToken(session.user.id).catch((e) => log('AuthContext', 'Register push token error:', e));
+
+      if (!unsubscribeProfiles) {
+        unsubscribeProfiles = subscribeToUserProfileChanges();
+        log('AuthContext', 'Subscribed to user profile changes');
+      }
+      if (!unsubscribeDeletions) {
+        unsubscribeDeletions = subscribeToMessageDeletions();
+        log('AuthContext', 'Subscribed to message deletions');
+      }
+    };
+
+    // Handle deep link for OAuth callback — skipped if signInWithGoogle is active
     const handleDeepLink = async (event: { url: string }) => {
       const url = event.url;
       log('AuthContext', '=== DEEP LINK EVENT ===', url);
 
-      if (url.includes('auth/callback') || url.includes('auth%2Fcallback')) {
-        let accessToken: string | null = null;
-        let refreshToken: string | null = null;
-        let code: string | null = null;
+      if (!url.includes('auth/callback') && !url.includes('auth%2Fcallback')) return;
 
-        // Try to extract tokens from hash fragment
-        const hashIndex = url.indexOf('#');
-        if (hashIndex !== -1) {
-          const hashParams = new URLSearchParams(url.substring(hashIndex + 1));
-          accessToken = hashParams.get('access_token');
-          refreshToken = hashParams.get('refresh_token');
-          log('AuthContext', 'Deep link hash - access:', !!accessToken, 'refresh:', !!refreshToken);
-        }
-
-        // Try to extract from query params
-        const queryIndex = url.indexOf('?');
-        if (queryIndex !== -1) {
-          const queryEnd = hashIndex !== -1 ? hashIndex : url.length;
-          const queryString = url.substring(queryIndex + 1, queryEnd);
-          const queryParams = new URLSearchParams(queryString);
-          code = queryParams.get('code');
-          if (!accessToken) accessToken = queryParams.get('access_token');
-          if (!refreshToken) refreshToken = queryParams.get('refresh_token');
-          log('AuthContext', 'Deep link query - code:', !!code, 'access:', !!accessToken, 'refresh:', !!refreshToken);
-        }
-
-        if (accessToken && refreshToken) {
-          await setSessionAndUpdateState(accessToken, refreshToken);
-        } else if (code) {
-          log('AuthContext', 'Exchanging code from deep link');
-          const { error } = await supabase.auth.exchangeCodeForSession(code);
-          if (error) {
-            log('AuthContext', 'Error exchanging code:', error.message);
-          }
-        }
+      if (googleAuthActiveRef.current) {
+        log('AuthContext', 'Deep link: googleAuth is active, skipping (signInWithGoogle will handle)');
+        return;
       }
+
+      await processCallbackUrl(url, 'deepLink');
     };
 
     // Check for initial URL (app opened via deep link)
     Linking.getInitialURL().then((url) => {
-      if (url) {
-        handleDeepLink({ url });
-      }
+      if (url) handleDeepLink({ url });
     });
 
     // Listen for deep links while app is running
@@ -275,13 +329,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (_event, session) => {
       log('AuthContext', 'onAuthStateChange:', _event, 'hasSession:', !!session, 'userId:', session?.user?.id);
-
-      // Wait for Supabase client to be fully initialized before updating state.
-      // Use supabaseReady (plain promise) instead of getSession() to avoid deadlock.
-      // getSession() acquires an internal lock that's already held during event firing.
-      log('AuthContext', 'Waiting for supabaseReady...');
-      await supabaseReady;
-      log('AuthContext', 'supabaseReady resolved, proceeding with:', _event);
 
       // On explicit sign out, clear everything
       if (_event === 'SIGNED_OUT') {
@@ -297,39 +344,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       // If we have a valid session, update state and run post-login setup
       if (session?.user) {
-        const mappedUser = mapUser(session.user);
-        log('AuthContext', 'Setting user:', mappedUser.id, 'event:', _event);
-        setUserContext(
-          mappedUser.display_name ?? mappedUser.email ?? mappedUser.phone ?? null,
-          null,
-        );
-        setState((prev) => ({
-          ...prev,
-          session,
-          user: mappedUser,
-          loading: false,
-        }));
+        applySession(session, _event);
 
         if (_event === 'SIGNED_IN' || _event === 'INITIAL_SESSION') {
           log('AuthContext', 'Running post-login setup for:', _event);
-          // All post-login operations are fire-and-forget to avoid deadlock.
-          // Supabase queries internally call getSession() which would deadlock
-          // if awaited inside onAuthStateChange (the auth lock is held).
-          ensureUserInDatabase(session.user).catch((e) => log('AuthContext', 'ensureUserInDatabase error:', e));
-          syncUserProfile(session.user).catch((e) => log('AuthContext', 'Sync profile error:', e));
-          updateUserWithDbProfile(mappedUser.id).catch((e) => log('AuthContext', 'Update profile error:', e));
-          registerPushToken(mappedUser.id).catch((e) => log('AuthContext', 'Register push token error:', e));
-
-          // Subscribe to user profile changes to keep local caches fresh
-          if (!unsubscribeProfiles) {
-            unsubscribeProfiles = subscribeToUserProfileChanges();
-            log('AuthContext', 'Subscribed to user profile changes');
-          }
-          // Subscribe to message deletions so deleted flags disappear from all devices
-          if (!unsubscribeDeletions) {
-            unsubscribeDeletions = subscribeToMessageDeletions();
-            log('AuthContext', 'Subscribed to message deletions');
-          }
+          runPostLoginSetup(session);
         }
         return;
       }
@@ -344,10 +363,41 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     });
 
+    // Session recovery on app foreground: if a valid session exists in storage
+    // but React state lost it (e.g. after background kill / race condition),
+    // restore it immediately.
+    const appStateSubscription = AppState.addEventListener(
+      'change',
+      async (nextState: AppStateStatus) => {
+        if (nextState !== 'active') return;
+
+        const current = stateRef.current;
+        // Only recover if we finished loading but have no user
+        if (current.loading || current.user) return;
+
+        log('AuthContext', 'App became active with no user, checking stored session...');
+        try {
+          const { data: { session }, error } = await supabase.auth.getSession();
+          if (error) {
+            log('AuthContext', 'Session recovery: getSession error:', error.message);
+            return;
+          }
+          if (session?.user) {
+            log('AuthContext', 'Session recovery: found stored session, restoring user:', session.user.id);
+            applySession(session, 'appStateRecovery');
+            runPostLoginSetup(session);
+          }
+        } catch (e) {
+          log('AuthContext', 'Session recovery: exception:', e);
+        }
+      },
+    );
+
     return () => {
       clearTimeout(loadingTimeout);
       subscription.unsubscribe();
       linkingSubscription.remove();
+      appStateSubscription.remove();
       unsubscribeProfiles?.();
       unsubscribeDeletions?.();
     };
@@ -373,105 +423,98 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       const redirectUrl = 'flag://auth/callback';
       log('AuthContext', '=== GOOGLE AUTH START ===');
-      log('AuthContext', 'Redirect URL:', redirectUrl);
 
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
           redirectTo: redirectUrl,
           skipBrowserRedirect: true,
-          queryParams: {
-            prompt: 'select_account',
-          },
+          queryParams: { prompt: 'select_account' },
         },
       });
 
       if (error) throw error;
       if (!data.url) throw new Error('No OAuth URL returned');
 
-      log('AuthContext', 'OAuth URL:', data.url);
+      log('AuthContext', 'OAuth URL obtained, opening browser');
 
-      // Safety timeout: prevents openAuthSessionAsync from hanging forever in edge cases.
-      // With the expo-web-browser plugin, the RedirectActivity natively captures flag://
-      // redirects and resolves the promise — no AppState/dismissAuthSession hack needed.
+      // Mark Google auth as active so handleDeepLink defers to us
+      googleAuthActiveRef.current = true;
+
+      // Safety timeout: prevents openAuthSessionAsync from hanging forever
       const dismissTimeout = setTimeout(() => {
-        log('AuthContext', 'Safety timeout: dismissing auth session');
+        log('AuthContext', 'Safety timeout (60s): dismissing auth session');
         WebBrowser.dismissAuthSession();
       }, 60000);
 
-      // Use openAuthSessionAsync with flag:// prefix to capture any flag:// redirect
       const result = await WebBrowser.openAuthSessionAsync(data.url, 'flag://');
       clearTimeout(dismissTimeout);
 
-      log('AuthContext', '=== AUTH DEBUG ===');
-      log('AuthContext', 'Result type:', result.type);
+      log('AuthContext', 'Browser result type:', result.type);
 
+      // ── SUCCESS: browser returned the callback URL ──
       if (result.type === 'success' && result.url) {
-        log('AuthContext', 'Full URL:', result.url);
+        log('AuthContext', 'Success URL received');
 
-        // Check for error in URL first
-        const urlObj = new URL(result.url);
-        const errorParam = urlObj.searchParams.get('error') || urlObj.hash.includes('error=');
-        const errorDescription = urlObj.searchParams.get('error_description');
-
-        if (errorParam && errorDescription) {
-          const decodedError = decodeURIComponent(errorDescription.replace(/\+/g, ' '));
-          log('AuthContext', 'Auth error from Supabase:', decodedError);
-          throw new Error(decodedError);
+        // Check for OAuth error in URL
+        try {
+          const urlObj = new URL(result.url);
+          const errorParam = urlObj.searchParams.get('error') || urlObj.hash.includes('error=');
+          const errorDescription = urlObj.searchParams.get('error_description');
+          if (errorParam && errorDescription) {
+            const decoded = decodeURIComponent(errorDescription.replace(/\+/g, ' '));
+            log('AuthContext', 'OAuth error from Supabase:', decoded);
+            throw new Error(decoded);
+          }
+        } catch (e) {
+          if (e instanceof Error && e.message !== 'Invalid URL') throw e;
         }
 
-        // Parse URL to extract tokens or code
-        let accessToken: string | null = null;
-        let refreshToken: string | null = null;
-
-        // Try to extract from hash fragment
-        const hashIndex = result.url.indexOf('#');
-        if (hashIndex !== -1) {
-          const hashParams = new URLSearchParams(result.url.substring(hashIndex + 1));
-          accessToken = hashParams.get('access_token');
-          refreshToken = hashParams.get('refresh_token');
-          log('AuthContext', 'Hash params - access:', !!accessToken, 'refresh:', !!refreshToken);
-        }
-
-        if (accessToken && refreshToken) {
-          log('AuthContext', 'Setting session with tokens');
-          const { error: sessionError } = await setSessionAndUpdateState(accessToken, refreshToken);
-          return { error: sessionError };
-        }
-
-        // No tokens in hash — try PKCE code exchange from query params
-        const queryIndex = result.url.indexOf('?');
-        if (queryIndex !== -1) {
-          const queryString = result.url.substring(queryIndex + 1).split('#')[0];
-          const queryParams = new URLSearchParams(queryString);
-          const code = queryParams.get('code');
-          if (code) {
-            log('AuthContext', 'Exchanging PKCE code from openAuthSessionAsync result');
-            const { error: codeError } = await supabase.auth.exchangeCodeForSession(code);
-            if (codeError) {
-              log('AuthContext', 'Error exchanging PKCE code:', codeError.message);
-              return { error: codeError as Error };
-            }
+        const { error: processError } = await processCallbackUrl(result.url, 'signInWithGoogle');
+        if (processError) {
+          // The callback URL processing failed, but the deep link handler
+          // might have already established the session. Check before returning error.
+          if (stateRef.current.user) {
+            log('AuthContext', 'processCallbackUrl failed but user already set, continuing');
             return { error: null };
           }
+          return { error: processError };
         }
-
-        log('AuthContext', 'No tokens or code in result URL');
+        return { error: null };
       }
 
+      // ── DISMISS / CANCEL: browser closed without returning a URL ──
+      // On Android, the deep link often arrives separately. Since we blocked
+      // handleDeepLink, we need to check for the session ourselves.
       if (result.type === 'cancel' || result.type === 'dismiss') {
-        log('AuthContext', 'Auth browser dismissed, checking for existing session...');
-        // On Android, openAuthSessionAsync may dismiss while the deep link is
-        // processed separately. Poll every 200ms (up to 3s) for the deep link
-        // handler to establish a session.
-        for (let i = 0; i < 15; i++) {
+        log('AuthContext', 'Browser dismissed — polling for session...');
+
+        // Check if user was already set (e.g. onAuthStateChange fired from another path)
+        if (stateRef.current.user) {
+          log('AuthContext', 'User already authenticated after dismiss');
+          return { error: null };
+        }
+
+        // Poll for session: the redirect intent may still be processing
+        for (let i = 0; i < 25; i++) {
           await new Promise((r) => setTimeout(r, 200));
+
+          // Check React state first (fastest path)
+          if (stateRef.current.user) {
+            log('AuthContext', `User set during poll (attempt ${i + 1})`);
+            return { error: null };
+          }
+
+          // Also check Supabase storage directly
           const { data: sessionData } = await supabase.auth.getSession();
           if (sessionData.session) {
-            log('AuthContext', `Session found after dismiss (attempt ${i + 1}), auth succeeded via deep link`);
+            log('AuthContext', `Session found in storage after dismiss (attempt ${i + 1})`);
+            applySession(sessionData.session, 'dismissPoll');
             return { error: null };
           }
         }
+
+        log('AuthContext', 'No session found after dismiss polling (5s), giving up');
       }
 
       return { error: null };
@@ -479,6 +522,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       log('AuthContext', 'Google sign in error:', error);
       reportError(error, 'auth.signInWithGoogle');
       return { error: error as Error };
+    } finally {
+      googleAuthActiveRef.current = false;
     }
   };
 

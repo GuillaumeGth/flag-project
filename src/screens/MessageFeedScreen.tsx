@@ -6,9 +6,6 @@ import {
   TouchableOpacity,
   StyleSheet,
   ActivityIndicator,
-  KeyboardAvoidingView,
-  Keyboard,
-  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -27,7 +24,6 @@ export default function MessageFeedScreen({ navigation, route }: Props) {
   const { user } = useAuth();
   const { userId, initialMessageId } = route.params;
   const flatListRef = useRef<FlatList>(null);
-  const focusedIndexRef = useRef<number>(-1);
 
   const [messages, setMessages] = useState<Message[]>([]);
   const [discoveredIds, setDiscoveredIds] = useState<Set<string>>(new Set());
@@ -69,16 +65,6 @@ export default function MessageFeedScreen({ navigation, route }: Props) {
     }
   }, [loading, messages, initialMessageId, scrolledToInitial]);
 
-  useEffect(() => {
-    const sub = Keyboard.addListener('keyboardDidShow', () => {
-      const idx = focusedIndexRef.current;
-      if (idx >= 0) {
-        flatListRef.current?.scrollToIndex({ index: idx, animated: true, viewPosition: 1 });
-      }
-    });
-    return () => sub.remove();
-  }, []);
-
   const handleUserPress = useCallback((pressedUserId: string) => {
     if (pressedUserId !== userId) {
       navigation.push('UserProfile', { userId: pressedUserId });
@@ -93,23 +79,19 @@ export default function MessageFeedScreen({ navigation, route }: Props) {
     });
   }, [navigation]);
 
-  const renderItem = useCallback(({ item, index }: { item: Message; index: number }) => (
+  const renderItem = useCallback(({ item }: { item: Message }) => (
     <MessageFeedItem
       message={item}
       senderName={userProfile?.display_name ?? undefined}
       senderAvatarUrl={userProfile?.avatar_url}
       isDiscovered={isOwnProfile ? undefined : discoveredIds.has(item.id)}
       onUserPress={handleUserPress}
-      onInputFocus={() => { focusedIndexRef.current = index; }}
       onMapPress={() => handleMapPress(item)}
     />
   ), [userProfile, discoveredIds, isOwnProfile, handleUserPress, handleMapPress]);
 
   return (
-    <KeyboardAvoidingView
-      style={[styles.container, { paddingTop: insets.top }]}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-    >
+    <View style={[styles.container, { paddingTop: insets.top }]}>
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
@@ -130,6 +112,8 @@ export default function MessageFeedScreen({ navigation, route }: Props) {
           renderItem={renderItem}
           keyExtractor={item => item.id}
           keyboardShouldPersistTaps="handled"
+          style={{ backgroundColor: colors.background.primary }}
+          contentContainerStyle={{ paddingBottom: insets.bottom }}
           onScrollToIndexFailed={(info) => {
             setTimeout(() => {
               flatListRef.current?.scrollToIndex({ index: info.index, animated: false });
@@ -137,7 +121,7 @@ export default function MessageFeedScreen({ navigation, route }: Props) {
           }}
         />
       )}
-    </KeyboardAvoidingView>
+    </View>
   );
 }
 

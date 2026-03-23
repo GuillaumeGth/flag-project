@@ -16,6 +16,7 @@ export type RootStackParamList = {
   UserProfile: { userId: string };
   MessageFeed: { userId: string; initialMessageId: string };
   Settings: undefined;
+  Contact: undefined;
   Privacy: undefined;
   FollowRequests: undefined;
 };

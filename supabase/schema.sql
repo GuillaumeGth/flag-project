@@ -39,8 +39,23 @@ CREATE TABLE IF NOT EXISTS public.user_push_tokens (
     user_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
     expo_push_token TEXT NOT NULL,
     device_name TEXT,
-    created_at TIMESTAMPTZ DEFAULT NOW()
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    last_used_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- Add last_used_at column if it doesn't exist (idempotent migration)
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = 'user_push_tokens'
+          AND column_name = 'last_used_at'
+    ) THEN
+        ALTER TABLE public.user_push_tokens ADD COLUMN last_used_at TIMESTAMPTZ DEFAULT NOW();
+    END IF;
+END
+$$;
 
 ALTER TABLE public.user_push_tokens ENABLE ROW LEVEL SECURITY;
 
@@ -977,6 +992,17 @@ CREATE TRIGGER on_reaction_created_send_push
     AFTER INSERT ON public.message_reactions
     FOR EACH ROW EXECUTE FUNCTION public.send_push_on_reaction();
 
+-- Function to clean up push tokens unused for more than 30 days
+-- Called from the client on app startup via RPC
+CREATE OR REPLACE FUNCTION public.cleanup_stale_push_tokens()
+RETURNS void AS $$
+BEGIN
+    DELETE FROM public.user_push_tokens
+    WHERE user_id = auth.uid()
+      AND last_used_at < NOW() - INTERVAL '30 days';
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
 -- ============================================================
 -- Comments on public flags
 -- ============================================================
@@ -1146,9 +1172,11 @@ BEGIN
                         'title', notif_title, 'body', notif_body,
                         'data', jsonb_build_object('type', 'comment_reply', 'messageId', NEW.message_id)
                     );
-                    PERFORM http(('POST', expo_url,
-                        ARRAY[http_header('Content-Type', 'application/json')],
-                        'application/json', payload::text)::http_request);
+                    PERFORM net.http_post(
+                        url := expo_url,
+                        body := payload,
+                        headers := '{"Content-Type": "application/json"}'::jsonb
+                    );
                 END LOOP;
             END IF;
         END IF;
@@ -1170,9 +1198,11 @@ BEGIN
                     'title', notif_title, 'body', notif_body,
                     'data', jsonb_build_object('type', 'comment', 'messageId', NEW.message_id)
                 );
-                PERFORM http(('POST', expo_url,
-                    ARRAY[http_header('Content-Type', 'application/json')],
-                    'application/json', payload::text)::http_request);
+                PERFORM net.http_post(
+                    url := expo_url,
+                    body := payload,
+                    headers := '{"Content-Type": "application/json"}'::jsonb
+                );
             END LOOP;
         END IF;
     END IF;
@@ -1209,11 +1239,60 @@ STABLE SECURITY DEFINER
 AS $$
   SELECT u.*
   FROM public.users u
-  LEFT JOIN public.subscriptions s ON s.following_id = u.id
+  LEFT JOIN public.subscriptions followers ON followers.following_id = u.id
+  LEFT JOIN public.subscriptions following ON following.follower_id = u.id
+  LEFT JOIN public.messages m ON m.sender_id = u.id AND m.is_public = true
   WHERE (exclude_user_id IS NULL OR u.id != exclude_user_id)
     AND u.is_searchable = true
     AND u.is_bot = false
   GROUP BY u.id
-  ORDER BY COUNT(s.follower_id) DESC
+  -- Must have at least 1 public message OR a follower/following ratio > 50
+  HAVING COUNT(DISTINCT m.id) > 0
+      OR (COUNT(DISTINCT followers.follower_id) > 0
+          AND COUNT(DISTINCT followers.follower_id)::float / GREATEST(COUNT(DISTINCT following.following_id), 1) > 50)
+  ORDER BY
+    -- Priority 1: high follower/following ratio (at least 1 follower required)
+    CASE WHEN COUNT(DISTINCT followers.follower_id) = 0 THEN 0
+         ELSE COUNT(DISTINCT followers.follower_id)::float / GREATEST(COUNT(DISTINCT following.following_id), 1)
+    END DESC,
+    -- Priority 2: most public messages
+    COUNT(DISTINCT m.id) DESC
+  LIMIT limit_count;
+$$;
+
+
+-- Friends-of-friends suggestions: returns users followed by people I follow,
+-- that I don't already follow, ordered by how many of my followees follow them.
+CREATE OR REPLACE FUNCTION public.get_suggested_users(limit_count integer DEFAULT 10)
+RETURNS TABLE(
+  id uuid,
+  display_name text,
+  avatar_url text,
+  is_private boolean,
+  mutual_count bigint
+)
+LANGUAGE sql
+STABLE SECURITY DEFINER
+AS $$
+  SELECT
+    u.id,
+    u.display_name,
+    u.avatar_url,
+    u.is_private,
+    COUNT(*) AS mutual_count
+  FROM public.subscriptions s1
+  JOIN public.subscriptions s2 ON s2.follower_id = s1.following_id
+  JOIN public.users u ON u.id = s2.following_id
+  WHERE s1.follower_id = auth.uid()
+    AND s2.following_id != auth.uid()
+    AND u.is_searchable = TRUE
+    AND u.is_bot = FALSE
+    AND NOT EXISTS (
+      SELECT 1 FROM public.subscriptions s3
+      WHERE s3.follower_id = auth.uid()
+        AND s3.following_id = s2.following_id
+    )
+  GROUP BY u.id, u.display_name, u.avatar_url, u.is_private
+  ORDER BY mutual_count DESC
   LIMIT limit_count;
 $$;

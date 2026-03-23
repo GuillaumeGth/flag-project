@@ -15,6 +15,7 @@ import { BottomTabNavigationProp, BottomTabScreenProps } from '@react-navigation
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { supabase, getCachedUserId } from '@/services/supabase';
+import { fetchSuggestedUsers, SuggestedUser } from '@/services/subscriptions';
 import { colors } from '@/theme-redesign';
 import { User, MainTabParamList, RootStackParamList } from '@/types';
 
@@ -31,6 +32,7 @@ export default function SearchUsersScreen({ navigation }: Props) {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<User[]>([]);
   const [topUsers, setTopUsers] = useState<User[]>([]);
+  const [suggestions, setSuggestions] = useState<SuggestedUser[]>([]);
   const [loading, setLoading] = useState(false);
   const currentUserId = getCachedUserId();
 
@@ -43,6 +45,8 @@ export default function SearchUsersScreen({ navigation }: Props) {
       .then(({ data }) => {
         if (data) setTopUsers(data);
       });
+
+    fetchSuggestedUsers(8).then(setSuggestions);
   }, [currentUserId]);
 
   const search = useCallback(async (text: string) => {
@@ -73,12 +77,15 @@ export default function SearchUsersScreen({ navigation }: Props) {
   }, [query, search]);
 
   const isSearching = query.trim().length > 0;
-  const displayedData = isSearching ? results : topUsers;
 
-  const renderUser = ({ item }: { item: User }) => (
+  const navigateToProfile = useCallback((userId: string) => {
+    navigation.navigate('UserProfile', { userId });
+  }, [navigation]);
+
+  const renderUser = useCallback(({ item }: { item: User }) => (
     <TouchableOpacity
       style={styles.userRow}
-      onPress={() => navigation.navigate('UserProfile', { userId: item.id })}
+      onPress={() => navigateToProfile(item.id)}
       activeOpacity={0.7}
     >
       <View style={styles.userAvatar}>
@@ -90,13 +97,57 @@ export default function SearchUsersScreen({ navigation }: Props) {
       </View>
       <View style={styles.userInfo}>
         <Text style={styles.userName}>{item.display_name || 'Utilisateur'}</Text>
-        {(item.phone || item.email) && (
-          <Text style={styles.userIdentifier}>{item.phone || item.email}</Text>
+        {item.phone && (
+          <Text style={styles.userIdentifier}>{item.phone}</Text>
         )}
       </View>
       <Ionicons name="chevron-forward" size={20} color={colors.text.tertiary} />
     </TouchableOpacity>
-  );
+  ), [navigateToProfile]);
+
+  const renderSuggestedUser = useCallback((user: SuggestedUser) => (
+    <TouchableOpacity
+      key={user.id}
+      style={styles.userRow}
+      onPress={() => navigateToProfile(user.id)}
+      activeOpacity={0.7}
+    >
+      <View style={styles.userAvatar}>
+        {user.avatar_url ? (
+          <Image source={{ uri: user.avatar_url }} style={styles.userAvatarImage} />
+        ) : (
+          <Ionicons name="person" size={20} color={colors.text.secondary} />
+        )}
+      </View>
+      <View style={styles.userInfo}>
+        <Text style={styles.userName}>{user.display_name || 'Utilisateur'}</Text>
+        <Text style={styles.mutualText}>
+          {user.mutual_count} {user.mutual_count > 1 ? 'amis en commun' : 'ami en commun'}
+        </Text>
+      </View>
+      <Ionicons name="chevron-forward" size={20} color={colors.text.tertiary} />
+    </TouchableOpacity>
+  ), [navigateToProfile]);
+
+  const listHeader = !isSearching ? (
+    <View>
+      {suggestions.length > 0 && (
+        <>
+          <View style={styles.sectionHeader}>
+            <Ionicons name="people" size={14} color={colors.text.tertiary} />
+            <Text style={styles.sectionHeaderText}>Suggérés pour vous</Text>
+          </View>
+          {suggestions.map(renderSuggestedUser)}
+        </>
+      )}
+      {topUsers.length > 0 && (
+        <View style={styles.sectionHeader}>
+          <Ionicons name="trending-up" size={14} color={colors.text.tertiary} />
+          <Text style={styles.sectionHeaderText}>Populaires</Text>
+        </View>
+      )}
+    </View>
+  ) : null;
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
@@ -125,17 +176,10 @@ export default function SearchUsersScreen({ navigation }: Props) {
       )}
 
       <FlatList
-        data={displayedData}
+        data={isSearching ? results : topUsers}
         keyExtractor={item => item.id}
         renderItem={renderUser}
-        ListHeaderComponent={
-          !isSearching && topUsers.length > 0 ? (
-            <View style={styles.sectionHeader}>
-              <Ionicons name="trending-up" size={14} color={colors.text.tertiary} />
-              <Text style={styles.sectionHeaderText}>Populaires</Text>
-            </View>
-          ) : null
-        }
+        ListHeaderComponent={listHeader}
         ListEmptyComponent={
           isSearching && !loading ? (
             <View style={styles.emptyContainer}>
@@ -216,6 +260,11 @@ const styles = StyleSheet.create({
   userIdentifier: {
     fontSize: 13,
     color: colors.text.secondary,
+    marginTop: 2,
+  },
+  mutualText: {
+    fontSize: 13,
+    color: colors.primary.violet,
     marginTop: 2,
   },
   emptyContainer: {

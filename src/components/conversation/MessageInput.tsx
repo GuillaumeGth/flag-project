@@ -178,7 +178,7 @@ export default function MessageInput({
 
             <TextInput
               style={styles.textInput}
-              placeholder="Message..."
+              placeholder="Message non géolocalisé"
               placeholderTextColor={colors.text.tertiary}
               value={inputText}
               onChangeText={setInputText}
@@ -268,7 +268,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border.accent,
   },
-  cannotSendText: {
+cannotSendText: {
     flex: 1,
     fontSize: 14,
     color: colors.text.secondary,

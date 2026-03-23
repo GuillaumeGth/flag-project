@@ -46,7 +46,7 @@ export default function SelectRecipientScreen({ navigation, route }: Props) {
   const confirmSelection = () => {
     const recipients = selectedUsers.map((u) => ({
       id: u.id,
-      name: u.display_name || u.email || u.phone || 'Utilisateur',
+      name: u.display_name || u.phone || 'Utilisateur',
     }));
     navigation.navigate('CreateMessage', { recipients });
   };
@@ -55,7 +55,7 @@ export default function SelectRecipientScreen({ navigation, route }: Props) {
     if (mode === 'flag') {
       toggleUser(user);
     } else {
-      const displayName = user.display_name || user.email || user.phone || 'Utilisateur';
+      const displayName = user.display_name || user.phone || 'Utilisateur';
       navigation.navigate('Conversation', {
         otherUserId: user.id,
         otherUserName: displayName,
@@ -66,7 +66,7 @@ export default function SelectRecipientScreen({ navigation, route }: Props) {
 
   const renderUser = ({ item }: { item: User }) => {
     const isBot = item.id === FLAG_BOT_ID;
-    const displayName = item.display_name || item.email || item.phone || 'Utilisateur';
+    const displayName = item.display_name || item.phone || 'Utilisateur';
     const isSelected = selectedUsers.some((u) => u.id === item.id);
 
     return (

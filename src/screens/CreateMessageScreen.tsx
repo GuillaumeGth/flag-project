@@ -2,7 +2,6 @@ import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
   Text,
-  TextInput,
   TouchableOpacity,
   StyleSheet,
   Image,
@@ -22,6 +21,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { sendMessage, uploadMedia } from '@/services/messages';
 import { Coordinates, MessageContentType, RootStackParamList } from '@/types';
 import { colors, shadows, radius, spacing, typography } from '@/theme-redesign';
+import GlassInput from '@/components/redesign/GlassInput';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'CreateMessage'>;
 
@@ -267,7 +267,10 @@ export default function CreateMessageScreen({ navigation, route }: Props) {
           <TouchableOpacity onPress={() => navigation.goBack()}>
             <Ionicons name="arrow-back" size={24} color={colors.text.primary} />
           </TouchableOpacity>
-          <Text style={styles.title}>Nouveau flag</Text>
+          <View style={styles.titleRow}>
+            <Ionicons name="location" size={18} color="#FFFFFF" />
+            <Text style={styles.title}>Nouveau Fläag</Text>
+          </View>
           <View style={{ width: 24 }} />
         </View>
 
@@ -336,10 +339,9 @@ export default function CreateMessageScreen({ navigation, route }: Props) {
         )}
 
         {/* Text input */}
-        <TextInput
+        <GlassInput
           style={styles.textInput}
-          placeholder="Votre message..."
-          placeholderTextColor={colors.text.tertiary}
+          placeholder="Ce message sera lié à votre position actuelle..."
           multiline
           value={textContent}
           onChangeText={setTextContent}
@@ -414,6 +416,11 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: spacing.xxl,
   },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
   title: {
     fontSize: typography.sizes.lg,
     fontWeight: '600',
@@ -485,16 +492,11 @@ const styles = StyleSheet.create({
     color: colors.text.primary,
   },
   textInput: {
-    borderWidth: 1,
-    borderColor: colors.border.default,
     borderRadius: radius.lg,
     padding: spacing.lg,
-    fontSize: typography.sizes.md,
     minHeight: 120,
     textAlignVertical: 'top',
     marginBottom: spacing.md,
-    backgroundColor: colors.surface.glass,
-    color: colors.text.primary,
   },
   mediaButtons: {
     flexDirection: 'row',

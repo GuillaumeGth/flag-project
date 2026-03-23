@@ -4,7 +4,6 @@ import {
   Text,
   TouchableOpacity,
   StyleSheet,
-  Image,
   ActivityIndicator,
   FlatList,
   RefreshControl,
@@ -14,9 +13,8 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { colors, spacing, radius, typography, shadows } from '@/theme-redesign';
+import { colors, spacing, radius, typography } from '@/theme-redesign';
 import { supabase } from '@/services/supabase';
-import { fetchUserPublicMessages, fetchDiscoveredPublicMessageIds } from '@/services/messages';
 import {
   follow,
   unfollow,
@@ -31,10 +29,12 @@ import {
   cancelFollowRequest,
   fetchSentRequestStatus,
 } from '@/services/followRequests';
-import { fetchCommentCounts } from '@/services/comments';
 import { Message, User, RootStackParamList } from '@/types';
 import GridCell from '@/components/profile/GridCell';
 import ProfileStatsRow from '@/components/profile/ProfileStatsRow';
+import PremiumAvatar from '@/components/redesign/PremiumAvatar';
+import EmptyState from '@/components/EmptyState';
+import { useProfileMessages } from '@/hooks/useProfileMessages';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'UserProfile'>;
 
@@ -46,14 +46,13 @@ export default function UserProfileScreen({ navigation, route }: Props) {
   const [following, setFollowing] = useState(false);
   const [followLoading, setFollowLoading] = useState(false);
   const [pendingRequestId, setPendingRequestId] = useState<string | null>(null);
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [discoveredIds, setDiscoveredIds] = useState<Set<string>>(new Set());
   const [followerCount, setFollowerCount] = useState(0);
-  const [commentCounts, setCommentCounts] = useState<Record<string, number>>({});
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
+  const [extraLoading, setExtraLoading] = useState(true);
   const [notifPrefs, setNotifPrefs] = useState<NotificationPrefs>({ notifyPrivateFlags: true, notifyPublicFlags: false });
   const [showNotifModal, setShowNotifModal] = useState(false);
+
+  const { messages, commentCounts, discoveredIds, loading: messagesLoading, refreshing: messagesRefreshing, onRefresh: refreshMessages } = useProfileMessages(userId);
+  const loading = messagesLoading || extraLoading;
 
   const loadProfile = useCallback(async () => {
     const { data } = await supabase
@@ -62,19 +61,6 @@ export default function UserProfileScreen({ navigation, route }: Props) {
       .eq('id', userId)
       .single();
     if (data) setUserProfile(data);
-  }, [userId]);
-
-  const loadMessages = useCallback(async () => {
-    const data = await fetchUserPublicMessages(userId);
-    setMessages(data);
-    if (data.length > 0) {
-      const [ids, counts] = await Promise.all([
-        fetchDiscoveredPublicMessageIds(data.map(m => m.id)),
-        fetchCommentCounts(data.map(m => m.id)),
-      ]);
-      setDiscoveredIds(ids);
-      setCommentCounts(counts);
-    }
   }, [userId]);
 
   const checkFollowing = useCallback(async () => {
@@ -95,15 +81,13 @@ export default function UserProfileScreen({ navigation, route }: Props) {
   }, [userId]);
 
   useEffect(() => {
-    Promise.all([loadProfile(), loadMessages(), checkFollowing(), loadFollowerCount()])
-      .finally(() => setLoading(false));
-  }, [loadProfile, loadMessages, checkFollowing]);
+    Promise.all([loadProfile(), checkFollowing(), loadFollowerCount()])
+      .finally(() => setExtraLoading(false));
+  }, [loadProfile, checkFollowing, loadFollowerCount]);
 
   const onRefresh = useCallback(async () => {
-    setRefreshing(true);
-    await Promise.all([loadMessages(), checkFollowing(), loadFollowerCount()]);
-    setRefreshing(false);
-  }, [loadMessages, checkFollowing, loadFollowerCount]);
+    await Promise.all([refreshMessages(), checkFollowing(), loadFollowerCount()]);
+  }, [refreshMessages, checkFollowing, loadFollowerCount]);
 
   const handleToggleFollow = async () => {
     setFollowLoading(true);
@@ -166,14 +150,10 @@ export default function UserProfileScreen({ navigation, route }: Props) {
   const renderEmpty = () => {
     if (loading) return null;
     return (
-      <View style={styles.emptyContainer}>
-        <Ionicons
-          name="albums-outline"
-          size={48}
-          color={colors.text.tertiary}
-        />
-        <Text style={styles.emptyText}>Aucun message public</Text>
-      </View>
+      <EmptyState
+        icon="albums-outline"
+        title="Aucun message public"
+      />
     );
   };
 
@@ -185,13 +165,7 @@ export default function UserProfileScreen({ navigation, route }: Props) {
         </TouchableOpacity>
         <View style={styles.profileInfo}>
           <View style={styles.profileTopRow}>
-            <View style={styles.avatar}>
-              {userProfile?.avatar_url ? (
-                <Image source={{ uri: userProfile.avatar_url }} style={styles.avatarImage} />
-              ) : (
-                <Ionicons name="person" size={24} color={colors.text.secondary} />
-              )}
-            </View>
+            <PremiumAvatar uri={userProfile?.avatar_url} name={userProfile?.display_name} size="large" withRing ringColor="violet" />
             <Text style={styles.displayName}>
               {userProfile?.display_name || 'Utilisateur'}
             </Text>
@@ -278,7 +252,7 @@ export default function UserProfileScreen({ navigation, route }: Props) {
           ListHeaderComponent={renderHeader}
           ListEmptyComponent={renderEmpty}
           refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary.violet} />
+            <RefreshControl refreshing={messagesRefreshing} onRefresh={onRefresh} tintColor={colors.primary.violet} />
           }
         />
       )}
@@ -368,19 +342,6 @@ const styles = StyleSheet.create({
     gap: 12,
     marginBottom: 10,
   },
-  avatar: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    backgroundColor: colors.surface.elevated,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  avatarImage: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-  },
   profileInfo: {
     flex: 1,
   },
@@ -388,11 +349,6 @@ const styles = StyleSheet.create({
     fontSize: 17,
     fontWeight: '600',
     color: colors.text.primary,
-  },
-  followerCount: {
-    fontSize: 13,
-    color: colors.text.secondary,
-    marginTop: 2,
   },
   followButton: {
     paddingHorizontal: 20,
@@ -421,27 +377,6 @@ const styles = StyleSheet.create({
     marginHorizontal: spacing.xl,
     marginTop: spacing.lg,
     marginBottom: spacing.md,
-  },
-  gridTitle: {
-    fontSize: typography.sizes.md,
-    fontWeight: '600',
-    color: colors.text.primary,
-    paddingHorizontal: spacing.lg,
-    marginBottom: spacing.sm,
-  },
-  emptyContainer: {
-    alignItems: 'center',
-    paddingTop: 48,
-    gap: 12,
-  },
-  emptyText: {
-    color: colors.text.tertiary,
-    fontSize: 14,
-  },
-  nameRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
   },
   profileActions: {
     flexDirection: 'row',
@@ -503,11 +438,6 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.md,
     fontWeight: '600',
     color: colors.text.primary,
-  },
-  notifRowDesc: {
-    fontSize: typography.sizes.sm,
-    color: colors.text.secondary,
-    marginTop: 2,
   },
   notifDivider: {
     height: 1,

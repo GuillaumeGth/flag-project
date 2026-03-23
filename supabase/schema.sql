@@ -155,11 +155,21 @@ CREATE POLICY "Users can send messages" ON public.messages
 
 DROP POLICY IF EXISTS "Recipients can update messages" ON public.messages;
 CREATE POLICY "Recipients can update messages" ON public.messages
-    FOR UPDATE USING (auth.uid() = recipient_id);
+    FOR UPDATE USING (auth.uid() = recipient_id)
+    WITH CHECK (
+        auth.uid() = recipient_id
+        -- Recipients cannot touch the sender's soft-delete flag
+        AND deleted_by_sender = (SELECT m.deleted_by_sender FROM public.messages m WHERE m.id = id)
+    );
 
 DROP POLICY IF EXISTS "Senders can soft delete messages" ON public.messages;
 CREATE POLICY "Senders can soft delete messages" ON public.messages
-    FOR UPDATE USING (auth.uid() = sender_id);
+    FOR UPDATE USING (auth.uid() = sender_id)
+    WITH CHECK (
+        auth.uid() = sender_id
+        -- Senders cannot touch the recipient's soft-delete flag
+        AND deleted_by_recipient = (SELECT m.deleted_by_recipient FROM public.messages m WHERE m.id = id)
+    );
 
 -- Enable Realtime for messages table
 ALTER PUBLICATION supabase_realtime ADD TABLE messages;

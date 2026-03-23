@@ -534,6 +534,7 @@ export async function fetchMyPublicMessages(): Promise<Message[]> {
     .select('*, discovered_public_messages(count)')
     .eq('sender_id', currentUserId)
     .eq('is_public', true)
+    .eq('deleted_by_sender', false)
     .order('created_at', { ascending: false });
 
   if (error) {
@@ -557,6 +558,7 @@ export async function fetchUserPublicMessages(userId: string): Promise<Message[]
     .select('*, discovered_public_messages(count)')
     .eq('sender_id', userId)
     .eq('is_public', true)
+    .eq('deleted_by_sender', false)
     .order('created_at', { ascending: false });
 
   log('messages', 'fetchUserPublicMessages: data =', data?.length, 'error =', error);
@@ -599,6 +601,7 @@ export async function fetchFollowingPublicMessages(): Promise<UndiscoveredMessag
     `)
     .in('sender_id', followingIds)
     .eq('is_public', true)
+    .eq('deleted_by_sender', false)
     .not('location', 'is', null)
     .order('created_at', { ascending: false });
 
@@ -779,8 +782,26 @@ export async function markMessageAsRead(messageId: string, senderId?: string): P
 }
 
 // Soft-delete a message for the current user (sender or recipient)
-export async function deleteMessage(messageId: string, otherUserId: string, isSender: boolean): Promise<boolean> {
-  const field = isSender ? 'deleted_by_sender' : 'deleted_by_recipient';
+export async function deleteMessage(messageId: string, otherUserId: string): Promise<boolean> {
+  // Determine isSender server-side — never trust the client parameter
+  const userId = await getCachedUserId();
+  if (!userId) return false;
+
+  const { data: msg, error: fetchError } = await supabase
+    .from('messages')
+    .select('sender_id')
+    .eq('id', messageId)
+    .single();
+
+  if (fetchError || !msg) {
+    reportError(fetchError ?? new Error('Message not found'), 'messages.deleteMessage.fetch');
+    return false;
+  }
+
+  // Only the sender can soft-delete; recipients cannot delete messages
+  if (msg.sender_id !== userId) return false;
+
+  const field = 'deleted_by_sender';
 
   const { error } = await supabase
     .from('messages')
@@ -901,6 +922,68 @@ export async function patchUserInAllCaches(userId: string, updates: UserProfileU
  * Automatically patches all local caches when a user updates their avatar or display name.
  * Returns a cleanup function — call it on logout or unmount.
  */
+/**
+ * Subscribe to message deletions via Supabase Realtime.
+ * When a sender soft-deletes a message, all devices that have it cached
+ * (map markers, conversations) will remove it immediately.
+ * Returns a cleanup function — call it on logout or unmount.
+ */
+export function subscribeToMessageDeletions(): () => void {
+  const channel = supabase
+    .channel('message-deletions')
+    .on(
+      'postgres_changes',
+      { event: 'UPDATE', schema: 'public', table: 'messages' },
+      (payload) => {
+        const newRow = payload.new as { id: string; deleted_by_sender: boolean };
+        if (!newRow.deleted_by_sender) return;
+
+        const messageId = newRow.id;
+        log('messages', 'realtime: message deleted, purging from caches:', messageId);
+
+        removeDeletedMessageFromCaches(messageId).catch((e) =>
+          log('messages', 'removeDeletedMessageFromCaches error:', e)
+        );
+      }
+    )
+    .subscribe();
+
+  return () => { supabase.removeChannel(channel); };
+}
+
+async function removeDeletedMessageFromCaches(messageId: string): Promise<void> {
+  // 1. Remove from map cache
+  const mapCached = await getCachedData<UndiscoveredMessageMapMeta[]>(CACHE_KEYS.MAP_MESSAGES);
+  if (mapCached) {
+    const filtered = mapCached.filter(m => m.id !== messageId);
+    if (filtered.length !== mapCached.length) {
+      await setCachedData(CACHE_KEYS.MAP_MESSAGES, filtered);
+    }
+  }
+
+  // 2. Mark as deleted in global conversations cache
+  const convMsgs = await getCachedData<RawMessageWithUsers[]>(CACHE_KEYS.CONVERSATIONS_MESSAGES);
+  if (convMsgs) {
+    const updated = convMsgs.map(m =>
+      m.id === messageId ? { ...m, deleted_by_sender: true } : m
+    );
+    await setCachedData(CACHE_KEYS.CONVERSATIONS_MESSAGES, updated);
+  }
+
+  // 3. Mark as deleted in per-conversation caches
+  const convKeys = await getKeysWithPrefix('conversation_');
+  for (const key of convKeys) {
+    const msgs = await getCachedData<MessageWithUsers[]>(key);
+    if (!msgs) continue;
+    const hasMessage = msgs.some(m => m.id === messageId);
+    if (hasMessage) {
+      await setCachedData(key, msgs.map(m =>
+        m.id === messageId ? { ...m, deleted_by_sender: true } : m
+      ));
+    }
+  }
+}
+
 export function subscribeToUserProfileChanges(): () => void {
   const channel = supabase
     .channel('user-profile-changes')

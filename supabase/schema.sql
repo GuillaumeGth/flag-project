@@ -1250,3 +1250,39 @@ AS $$
   LIMIT limit_count;
 $$;
 
+
+-- Friends-of-friends suggestions: returns users followed by people I follow,
+-- that I don't already follow, ordered by how many of my followees follow them.
+CREATE OR REPLACE FUNCTION public.get_suggested_users(limit_count integer DEFAULT 10)
+RETURNS TABLE(
+  id uuid,
+  display_name text,
+  avatar_url text,
+  is_private boolean,
+  mutual_count bigint
+)
+LANGUAGE sql
+STABLE SECURITY DEFINER
+AS $$
+  SELECT
+    u.id,
+    u.display_name,
+    u.avatar_url,
+    u.is_private,
+    COUNT(*) AS mutual_count
+  FROM public.subscriptions s1
+  JOIN public.subscriptions s2 ON s2.follower_id = s1.following_id
+  JOIN public.users u ON u.id = s2.following_id
+  WHERE s1.follower_id = auth.uid()
+    AND s2.following_id != auth.uid()
+    AND u.is_searchable = TRUE
+    AND u.is_bot = FALSE
+    AND NOT EXISTS (
+      SELECT 1 FROM public.subscriptions s3
+      WHERE s3.follower_id = auth.uid()
+        AND s3.following_id = s2.following_id
+    )
+  GROUP BY u.id, u.display_name, u.avatar_url, u.is_private
+  ORDER BY mutual_count DESC
+  LIMIT limit_count;
+$$;

@@ -330,7 +330,7 @@ export default function MapFilterModal({
               <Text style={styles.resetLabel}>Réinitialiser</Text>
             </TouchableOpacity>
           )}
-        </BlurView>
+        </View>
       </View>
     </Modal>
   );

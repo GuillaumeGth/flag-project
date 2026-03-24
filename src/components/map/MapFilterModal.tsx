@@ -7,7 +7,6 @@ import {
   Modal,
   Pressable,
 } from 'react-native';
-import { BlurView } from 'expo-blur';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { colors } from '@/theme-redesign';
@@ -167,7 +166,7 @@ export default function MapFilterModal({
       <Pressable style={styles.backdrop} onPress={onClose} />
 
       <View style={styles.sheet}>
-        <BlurView intensity={50} tint="dark" style={styles.sheetBlur}>
+        <View style={styles.sheetBlur}>
           {/* Handle */}
           <View style={styles.handle} />
 

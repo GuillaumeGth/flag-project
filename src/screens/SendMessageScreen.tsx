@@ -29,7 +29,12 @@ export default function SendMessageScreen({ navigation, route }: Props) {
   const { user } = useAuth();
   const { current: userLocation } = useLocation();
 
-  const { contentType, textContent, mediaUri } = route.params ?? {};
+  // Store content params in state so they survive route.params updates
+  // (when SelectRecipientScreen navigates back with { recipients }, the native stack
+  // can replace params, wiping contentType/textContent/mediaUri and hiding the preview)
+  const [contentType] = useState(() => route.params?.contentType);
+  const [textContent] = useState(() => route.params?.textContent);
+  const [mediaUri] = useState(() => route.params?.mediaUri);
 
   // adminLocation comes from route params (set by CreateMessageScreen)
   const [adminLocation] = useState<Coordinates | null>(

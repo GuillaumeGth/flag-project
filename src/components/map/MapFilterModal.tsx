@@ -7,7 +7,6 @@ import {
   Modal,
   Pressable,
 } from 'react-native';
-import { BlurView } from 'expo-blur';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { colors } from '@/theme-redesign';
@@ -21,24 +20,26 @@ export interface FilterPerson {
 
 export interface ExploreFilters {
   authorIds: string[]; // empty = show all
+  visibility: 'all' | 'public' | 'private';
 }
 
 export interface MineFilters {
   recipientIds: string[]; // empty = show all; PUBLIC_FLAG_ID = public flags
   readStatus: 'all' | 'read' | 'unread';
+  visibility: 'all' | 'public' | 'private';
 }
 
 export const PUBLIC_FLAG_ID = '__public__';
 
-export const DEFAULT_EXPLORE_FILTERS: ExploreFilters = { authorIds: [] };
-export const DEFAULT_MINE_FILTERS: MineFilters = { recipientIds: [], readStatus: 'all' };
+export const DEFAULT_EXPLORE_FILTERS: ExploreFilters = { authorIds: [], visibility: 'all' };
+export const DEFAULT_MINE_FILTERS: MineFilters = { recipientIds: [], readStatus: 'all', visibility: 'all' };
 
 export function isExploreFiltersActive(f: ExploreFilters) {
-  return f.authorIds.length > 0;
+  return f.authorIds.length > 0 || f.visibility !== 'all';
 }
 
 export function isMineFiltersActive(f: MineFilters) {
-  return f.recipientIds.length > 0 || f.readStatus !== 'all';
+  return f.recipientIds.length > 0 || f.readStatus !== 'all' || f.visibility !== 'all';
 }
 
 interface Props {
@@ -64,6 +65,12 @@ const READ_STATUS_OPTIONS: { label: string; value: MineFilters['readStatus'] }[]
   { label: 'Tous', value: 'all' },
   { label: 'Lus', value: 'read' },
   { label: 'Non lus', value: 'unread' },
+];
+
+const VISIBILITY_OPTIONS: { label: string; value: 'all' | 'public' | 'private' }[] = [
+  { label: 'Tous', value: 'all' },
+  { label: 'Public', value: 'public' },
+  { label: 'Privé', value: 'private' },
 ];
 
 function PersonChip({
@@ -134,6 +141,14 @@ export default function MapFilterModal({
     onMineFiltersChange({ ...mineFilters, readStatus: status });
   }
 
+  function setExploreVisibility(v: ExploreFilters['visibility']) {
+    onExploreFiltersChange({ ...exploreFilters, visibility: v });
+  }
+
+  function setMineVisibility(v: MineFilters['visibility']) {
+    onMineFiltersChange({ ...mineFilters, visibility: v });
+  }
+
   function handleReset() {
     if (mode === 'explore') {
       onExploreFiltersChange(DEFAULT_EXPLORE_FILTERS);
@@ -151,7 +166,7 @@ export default function MapFilterModal({
       <Pressable style={styles.backdrop} onPress={onClose} />
 
       <View style={styles.sheet}>
-        <BlurView intensity={50} tint="dark" style={styles.sheetBlur}>
+        <View style={styles.sheetBlur}>
           {/* Handle */}
           <View style={styles.handle} />
 
@@ -169,31 +184,92 @@ export default function MapFilterModal({
             contentContainerStyle={styles.scrollContent}
             showsVerticalScrollIndicator={false}
           >
-            {/* ─── Explore mode: author filter ─── */}
+            {/* ─── Explore mode: visibility + author filter ─── */}
             {mode === 'explore' && (
               <>
-                {authors.length === 0 ? (
+                {/* Visibility */}
+                <Text style={styles.sectionLabel}>Visibilité</Text>
+                <View style={styles.segmentRow}>
+                  {VISIBILITY_OPTIONS.map(opt => (
+                    <TouchableOpacity
+                      key={opt.value}
+                      activeOpacity={0.75}
+                      style={styles.segmentItem}
+                      onPress={() => setExploreVisibility(opt.value)}
+                    >
+                      {exploreFilters.visibility === opt.value ? (
+                        <LinearGradient
+                          colors={ACTIVE_GRADIENT}
+                          start={GRADIENT_START}
+                          end={GRADIENT_END}
+                          style={styles.segmentActive}
+                        >
+                          <Text style={styles.segmentLabelActive}>{opt.label}</Text>
+                        </LinearGradient>
+                      ) : (
+                        <View style={styles.segmentInactive}>
+                          <Text style={styles.segmentLabelInactive}>{opt.label}</Text>
+                        </View>
+                      )}
+                    </TouchableOpacity>
+                  ))}
+                </View>
+
+                {/* Author filter */}
+                {authors.length > 0 && (
+                  <>
+                    <Text style={styles.sectionLabelSpaced}>Auteur</Text>
+                    <View style={styles.chipsWrap}>
+                      {authors.map(author => (
+                        <PersonChip
+                          key={author.id}
+                          person={author}
+                          selected={exploreFilters.authorIds.includes(author.id)}
+                          onToggle={() => toggleAuthor(author.id)}
+                        />
+                      ))}
+                    </View>
+                  </>
+                )}
+                {authors.length === 0 && exploreFilters.visibility === 'all' && (
                   <Text style={styles.emptyHint}>Aucun message à proximité</Text>
-                ) : (
-                  <View style={styles.chipsWrap}>
-                    {authors.map(author => (
-                      <PersonChip
-                        key={author.id}
-                        person={author}
-                        selected={exploreFilters.authorIds.includes(author.id)}
-                        onToggle={() => toggleAuthor(author.id)}
-                      />
-                    ))}
-                  </View>
                 )}
               </>
             )}
 
-            {/* ─── Mine mode: recipient + read status ─── */}
+            {/* ─── Mine mode: visibility + recipient + read status ─── */}
             {mode === 'mine' && (
               <>
+                {/* Visibility */}
+                <Text style={styles.sectionLabel}>Visibilité</Text>
+                <View style={styles.segmentRow}>
+                  {VISIBILITY_OPTIONS.map(opt => (
+                    <TouchableOpacity
+                      key={opt.value}
+                      activeOpacity={0.75}
+                      style={styles.segmentItem}
+                      onPress={() => setMineVisibility(opt.value)}
+                    >
+                      {mineFilters.visibility === opt.value ? (
+                        <LinearGradient
+                          colors={ACTIVE_GRADIENT}
+                          start={GRADIENT_START}
+                          end={GRADIENT_END}
+                          style={styles.segmentActive}
+                        >
+                          <Text style={styles.segmentLabelActive}>{opt.label}</Text>
+                        </LinearGradient>
+                      ) : (
+                        <View style={styles.segmentInactive}>
+                          <Text style={styles.segmentLabelInactive}>{opt.label}</Text>
+                        </View>
+                      )}
+                    </TouchableOpacity>
+                  ))}
+                </View>
+
                 {/* Read status */}
-                <Text style={styles.sectionLabel}>Statut</Text>
+                <Text style={styles.sectionLabelSpaced}>Statut</Text>
                 <View style={styles.segmentRow}>
                   {READ_STATUS_OPTIONS.map(opt => (
                     <TouchableOpacity
@@ -254,7 +330,7 @@ export default function MapFilterModal({
               <Text style={styles.resetLabel}>Réinitialiser</Text>
             </TouchableOpacity>
           )}
-        </BlurView>
+        </View>
       </View>
     </Modal>
   );

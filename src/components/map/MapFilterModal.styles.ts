@@ -30,6 +30,7 @@ export default StyleSheet.create({
   },
   sheetBlur: {
     paddingBottom: spacing.xxxl,
+    backgroundColor: colors.surface.elevated,
   },
   handle: {
     width: HANDLE_WIDTH,

@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useRef, useCallback, useMemo } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   View,
   StyleSheet,
@@ -103,10 +104,43 @@ export default function MapScreen({ navigation, route }: Props) {
   const [mineFilters, setMineFilters] = useState<MineFilters>(DEFAULT_MINE_FILTERS);
   const [filterModalVisible, setFilterModalVisible] = useState(false);
 
+  // Persist filters across sessions
+  useEffect(() => {
+    AsyncStorage.getItem('map_explore_filters').then(raw => {
+      if (raw) {
+        try {
+          const parsed = JSON.parse(raw) as Partial<ExploreFilters>;
+          setExploreFilters({ ...DEFAULT_EXPLORE_FILTERS, ...parsed });
+        } catch { /* ignore */ }
+      }
+    });
+    AsyncStorage.getItem('map_mine_filters').then(raw => {
+      if (raw) {
+        try {
+          const parsed = JSON.parse(raw) as Partial<MineFilters>;
+          setMineFilters({ ...DEFAULT_MINE_FILTERS, ...parsed });
+        } catch { /* ignore */ }
+      }
+    });
+  }, []);
+
+  const handleExploreFiltersChange = useCallback((f: ExploreFilters) => {
+    setExploreFilters(f);
+    AsyncStorage.setItem('map_explore_filters', JSON.stringify(f));
+  }, []);
+
+  const handleMineFiltersChange = useCallback((f: MineFilters) => {
+    setMineFilters(f);
+    AsyncStorage.setItem('map_mine_filters', JSON.stringify(f));
+  }, []);
+
   // Apply explore filters (must be before useClusteredMarkers)
   const filteredOtherMessages = useMemo(() => {
-    if (exploreFilters.authorIds.length === 0) return otherMessages;
-    return otherMessages.filter(m => m.sender?.id && exploreFilters.authorIds.includes(m.sender.id));
+    let result = otherMessages;
+    if (exploreFilters.visibility === 'public') result = result.filter(m => m.is_public);
+    else if (exploreFilters.visibility === 'private') result = result.filter(m => !m.is_public);
+    if (exploreFilters.authorIds.length > 0) result = result.filter(m => m.sender?.id && exploreFilters.authorIds.includes(m.sender.id));
+    return result;
   }, [otherMessages, exploreFilters]);
 
   const clusters = useClusteredMarkers(filteredOtherMessages, clusterRadius, false);
@@ -146,6 +180,8 @@ export default function MapScreen({ navigation, route }: Props) {
   // Apply mine filters
   const filteredMyFlags = useMemo(() => {
     let result = myFlags;
+    if (mineFilters.visibility === 'public') result = result.filter(f => f.is_public);
+    else if (mineFilters.visibility === 'private') result = result.filter(f => !f.is_public);
     if (mineFilters.readStatus === 'read') result = result.filter(f => f.is_read);
     else if (mineFilters.readStatus === 'unread') result = result.filter(f => !f.is_read);
     if (mineFilters.recipientIds.length > 0) {
@@ -459,8 +495,6 @@ export default function MapScreen({ navigation, route }: Props) {
     setSelectedOwnFlag(null);
     setRouteCoordinates(null);
     setRouteTargetId(null);
-    setExploreFilters(DEFAULT_EXPLORE_FILTERS);
-    setMineFilters(DEFAULT_MINE_FILTERS);
     if (mode === 'mine') {
       loadFlags();
     }
@@ -975,11 +1009,11 @@ export default function MapScreen({ navigation, route }: Props) {
         mode={mapMode}
         authors={exploreAuthors}
         exploreFilters={exploreFilters}
-        onExploreFiltersChange={setExploreFilters}
+        onExploreFiltersChange={handleExploreFiltersChange}
         recipients={mineRecipients}
         hasPublicFlags={hasPublicFlags}
         mineFilters={mineFilters}
-        onMineFiltersChange={setMineFilters}
+        onMineFiltersChange={handleMineFiltersChange}
       />
     </View>
   );

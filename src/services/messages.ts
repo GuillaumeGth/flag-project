@@ -133,7 +133,8 @@ export async function fetchFollowedUsers(): Promise<User[]> {
 
 // Build conversations from a list of messages (with user joins)
 function buildConversations(messages: RawMessageWithUsers[], currentUserId: string): Conversation[] {
-  const conversationsMap = new Map<string, Conversation>();
+  type PartialConversation = Omit<Conversation, 'lastMessage'> & { lastMessage: Conversation['lastMessage'] | null };
+  const conversationsMap = new Map<string, PartialConversation>();
 
   // Sort by created_at descending to ensure first entry per user is the latest message
   const sorted = [...messages].sort(
@@ -147,6 +148,8 @@ function buildConversations(messages: RawMessageWithUsers[], currentUserId: stri
 
     if (!otherUser || !otherUserId) continue;
 
+    const isDeletedForMe = isFromMe ? !!msg.deleted_by_sender : !!msg.deleted_by_recipient;
+
     if (!conversationsMap.has(otherUserId)) {
       const unreadCount = sorted.filter(
         m => m.sender_id === otherUserId && m.recipient_id === currentUserId && !m.is_read
@@ -159,7 +162,7 @@ function buildConversations(messages: RawMessageWithUsers[], currentUserId: stri
           display_name: otherUser.display_name,
           avatar_url: otherUser.avatar_url,
         },
-        lastMessage: {
+        lastMessage: isDeletedForMe ? null : {
           id: msg.id,
           content_type: msg.content_type as MessageContentType,
           text_content: msg.text_content,
@@ -171,10 +174,29 @@ function buildConversations(messages: RawMessageWithUsers[], currentUserId: stri
         },
         unreadCount,
       });
+    } else if (!isDeletedForMe) {
+      // Conversation already exists but lastMessage was null (all more recent messages were deleted)
+      // Use this non-deleted message as the lastMessage
+      const conv = conversationsMap.get(otherUserId)!;
+      if (!conv.lastMessage) {
+        conv.lastMessage = {
+          id: msg.id,
+          content_type: msg.content_type as MessageContentType,
+          text_content: msg.text_content,
+          created_at: msg.created_at,
+          is_read: msg.is_read,
+          is_from_me: isFromMe,
+          deleted_by_sender: msg.deleted_by_sender,
+          deleted_by_recipient: msg.deleted_by_recipient,
+        };
+      }
     }
   }
 
-  return Array.from(conversationsMap.values());
+  // Exclude conversations where every message has been deleted
+  return Array.from(conversationsMap.values()).filter(
+    (c): c is Conversation => c.lastMessage !== null
+  );
 }
 
 // Fetch all conversations for current user (with local cache + incremental sync)
@@ -820,6 +842,15 @@ export async function deleteMessage(messageId: string, otherUserId: string): Pro
       m.id === messageId ? { ...m, [field]: true } : m
     );
     await setCachedData(CACHE_KEYS.CONVERSATION(otherUserId), updated);
+  }
+
+  // Update inbox (conversations list) cache so the preview shows "Message supprimé"
+  const inboxCached = await getCachedData<RawMessageWithUsers[]>(CACHE_KEYS.CONVERSATIONS_MESSAGES);
+  if (inboxCached) {
+    const updatedInbox = inboxCached.map((m) =>
+      m.id === messageId ? { ...m, [field]: true } : m
+    );
+    await setCachedData(CACHE_KEYS.CONVERSATIONS_MESSAGES, updatedInbox);
   }
 
   // Remove from map cache so the marker disappears immediately

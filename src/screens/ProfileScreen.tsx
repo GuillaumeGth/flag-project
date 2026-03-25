@@ -25,6 +25,7 @@ import GridCell from '@/components/profile/GridCell';
 import ProfileStatsRow from '@/components/profile/ProfileStatsRow';
 import EmptyState from '@/components/EmptyState';
 import { useProfileMessages } from '@/hooks/useProfileMessages';
+import { useCityCount } from '@/hooks/useCityCount';
 
 type ProfileNavigationProp = CompositeNavigationProp<
   BottomTabNavigationProp<MainTabParamList, 'Profile'>,
@@ -40,6 +41,7 @@ export default function ProfileScreen({ navigation }: Props) {
   const [uploading, setUploading] = useState(false);
 
   const { messages, commentCounts, loading: messagesLoading, refreshing: messagesRefreshing, onRefresh: refreshMessages } = useProfileMessages();
+  const { cityCount, cityNames } = useCityCount(messages);
   const [followerCount, setFollowerCount] = useState(0);
   const [pendingRequestsCount, setPendingRequestsCount] = useState(0);
   const [extraLoading, setExtraLoading] = useState(true);
@@ -162,7 +164,10 @@ export default function ProfileScreen({ navigation }: Props) {
       <ProfileStatsRow
         messagesCount={messages.length}
         followerCount={followerCount}
-        locationsCount={messages.length}
+        locationsCount={cityCount}
+        cityNames={cityNames}
+        userId={user?.id}
+        onPressFollower={(id) => navigation.navigate('UserProfile', { userId: id })}
       />
 
       <View style={styles.divider} />

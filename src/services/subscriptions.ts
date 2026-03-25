@@ -163,6 +163,26 @@ export async function fetchSuggestedUsers(limit = 10): Promise<SuggestedUser[]> 
   return (data as SuggestedUser[]) || [];
 }
 
+export interface FollowerUser {
+  id: string;
+  display_name: string | null;
+  avatar_url: string | null;
+}
+
+export async function fetchFollowers(userId: string): Promise<FollowerUser[]> {
+  const { data, error } = await supabase
+    .from('subscriptions')
+    .select('follower:users!follower_id(id, display_name, avatar_url)')
+    .eq('following_id', userId);
+
+  if (error) {
+    reportError(error, 'subscriptions.fetchFollowers');
+    return [];
+  }
+
+  return (data || []).map((row: any) => row.follower).filter(Boolean);
+}
+
 export async function fetchFollowerCount(userId: string): Promise<number> {
   const { count, error } = await supabase
     .from('subscriptions')

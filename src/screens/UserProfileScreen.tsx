@@ -35,6 +35,7 @@ import ProfileStatsRow from '@/components/profile/ProfileStatsRow';
 import PremiumAvatar from '@/components/redesign/PremiumAvatar';
 import EmptyState from '@/components/EmptyState';
 import { useProfileMessages } from '@/hooks/useProfileMessages';
+import { useCityCount } from '@/hooks/useCityCount';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'UserProfile'>;
 
@@ -52,6 +53,7 @@ export default function UserProfileScreen({ navigation, route }: Props) {
   const [showNotifModal, setShowNotifModal] = useState(false);
 
   const { messages, commentCounts, discoveredIds, loading: messagesLoading, refreshing: messagesRefreshing, onRefresh: refreshMessages } = useProfileMessages(userId);
+  const { cityCount, cityNames } = useCityCount(messages);
   const loading = messagesLoading || extraLoading;
 
   const loadProfile = useCallback(async () => {
@@ -227,7 +229,10 @@ export default function UserProfileScreen({ navigation, route }: Props) {
       <ProfileStatsRow
         messagesCount={messages.length}
         followerCount={followerCount}
-        locationsCount={messages.length}
+        locationsCount={cityCount}
+        cityNames={cityNames}
+        userId={userId}
+        onPressFollower={(id) => navigation.navigate('UserProfile', { userId: id })}
       />
 
       <View style={styles.divider} />

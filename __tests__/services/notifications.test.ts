@@ -53,6 +53,7 @@ import {
   registerPushToken,
   unregisterPushToken,
   addNotificationResponseListener,
+  notifyNearbyPublicFlag,
 } from '@/services/notifications';
 
 const mockNotifications = Notifications as jest.Mocked<typeof Notifications>;
@@ -441,7 +442,7 @@ describe('addNotificationResponseListener', () => {
     expect(callback).toHaveBeenCalledWith('msg-abc');
   });
 
-  it('does not call the callback when messageId is missing', () => {
+  it('does not call the callback when messageId is missing from notification data', () => {
     const callback = jest.fn();
     let registeredListener: ((response: any) => void) | undefined;
 
@@ -461,5 +462,49 @@ describe('addNotificationResponseListener', () => {
     });
 
     expect(callback).not.toHaveBeenCalled();
+  });
+});
+
+// ─── notifyNearbyPublicFlag ───────────────────────────────────────────────────
+
+describe('notifyNearbyPublicFlag', () => {
+  it('schedules an immediate notification with title "Fläag à proximité !"', async () => {
+    mockNotifications.scheduleNotificationAsync.mockResolvedValue('notif-public-1');
+
+    await notifyNearbyPublicFlag('msg-public-1', 'Alice');
+
+    expect(mockNotifications.scheduleNotificationAsync).toHaveBeenCalledWith(
+      expect.objectContaining({
+        content: expect.objectContaining({ title: 'Fläag à proximité !' }),
+        trigger: null,
+      })
+    );
+  });
+
+  it('includes the sender name in the notification body', async () => {
+    mockNotifications.scheduleNotificationAsync.mockResolvedValue('notif-public-2');
+
+    await notifyNearbyPublicFlag('msg-public-2', 'Bob');
+
+    const call = mockNotifications.scheduleNotificationAsync.mock.calls[0][0];
+    expect(call.content.body).toContain('Bob');
+  });
+
+  it('passes the messageId in notification data', async () => {
+    mockNotifications.scheduleNotificationAsync.mockResolvedValue('notif-public-3');
+
+    await notifyNearbyPublicFlag('msg-public-3', 'Charlie');
+
+    const call = mockNotifications.scheduleNotificationAsync.mock.calls[0][0];
+    expect(call.content.data).toEqual(expect.objectContaining({ messageId: 'msg-public-3' }));
+  });
+
+  it('uses an immediate trigger (null)', async () => {
+    mockNotifications.scheduleNotificationAsync.mockResolvedValue('notif-public-4');
+
+    await notifyNearbyPublicFlag('msg-public-4', 'Dana');
+
+    const call = mockNotifications.scheduleNotificationAsync.mock.calls[0][0];
+    expect(call.trigger).toBeNull();
   });
 });

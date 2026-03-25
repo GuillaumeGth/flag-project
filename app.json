@@ -63,7 +63,12 @@
         "android.permission.CAMERA",
         "android.permission.RECORD_AUDIO"
       ],
-      "versionCode": 74
+      "versionCode": 79
+    },
+    "androidStatusBar": {
+      "barStyle": "light-content",
+      "backgroundColor": "#1E2028",
+      "translucent": false
     },
     "plugins": [
       [

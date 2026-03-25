@@ -13,6 +13,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, spacing, typography } from '@/theme-redesign';
 import { supabase } from '@/services/supabase';
 import { fetchUserPublicMessages, fetchMyPublicMessages, fetchDiscoveredPublicMessageIds, deletePublicMessage } from '@/services/messages';
+import { parseLocationField } from '@/utils/mapUtils';
 import { useAuth } from '@/contexts/AuthContext';
 import { Message, User, RootStackParamList } from '@/types';
 import MessageFeedItem from '@/components/comments/MessageFeedItem';
@@ -87,10 +88,11 @@ export default function MessageFeedScreen({ navigation, route }: Props) {
   }, [deletingMessageId]);
 
   const handleMapPress = useCallback((message: Message) => {
-    const { latitude, longitude } = message.location;
+    const coords = parseLocationField(message.location);
+    if (!coords) return;
     navigation.navigate('Main', {
       screen: 'Map',
-      params: { focusLocation: { latitude, longitude } },
+      params: { focusLocation: coords },
     });
   }, [navigation]);
 

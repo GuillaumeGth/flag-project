@@ -1,5 +1,33 @@
 import { UndiscoveredMessageMapMeta, Coordinates } from '@/types';
 
+/** Parse a location field from Supabase (WKB hex, POINT string, GeoJSON, or plain object). */
+export function parseLocationField(location: unknown): Coordinates | null {
+  if (!location) return null;
+  if (typeof location === 'object') {
+    const loc = location as Record<string, unknown>;
+    if (loc.type === 'Point' && Array.isArray(loc.coordinates) && loc.coordinates.length >= 2) {
+      const [lng, lat] = loc.coordinates as number[];
+      if (!isNaN(lng) && !isNaN(lat)) return { longitude: lng, latitude: lat };
+    }
+    if (typeof loc.latitude === 'number' && typeof loc.longitude === 'number') {
+      return { longitude: loc.longitude, latitude: loc.latitude };
+    }
+  }
+  if (typeof location === 'string') {
+    if (/^[0-9A-Fa-f]+$/.test(location) && location.length >= 42) {
+      const coords = parseWKBHex(location);
+      if (coords) return coords;
+    }
+    const match = location.match(/POINT\(([^ ]+) ([^)]+)\)/);
+    if (match) {
+      const lng = parseFloat(match[1]);
+      const lat = parseFloat(match[2]);
+      if (!isNaN(lng) && !isNaN(lat)) return { longitude: lng, latitude: lat };
+    }
+  }
+  return null;
+}
+
 /** Deterministic palette for avatar background colors. */
 const AVATAR_COLORS = [
   '#6366F1', '#8B5CF6', '#EC4899', '#14B8A6',

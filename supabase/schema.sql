@@ -427,7 +427,7 @@ CREATE TABLE IF NOT EXISTS public.subscriptions (
     follower_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
     following_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
     notify_private_flags BOOLEAN NOT NULL DEFAULT TRUE,
-    notify_public_flags  BOOLEAN NOT NULL DEFAULT FALSE,
+    notify_public_flags  BOOLEAN NOT NULL DEFAULT TRUE,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     CONSTRAINT subscriptions_unique UNIQUE (follower_id, following_id),
     CONSTRAINT subscriptions_no_self CHECK (follower_id != following_id)
@@ -469,7 +469,7 @@ BEGIN
   END IF;
 
   INSERT INTO public.subscriptions (follower_id, following_id, notify_private_flags, notify_public_flags)
-  VALUES (NEW.id, guigz_id, true, false)
+  VALUES (NEW.id, guigz_id, true, true)
   ON CONFLICT (follower_id, following_id) DO NOTHING;
 
   RETURN NEW;
@@ -501,7 +501,7 @@ BEGIN
   END IF;
 
   INSERT INTO public.subscriptions (follower_id, following_id, notify_private_flags, notify_public_flags)
-  VALUES (NEW.id, flaagbot_id, true, false)
+  VALUES (NEW.id, flaagbot_id, true, true)
   ON CONFLICT (follower_id, following_id) DO NOTHING;
 
   RETURN NEW;

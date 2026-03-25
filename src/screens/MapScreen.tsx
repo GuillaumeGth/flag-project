@@ -149,31 +149,43 @@ export default function MapScreen({ navigation, route }: Props) {
   const { flags: myFlags, loadFlags } = useMyFlags();
   const [mapMode, setMapMode] = useState<MapMode>('explore');
 
-  // Unique authors for explore mode filter
+  // Unique authors for explore mode filter — filtered by visibility only (not by authorIds)
   const exploreAuthors = useMemo<FilterPerson[]>(() => {
-    const seen = new Set<string>();
+    let base = otherMessages;
+    if (exploreFilters.visibility === 'public') base = base.filter(m => m.is_public);
+    else if (exploreFilters.visibility === 'private') base = base.filter(m => !m.is_public);
+    const counts = new Map<string, number>();
+    for (const m of base) {
+      if (m.sender?.id) counts.set(m.sender.id, (counts.get(m.sender.id) ?? 0) + 1);
+    }
     const result: FilterPerson[] = [];
-    for (const m of otherMessages) {
-      if (m.sender?.id && !seen.has(m.sender.id)) {
-        seen.add(m.sender.id);
-        result.push({ id: m.sender.id, display_name: m.sender.display_name });
+    for (const m of base) {
+      if (m.sender?.id && !result.find(r => r.id === m.sender!.id)) {
+        result.push({ id: m.sender.id, display_name: m.sender.display_name, avatar_url: m.sender.avatar_url, messageCount: counts.get(m.sender.id) });
       }
     }
     return result;
-  }, [otherMessages]);
+  }, [otherMessages, exploreFilters.visibility]);
 
-  // Unique recipients for mine mode filter
+  // Unique recipients for mine mode filter — filtered by visibility + readStatus only (not by recipientIds)
   const mineRecipients = useMemo<FilterPerson[]>(() => {
-    const seen = new Set<string>();
+    let base = myFlags;
+    if (mineFilters.visibility === 'public') base = base.filter(f => f.is_public);
+    else if (mineFilters.visibility === 'private') base = base.filter(f => !f.is_public);
+    if (mineFilters.readStatus === 'read') base = base.filter(f => f.is_read);
+    else if (mineFilters.readStatus === 'unread') base = base.filter(f => !f.is_read);
+    const counts = new Map<string, number>();
+    for (const f of base) {
+      if (f.recipient?.id) counts.set(f.recipient.id, (counts.get(f.recipient.id) ?? 0) + 1);
+    }
     const result: FilterPerson[] = [];
-    for (const f of myFlags) {
-      if (f.recipient?.id && !seen.has(f.recipient.id)) {
-        seen.add(f.recipient.id);
-        result.push({ id: f.recipient.id, display_name: f.recipient.display_name });
+    for (const f of base) {
+      if (f.recipient?.id && !result.find(r => r.id === f.recipient!.id)) {
+        result.push({ id: f.recipient.id, display_name: f.recipient.display_name, avatar_url: f.recipient.avatar_url, messageCount: counts.get(f.recipient.id) });
       }
     }
     return result;
-  }, [myFlags]);
+  }, [myFlags, mineFilters.visibility, mineFilters.readStatus]);
 
   const hasPublicFlags = useMemo(() => myFlags.some(f => f.is_public), [myFlags]);
 
@@ -1038,14 +1050,15 @@ const styles = StyleSheet.create({
   },
   filterActiveDot: {
     position: 'absolute',
-    top: 6,
-    right: 6,
-    width: spacing.sm,
-    height: spacing.sm,
-    borderRadius: radius.xs,
-    backgroundColor: colors.primary.violet,
-    borderWidth: 1.5,
-    borderColor: colors.background.primary,
+    top: -4,
+    right: -4,
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    backgroundColor: '#FF3B30',
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
+    ...shadows.small,
   },
   loadingContainer: {
     flex: 1,

@@ -279,7 +279,7 @@ export default function App() {
             }}
           >
             <AppNavigator />
-            <StatusBar style="light" />
+            <StatusBar style="light" backgroundColor="#1E2028" />
           </NavigationContainer>
         </LocationProvider>
       </AuthProvider>

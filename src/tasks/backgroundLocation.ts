@@ -3,13 +3,14 @@ import * as Location from 'expo-location';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '@/services/supabase';
 import { calculateDistance } from '@/services/location';
-import { notifyNearbyMessage } from '@/services/notifications';
+import { notifyNearbyMessage, notifyNearbyPublicFlag } from '@/services/notifications';
 import { reportError } from '@/services/errorReporting';
 import { Coordinates } from '@/types';
 
 const LOCATION_TASK_NAME = 'background-location-task';
 const PROXIMITY_RADIUS = 300; // Notify at 300m to give time before reaching message
 const NOTIFIED_MESSAGES_KEY = '@flagapp/notified_proximity_messages';
+const NOTIFIED_PUBLIC_FLAGS_KEY = '@flagapp/notified_proximity_public_flags';
 
 async function loadNotifiedMessages(): Promise<Set<string>> {
   try {
@@ -43,7 +44,10 @@ TaskManager.defineTask(LOCATION_TASK_NAME, async ({ data, error }) => {
         longitude: location.coords.longitude,
       };
 
-      await checkNearbyMessages(userCoords);
+      await Promise.all([
+        checkNearbyMessages(userCoords),
+        checkNearbyPublicFlags(userCoords),
+      ]);
     }
   }
 });
@@ -101,6 +105,64 @@ async function checkNearbyMessages(userLocation: Coordinates) {
     }
   } catch (error) {
     reportError(error, 'backgroundLocation.checkNearbyMessages');
+  }
+}
+
+async function checkNearbyPublicFlags(userLocation: Coordinates) {
+  try {
+    const { data: userData } = await supabase.auth.getUser();
+    if (!userData.user) return;
+    const userId = userData.user.id;
+
+    // Fetch public flags from followed users (notify_public_flags = true)
+    // that the current user hasn't discovered yet
+    const { data: flags, error } = await supabase
+      .from('messages')
+      .select(`
+        id,
+        location,
+        users!sender_id(display_name),
+        subscriptions!inner(follower_id, notify_public_flags),
+        discovered_public_messages(message_id)
+      `)
+      .eq('is_public', true)
+      .eq('deleted_by_sender', false)
+      .eq('subscriptions.follower_id', userId)
+      .eq('subscriptions.notify_public_flags', true)
+      .is('discovered_public_messages.message_id', null);
+
+    if (error || !flags) return;
+
+    const stored = await AsyncStorage.getItem(NOTIFIED_PUBLIC_FLAGS_KEY);
+    const notifiedFlags: Set<string> = stored
+      ? new Set(JSON.parse(stored) as string[])
+      : new Set();
+
+    let changed = false;
+
+    for (const flag of flags) {
+      if (notifiedFlags.has(flag.id)) continue;
+
+      const flagLocation = parseLocation(flag.location);
+      if (!flagLocation) continue;
+
+      const distance = calculateDistance(userLocation, flagLocation);
+      if (distance <= PROXIMITY_RADIUS) {
+        const senderName = (flag as any).users?.display_name || 'Quelqu\'un';
+        await notifyNearbyPublicFlag(flag.id, senderName);
+        notifiedFlags.add(flag.id);
+        changed = true;
+      }
+    }
+
+    if (changed) {
+      await AsyncStorage.setItem(
+        NOTIFIED_PUBLIC_FLAGS_KEY,
+        JSON.stringify([...notifiedFlags])
+      );
+    }
+  } catch (error) {
+    reportError(error, 'backgroundLocation.checkNearbyPublicFlags');
   }
 }
 

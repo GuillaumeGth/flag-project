@@ -140,6 +140,25 @@ export async function unregisterPushToken(userId: string): Promise<void> {
   }
 }
 
+// Send local notification when near a public flag from a followed user
+export async function notifyNearbyPublicFlag(
+  messageId: string,
+  senderName: string
+): Promise<void> {
+  await Notifications.scheduleNotificationAsync({
+    content: {
+      title: 'Fläag à proximité !',
+      body: `${senderName} a posté un fläag près de vous`,
+      data: { messageId },
+      sound: true,
+      ...(Platform.OS === 'android' && {
+        icon: 'ic_notification',
+      }),
+    },
+    trigger: null,
+  });
+}
+
 // Add notification response listener
 export function addNotificationResponseListener(
   callback: (messageId: string) => void

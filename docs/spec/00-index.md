@@ -26,6 +26,7 @@
 | [spec/mes-flaags.md](./mes-flaags.md) | Mode "Mes Flaags" sur la carte |
 | [spec/admin-flag-placement.md](./admin-flag-placement.md) | Placement de flags admin n'importe où |
 | [spec/map-filters.md](./map-filters.md) | Filtres carte — par auteur (explorer) et par destinataire/statut (mes flaags) |
+| [spec/bottom-sheet.md](./bottom-sheet.md) | BottomSheet — composant overlay partagé (profil, filtres carte) |
 
 ## Specs d'écrans
 

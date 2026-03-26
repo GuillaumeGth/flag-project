@@ -22,7 +22,7 @@ import { fetchReceivedRequestsCount } from '@/services/followRequests';
 import { Message, MainTabParamList, RootStackParamList } from '@/types';
 import PremiumAvatar from '@/components/redesign/PremiumAvatar';
 import GridCell from '@/components/profile/GridCell';
-import ProfileStatsRow from '@/components/profile/ProfileStatsRow';
+import ProfileStatsRow, { useProfileSheets } from '@/components/profile/ProfileStatsRow';
 import EmptyState from '@/components/EmptyState';
 import { useProfileMessages } from '@/hooks/useProfileMessages';
 import { useCityCount } from '@/hooks/useCityCount';
@@ -47,6 +47,12 @@ export default function ProfileScreen({ navigation }: Props) {
   const [extraLoading, setExtraLoading] = useState(true);
 
   const loading = messagesLoading || extraLoading;
+
+  const { openCities, openFollowers, renderOverlay } = useProfileSheets({
+    cityNames,
+    userId: user?.id,
+    onPressFollower: (id) => navigation.navigate('UserProfile', { userId: id }),
+  });
 
   const [fadeAnim] = useState(new Animated.Value(0));
   const [slideAnim] = useState(new Animated.Value(30));
@@ -165,9 +171,8 @@ export default function ProfileScreen({ navigation }: Props) {
         messagesCount={messages.length}
         followerCount={followerCount}
         locationsCount={cityCount}
-        cityNames={cityNames}
-        userId={user?.id}
-        onPressFollower={(id) => navigation.navigate('UserProfile', { userId: id })}
+        onOpenCities={openCities}
+        onOpenFollowers={followerCount > 0 ? openFollowers : undefined}
       />
 
       <View style={styles.divider} />
@@ -195,7 +200,7 @@ export default function ProfileScreen({ navigation }: Props) {
           columnWrapperStyle={styles.gridRow}
         />
       )}
-
+      {renderOverlay()}
     </View>
   );
 }

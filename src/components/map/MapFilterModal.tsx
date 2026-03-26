@@ -1,22 +1,18 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
   TouchableOpacity,
-  Pressable,
   TextInput,
-  Animated,
-  StyleSheet,
-  Dimensions,
   Image,
 } from 'react-native';
 import { ScrollViewWithScrollbar } from '@/components/ScrollableWithScrollbar';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, spacing } from '@/theme-redesign';
 import type { MapMode } from './MapModePill';
 import styles from './MapFilterModal.styles';
+import BottomSheet from '@/components/BottomSheet';
 
 export interface FilterPerson {
   id: string;
@@ -369,8 +365,6 @@ function SegmentControl<T extends string>({
 
 // ─── Main modal ──────────────────────────────────────────────────────────────
 
-const SCREEN_HEIGHT = Dimensions.get('window').height;
-
 export default function MapFilterModal({
   visible,
   onClose,
@@ -383,29 +377,7 @@ export default function MapFilterModal({
   mineFilters,
   onMineFiltersChange,
 }: Props) {
-  const insets = useSafeAreaInsets();
-  const translateY = useRef(new Animated.Value(SCREEN_HEIGHT)).current;
-  const [rendered, setRendered] = useState(visible);
-
-  useEffect(() => {
-    if (visible) {
-      setRendered(true);
-      Animated.spring(translateY, {
-        toValue: 0,
-        useNativeDriver: true,
-        damping: 20,
-        stiffness: 200,
-      }).start();
-    } else {
-      Animated.timing(translateY, {
-        toValue: SCREEN_HEIGHT,
-        duration: 280,
-        useNativeDriver: true,
-      }).start(({ finished }) => {
-        if (finished) setRendered(false);
-      });
-    }
-  }, [visible]);
+  // Animation is handled by BottomSheet
 
   function toggleAuthor(id: string) {
     const next = exploreFilters.authorIds.includes(id)
@@ -440,24 +412,22 @@ export default function MapFilterModal({
 
   const hasPeople = mode === 'explore' ? authors.length > 0 : allRecipients.length > 0;
 
-  if (!rendered) return null;
-
   return (
-    <View style={[StyleSheet.absoluteFillObject, styles.overlay]} pointerEvents="box-none">
-      {/* Backdrop — tap to close */}
-      <Pressable style={StyleSheet.absoluteFillObject} onPress={onClose} />
+    <BottomSheet
+      visible={visible}
+      onClose={onClose}
+      height="80%"
+      hideHandle
+      sheetStyle={styles.sheet}
+    >
+      <View
+        style={[styles.sheetBlur, { paddingBottom: spacing.md }]}
+        onStartShouldSetResponder={() => true}
+      >
+        {/* Handle */}
+        <View style={styles.handle} />
 
-      {/* Sheet — aligné en bas, rendu après le backdrop donc au-dessus */}
-      <View style={[StyleSheet.absoluteFillObject, styles.kvContainer]} pointerEvents="box-none">
-        <Animated.View style={[styles.sheet, { transform: [{ translateY }] }]}>
-          <View
-            style={[styles.sheetBlur, { paddingBottom: spacing.md }]}
-            onStartShouldSetResponder={() => true}
-          >
-            {/* Handle */}
-            <View style={styles.handle} />
-
-            {/* Header */}
+        {/* Header */}
             <View style={styles.header}>
               <View style={styles.headerLeft}>
                 <Text style={styles.title}>Filtres</Text>
@@ -535,9 +505,7 @@ export default function MapFilterModal({
               </View>
             )}
 
-          </View>
-        </Animated.View>
       </View>
-    </View>
+    </BottomSheet>
   );
 }

@@ -31,7 +31,7 @@ import {
 } from '@/services/followRequests';
 import { Message, User, RootStackParamList } from '@/types';
 import GridCell from '@/components/profile/GridCell';
-import ProfileStatsRow from '@/components/profile/ProfileStatsRow';
+import ProfileStatsRow, { useProfileSheets } from '@/components/profile/ProfileStatsRow';
 import PremiumAvatar from '@/components/redesign/PremiumAvatar';
 import EmptyState from '@/components/EmptyState';
 import { useProfileMessages } from '@/hooks/useProfileMessages';
@@ -55,6 +55,12 @@ export default function UserProfileScreen({ navigation, route }: Props) {
   const { messages, commentCounts, discoveredIds, loading: messagesLoading, refreshing: messagesRefreshing, onRefresh: refreshMessages } = useProfileMessages(userId);
   const { cityCount, cityNames } = useCityCount(messages);
   const loading = messagesLoading || extraLoading;
+
+  const { openCities, openFollowers, renderOverlay } = useProfileSheets({
+    cityNames,
+    userId,
+    onPressFollower: (id) => navigation.navigate('UserProfile', { userId: id }),
+  });
 
   const loadProfile = useCallback(async () => {
     const { data } = await supabase
@@ -230,9 +236,8 @@ export default function UserProfileScreen({ navigation, route }: Props) {
         messagesCount={messages.length}
         followerCount={followerCount}
         locationsCount={cityCount}
-        cityNames={cityNames}
-        userId={userId}
-        onPressFollower={(id) => navigation.navigate('UserProfile', { userId: id })}
+        onOpenCities={openCities}
+        onOpenFollowers={followerCount > 0 ? openFollowers : undefined}
       />
 
       <View style={styles.divider} />
@@ -317,7 +322,7 @@ export default function UserProfileScreen({ navigation, route }: Props) {
           </TouchableOpacity>
         </TouchableOpacity>
       </Modal>
-
+      {renderOverlay()}
     </View>
   );
 }

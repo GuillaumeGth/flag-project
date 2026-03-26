@@ -6,8 +6,8 @@ import {
   TouchableOpacity,
   StyleSheet,
   ActivityIndicator,
-  ScrollView,
 } from 'react-native';
+import { ScrollViewWithScrollbar } from '@/components/ScrollableWithScrollbar';
 import { Ionicons } from '@expo/vector-icons';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Audio } from 'expo-av';
@@ -132,7 +132,7 @@ export default function ReadMessageScreen({ navigation, route }: Props) {
         <View style={{ width: 24 }} />
       </View>
 
-      <ScrollView style={styles.content} contentContainerStyle={styles.contentContainer}>
+      <ScrollViewWithScrollbar style={styles.content} contentContainerStyle={styles.contentContainer}>
         {/* Photo content */}
         {message.content_type === 'photo' && message.media_url && (
           <Image source={{ uri: message.media_url }} style={styles.image} />
@@ -163,7 +163,7 @@ export default function ReadMessageScreen({ navigation, route }: Props) {
             Message découvert à cet endroit
           </Text>
         </View>
-      </ScrollView>
+      </ScrollViewWithScrollbar>
 
       <View style={styles.footer}>
         <TouchableOpacity

@@ -5,10 +5,10 @@ import {
   TextInput,
   TouchableOpacity,
   StyleSheet,
-  FlatList,
   Image,
   ActivityIndicator,
 } from 'react-native';
+import { FlatListWithScrollbar } from '@/components/ScrollableWithScrollbar';
 import { Ionicons } from '@expo/vector-icons';
 import { CompositeNavigationProp } from '@react-navigation/native';
 import { BottomTabNavigationProp, BottomTabScreenProps } from '@react-navigation/bottom-tabs';
@@ -175,7 +175,7 @@ export default function SearchUsersScreen({ navigation }: Props) {
         <ActivityIndicator size="small" color={colors.primary.cyan} style={styles.loader} />
       )}
 
-      <FlatList
+      <FlatListWithScrollbar
         data={isSearching ? results : topUsers}
         keyExtractor={item => item.id}
         renderItem={renderUser}

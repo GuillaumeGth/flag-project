@@ -6,9 +6,9 @@ import {
   StyleSheet,
   Image,
   ActivityIndicator,
-  ScrollView,
   Switch,
 } from 'react-native';
+import { ScrollViewWithScrollbar } from '@/components/ScrollableWithScrollbar';
 import Toast from '@/components/Toast';
 import { Ionicons } from '@expo/vector-icons';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -172,7 +172,7 @@ export default function SendMessageScreen({ navigation, route }: Props) {
         action={toast.action}
         onHide={hideToast}
       />
-      <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+      <ScrollViewWithScrollbar style={styles.container} contentContainerStyle={styles.content}>
         <View style={[styles.header, { marginTop: insets.top }]}>
           <TouchableOpacity onPress={() => navigation.goBack()}>
             <Ionicons name="arrow-back" size={24} color={colors.text.primary} />
@@ -303,7 +303,7 @@ export default function SendMessageScreen({ navigation, route }: Props) {
             )}
           </LinearGradient>
         </TouchableOpacity>
-      </ScrollView>
+      </ScrollViewWithScrollbar>
     </View>
   );
 }

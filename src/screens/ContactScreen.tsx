@@ -6,9 +6,9 @@ import {
   StyleSheet,
   KeyboardAvoidingView,
   Platform,
-  ScrollView,
   Linking,
 } from 'react-native';
+import { ScrollViewWithScrollbar } from '@/components/ScrollableWithScrollbar';
 import Toast from '@/components/Toast';
 import { Ionicons } from '@expo/vector-icons';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -97,7 +97,7 @@ export default function ContactScreen({ navigation }: Props) {
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.flex}
       >
-        <ScrollView
+        <ScrollViewWithScrollbar
           contentContainerStyle={styles.content}
           keyboardShouldPersistTaps="handled"
         >
@@ -144,7 +144,7 @@ export default function ContactScreen({ navigation }: Props) {
             Ou écrivez-nous directement à{' '}
             <Text style={styles.emailLink}>{CONTACT_EMAIL}</Text>
           </Text>
-        </ScrollView>
+        </ScrollViewWithScrollbar>
       </KeyboardAvoidingView>
     </View>
   );

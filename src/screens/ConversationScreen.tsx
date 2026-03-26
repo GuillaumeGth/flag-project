@@ -12,6 +12,7 @@ import {
   Animated,
   Keyboard,
 } from 'react-native';
+import { FlatListWithScrollbar } from '@/components/ScrollableWithScrollbar';
 import { useFocusEffect } from '@react-navigation/native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
@@ -381,7 +382,7 @@ export default function ConversationScreen({ navigation, route }: Props) {
         enabled={Platform.OS === 'ios' ? true : keyboardVisible}
         keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top + 60 : 0}
       >
-        <FlatList
+        <FlatListWithScrollbar
           ref={flatListRef}
           data={reversedMessages}
           keyExtractor={(item) => item.id}

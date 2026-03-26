@@ -8,6 +8,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { FlatListWithScrollbar } from '@/components/ScrollableWithScrollbar';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, spacing, typography } from '@/theme-redesign';
@@ -133,7 +134,7 @@ export default function MessageFeedScreen({ navigation, route }: Props) {
       {loading ? (
         <ActivityIndicator size="large" color={colors.primary.violet} style={{ marginTop: 32 }} />
       ) : (
-        <FlatList
+        <FlatListWithScrollbar
           ref={flatListRef}
           data={messages}
           renderItem={renderItem}

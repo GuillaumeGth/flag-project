@@ -99,7 +99,8 @@ CREATE TABLE IF NOT EXISTS public.messages (
     deleted_by_recipient BOOLEAN NOT NULL DEFAULT FALSE,
     reply_to_id UUID REFERENCES messages(id) ON DELETE SET NULL,
     reply_to_message_id UUID REFERENCES messages(id) ON DELETE SET NULL,
-    is_admin_placed BOOLEAN NOT NULL DEFAULT FALSE
+    is_admin_placed BOOLEAN NOT NULL DEFAULT FALSE,
+    custom_marker_avatar_url TEXT
 );
 
 -- Enable RLS

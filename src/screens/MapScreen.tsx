@@ -215,6 +215,7 @@ export default function MapScreen({ navigation, route }: Props) {
       // For private flags, show the recipient's identity (id + name) so the marker
       // displays their initials/color. For public flags, show the sender's own identity.
       is_admin_placed: flag.is_admin_placed,
+      custom_marker_avatar_url: flag.custom_marker_avatar_url ?? null,
       sender: {
         id: (!flag.is_public && flag.recipient?.id) ? flag.recipient.id : user?.id ?? '',
         display_name: (!flag.is_public && flag.recipient?.display_name)
@@ -778,9 +779,11 @@ export default function MapScreen({ navigation, route }: Props) {
           const isAdminCluster = cluster.isAdminPlaced;
 
           // Inner avatar shared between all border styles
-          const avatarContent = cluster.senderAvatarUrl ? (
+          // Custom marker avatar (admin-set) takes priority over sender avatar
+          const avatarUrl = cluster.customMarkerAvatarUrl ?? cluster.senderAvatarUrl;
+          const avatarContent = avatarUrl ? (
             <Image
-              source={{ uri: cluster.senderAvatarUrl }}
+              source={{ uri: avatarUrl }}
               style={styles.captureAvatarImage}
               fadeDuration={0}
               onLoad={() => {
@@ -799,7 +802,7 @@ export default function MapScreen({ navigation, route }: Props) {
               ref={(ref) => { avatarRefs.current[captureKey] = ref; }}
               collapsable={false}
               style={styles.captureAvatarWrapper}
-              onLayout={cluster.senderAvatarUrl ? undefined : () => {
+              onLayout={avatarUrl ? undefined : () => {
                 requestAnimationFrame(() => requestAnimationFrame(() => captureAvatar(captureKey)));
               }}
             >

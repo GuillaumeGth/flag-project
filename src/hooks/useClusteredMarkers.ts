@@ -24,6 +24,8 @@ export interface MessageCluster {
   senderId: string;
   isPublic: boolean;
   isAdminPlaced: boolean;
+  /** Custom avatar image URL for admin-placed flags (overrides sender avatar on the map marker). */
+  customMarkerAvatarUrl: string | null;
 }
 
 /**
@@ -124,6 +126,7 @@ function spatialCluster(
       senderDisplayName: seed.sender!.display_name ?? null,
       isPublic: clusterMessages.some(m => m.is_public),
       isAdminPlaced: seed.sender?.is_admin === true,
+      customMarkerAvatarUrl: seed.custom_marker_avatar_url ?? null,
     });
   }
 }

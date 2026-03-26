@@ -460,6 +460,7 @@ export async function fetchUndiscoveredMessagesForMap(): Promise<UndiscoveredMes
       location,
       created_at,
       is_public,
+      custom_marker_avatar_url,
       sender:users!sender_id (id, display_name, avatar_url, is_admin)
     `)
     .eq('recipient_id', currentUserId)
@@ -699,6 +700,7 @@ export async function fetchMyFlagsForMap(): Promise<OwnFlagMapMeta[]> {
       text_content,
       media_url,
       recipient_id,
+      custom_marker_avatar_url,
       recipient:users!recipient_id (id, display_name, avatar_url)
     `)
     .eq('sender_id', currentUserId)
@@ -723,7 +725,8 @@ export async function sendMessage(
   mediaUrl?: string,
   isPublic?: boolean,
   replyToMessageId?: string | null,
-  isAdminPlaced?: boolean
+  isAdminPlaced?: boolean,
+  customMarkerAvatarUrl?: string
 ): Promise<Message | null> {
   const currentUserId = getCurrentUserId();
   if (!currentUserId) return null;
@@ -744,6 +747,7 @@ export async function sendMessage(
       is_public: isPublic || false,
       is_admin_placed: isAdminPlaced || false,
       ...(replyToMessageId ? { reply_to_id: replyToMessageId } : {}),
+      ...(customMarkerAvatarUrl ? { custom_marker_avatar_url: customMarkerAvatarUrl } : {}),
     })
     .select()
     .single();
@@ -918,6 +922,34 @@ export async function uploadMedia(
     return urlData.publicUrl;
   } catch (e) {
     reportError(e, 'messages.uploadMedia');
+    return null;
+  }
+}
+
+// Upload a custom marker avatar image for admin-placed flags (stored in the avatars bucket)
+export async function uploadCustomMarkerAvatar(uri: string): Promise<string | null> {
+  try {
+    const currentUserId = getCurrentUserId();
+    if (!currentUserId) return null;
+
+    const base64 = await FileSystem.readAsStringAsync(uri, { encoding: 'base64' });
+    const { decode } = await import('base64-arraybuffer');
+    const arrayBuffer = decode(base64);
+    const fileName = `${currentUserId}/custom-markers/${Date.now()}.jpg`;
+
+    const { error } = await supabase.storage
+      .from('avatars')
+      .upload(fileName, arrayBuffer, { contentType: 'image/jpeg', upsert: true });
+
+    if (error) {
+      reportError(error, 'messages.uploadCustomMarkerAvatar');
+      return null;
+    }
+
+    const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(fileName);
+    return urlData.publicUrl;
+  } catch (e) {
+    reportError(e, 'messages.uploadCustomMarkerAvatar');
     return null;
   }
 }

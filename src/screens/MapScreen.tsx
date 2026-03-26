@@ -870,7 +870,7 @@ export default function MapScreen({ navigation, route }: Props) {
       </View>
 
       {routeCoordinates && (
-        <View style={[styles.floatingButtonsContainer, { top: insets.top + 16 }]}>
+        <View style={[styles.floatingButtonsContainer, { top: insets.top + 66 }]}>
           <TouchableOpacity onPress={openInMaps} activeOpacity={0.9} style={[styles.floatingButton, styles.floatingButtonMaps]}>
             <Ionicons name="walk-outline" size={22} color={colors.primary.cyan} />
           </TouchableOpacity>

@@ -63,7 +63,7 @@
         "android.permission.CAMERA",
         "android.permission.RECORD_AUDIO"
       ],
-      "versionCode": 80
+      "versionCode": 81
     },
     "androidStatusBar": {
       "barStyle": "light-content",

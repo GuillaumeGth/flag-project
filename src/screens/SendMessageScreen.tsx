@@ -8,6 +8,7 @@ import {
   ActivityIndicator,
   Switch,
 } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
 import { ScrollViewWithScrollbar } from '@/components/ScrollableWithScrollbar';
 import Toast from '@/components/Toast';
 import { Ionicons } from '@expo/vector-icons';
@@ -16,7 +17,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocation } from '@/contexts/LocationContext';
 import { useAuth } from '@/contexts/AuthContext';
-import { sendMessage, uploadMedia } from '@/services/messages';
+import { sendMessage, uploadMedia, uploadCustomMarkerAvatar } from '@/services/messages';
 import { Coordinates, RootStackParamList } from '@/types';
 import { colors, shadows, radius, spacing, typography } from '@/theme-redesign';
 
@@ -44,6 +45,7 @@ export default function SendMessageScreen({ navigation, route }: Props) {
 
   const [recipients, setRecipients] = useState<Recipient[]>(route.params?.recipients ?? []);
   const [isPublic, setIsPublic] = useState((route.params?.recipients ?? []).length === 0);
+  const [customMarkerAvatarUri, setCustomMarkerAvatarUri] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [toast, setToast] = useState<{
     visible: boolean;
@@ -71,6 +73,18 @@ export default function SendMessageScreen({ navigation, route }: Props) {
     setToast((prev) => ({ ...prev, visible: false }));
   }, []);
 
+  const pickCustomMarkerAvatar = async () => {
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      quality: 0.9,
+      allowsEditing: true,
+      aspect: [1, 1],
+    });
+    if (!result.canceled && result.assets[0]) {
+      setCustomMarkerAvatarUri(result.assets[0].uri);
+    }
+  };
+
   const handleSend = useCallback(async () => {
     if (!effectiveLocation) {
       showToast('Position GPS non disponible', 'error');
@@ -89,15 +103,34 @@ export default function SendMessageScreen({ navigation, route }: Props) {
 
     try {
       let uploadedMediaUrl: string | undefined;
+      let uploadedMarkerAvatarUrl: string | undefined;
+
+      const uploads: Promise<unknown>[] = [];
 
       if (mediaUri && contentType !== 'text') {
-        const url = await uploadMedia(mediaUri, contentType as 'photo' | 'audio');
-        if (!url) {
-          showToast("Échec de l'upload du média", 'error', { label: 'Réessayer', onPress: handleSend });
-          setLoading(false);
-          return;
-        }
-        uploadedMediaUrl = url;
+        uploads.push(
+          uploadMedia(mediaUri, contentType as 'photo' | 'audio').then(url => {
+            if (!url) throw new Error('media_upload_failed');
+            uploadedMediaUrl = url;
+          })
+        );
+      }
+
+      if (customMarkerAvatarUri) {
+        uploads.push(
+          uploadCustomMarkerAvatar(customMarkerAvatarUri).then(url => {
+            if (!url) throw new Error('avatar_upload_failed');
+            uploadedMarkerAvatarUrl = url;
+          })
+        );
+      }
+
+      try {
+        await Promise.all(uploads);
+      } catch {
+        showToast("Échec de l'upload", 'error', { label: 'Réessayer', onPress: handleSend });
+        setLoading(false);
+        return;
       }
 
       const isAdminPlaced = !!adminLocation;
@@ -111,7 +144,8 @@ export default function SendMessageScreen({ navigation, route }: Props) {
           uploadedMediaUrl,
           true,
           null,
-          isAdminPlaced
+          isAdminPlaced,
+          uploadedMarkerAvatarUrl
         );
         if (result) {
           navigation.navigate('Main', {
@@ -134,7 +168,8 @@ export default function SendMessageScreen({ navigation, route }: Props) {
               uploadedMediaUrl,
               false,
               null,
-              isAdminPlaced
+              isAdminPlaced,
+              uploadedMarkerAvatarUrl
             )
           )
         );
@@ -161,7 +196,7 @@ export default function SendMessageScreen({ navigation, route }: Props) {
     }
 
     setLoading(false);
-  }, [effectiveLocation, isPublic, recipients, mediaUri, contentType, textContent, adminLocation, navigation, showToast]);
+  }, [effectiveLocation, isPublic, recipients, mediaUri, contentType, textContent, adminLocation, customMarkerAvatarUri, navigation, showToast]);
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background.primary }}>
@@ -191,6 +226,26 @@ export default function SendMessageScreen({ navigation, route }: Props) {
             <Text style={styles.adminBadgeCoords}>
               {adminLocation.latitude.toFixed(5)}, {adminLocation.longitude.toFixed(5)}
             </Text>
+          </View>
+        )}
+
+        {/* Custom marker avatar (admin + adminLocation only) */}
+        {adminLocation && (
+          <View style={styles.adminSection}>
+            <Text style={styles.adminSectionLabel}>Image du marqueur</Text>
+            <TouchableOpacity style={styles.markerAvatarRow} onPress={pickCustomMarkerAvatar}>
+              {customMarkerAvatarUri ? (
+                <Image source={{ uri: customMarkerAvatarUri }} style={styles.markerAvatarPreview} />
+              ) : (
+                <View style={styles.markerAvatarPlaceholder}>
+                  <Ionicons name="image-outline" size={24} color="#FFD700" />
+                </View>
+              )}
+              <Text style={styles.markerAvatarLabel}>
+                {customMarkerAvatarUri ? 'Changer l\'image' : 'Choisir une image (optionnel)'}
+              </Text>
+              <Ionicons name="chevron-forward" size={18} color={colors.text.tertiary} />
+            </TouchableOpacity>
           </View>
         )}
 
@@ -504,5 +559,44 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.xs,
     color: colors.text.secondary,
     fontFamily: 'monospace',
+  },
+  adminSection: {
+    marginBottom: spacing.md,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 215, 0, 0.3)',
+    borderRadius: radius.md,
+    padding: spacing.md,
+    backgroundColor: 'rgba(255, 215, 0, 0.06)',
+  },
+  adminSectionLabel: {
+    fontSize: typography.sizes.xs,
+    fontWeight: '600',
+    color: '#FFD700',
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+    marginBottom: spacing.sm,
+  },
+  markerAvatarRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  markerAvatarPreview: {
+    width: 44,
+    height: 44,
+    borderRadius: radius.full,
+  },
+  markerAvatarPlaceholder: {
+    width: 44,
+    height: 44,
+    borderRadius: radius.full,
+    backgroundColor: 'rgba(255, 215, 0, 0.15)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  markerAvatarLabel: {
+    flex: 1,
+    fontSize: typography.sizes.sm,
+    color: colors.text.primary,
   },
 });

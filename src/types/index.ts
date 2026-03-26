@@ -72,6 +72,7 @@ export interface UndiscoveredMessageMapMeta {
   is_public?: boolean;
   sender?: Pick<User, 'id' | 'display_name' | 'avatar_url' | 'is_admin'>;
   is_admin_placed?: boolean;
+  custom_marker_avatar_url?: string | null;
 }
 
 // Metadata for the current user's own sent flags on the map
@@ -87,6 +88,7 @@ export interface OwnFlagMapMeta {
   media_url?: string | null;
   recipient_id: string | null;
   recipient?: Pick<User, 'id' | 'display_name' | 'avatar_url'> | null;
+  custom_marker_avatar_url?: string | null;
 }
 
 // For map markers

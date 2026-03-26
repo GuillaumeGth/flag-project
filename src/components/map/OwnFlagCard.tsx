@@ -6,8 +6,8 @@ import {
   StyleSheet,
   Animated,
   Image,
-  ScrollView,
 } from 'react-native';
+import { ScrollViewWithScrollbar } from '@/components/ScrollableWithScrollbar';
 import { Ionicons } from '@expo/vector-icons';
 import { Audio } from 'expo-av';
 import { OwnFlagMapMeta, MessageContentType } from '@/types';
@@ -117,9 +117,9 @@ export default function OwnFlagCard({
 
         {/* Content */}
         {flag.content_type === 'text' && flag.text_content ? (
-          <ScrollView style={styles.textScroll} showsVerticalScrollIndicator={false}>
+          <ScrollViewWithScrollbar style={styles.textScroll}>
             <Text style={styles.textContent}>{flag.text_content}</Text>
-          </ScrollView>
+          </ScrollViewWithScrollbar>
         ) : flag.content_type === 'photo' && flag.media_url ? (
           <Image
             source={{ uri: flag.media_url }}

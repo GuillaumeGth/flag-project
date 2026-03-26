@@ -4,10 +4,10 @@ import {
   Text,
   TouchableOpacity,
   StyleSheet,
-  FlatList,
   RefreshControl,
   Animated,
 } from 'react-native';
+import { FlatListWithScrollbar } from '@/components/ScrollableWithScrollbar';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -181,7 +181,7 @@ export default function ProfileScreen({ navigation }: Props) {
           {renderHeader()}
         </>
       ) : (
-        <FlatList
+        <FlatListWithScrollbar
           data={messages}
           renderItem={renderCell}
           keyExtractor={(item) => item.id}

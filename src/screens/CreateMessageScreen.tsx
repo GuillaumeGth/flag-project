@@ -5,8 +5,8 @@ import {
   TouchableOpacity,
   StyleSheet,
   Image,
-  ScrollView,
 } from 'react-native';
+import { ScrollViewWithScrollbar } from '@/components/ScrollableWithScrollbar';
 import ConfirmDialog from '@/components/ConfirmDialog';
 import Toast from '@/components/Toast';
 import { Ionicons } from '@expo/vector-icons';
@@ -212,7 +212,7 @@ export default function CreateMessageScreen({ navigation, route }: Props) {
         type={toast.type}
         onHide={hideToast}
       />
-      <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+      <ScrollViewWithScrollbar style={styles.container} contentContainerStyle={styles.content}>
         <View style={[styles.header, { marginTop: insets.top }]}>
           <TouchableOpacity onPress={() => navigation.goBack()}>
             <Ionicons name="arrow-back" size={24} color={colors.text.primary} />
@@ -315,7 +315,7 @@ export default function CreateMessageScreen({ navigation, route }: Props) {
             <Ionicons name="arrow-forward" size={20} color="#FFFFFF" />
           </LinearGradient>
         </TouchableOpacity>
-      </ScrollView>
+      </ScrollViewWithScrollbar>
     </View>
   );
 }

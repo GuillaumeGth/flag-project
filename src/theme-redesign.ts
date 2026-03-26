@@ -182,6 +182,22 @@ export const typography = {
   },
 };
 
+// === Scrollbar ===
+export const scrollbar = {
+  /** Gradient colors du thumb (vertical, top→bottom) */
+  gradient: ['rgba(124, 92, 252, 0.85)', 'rgba(0, 200, 255, 0.7)'] as const,
+  /** Couleur du track (fond de la scrollbar) */
+  trackColor: 'rgba(255,255,255,0.06)' as const,
+  /** Largeur du track et du thumb (px) */
+  width: 3,
+  /** Border radius du track et du thumb */
+  borderRadius: 2,
+  /** Marge intérieure par rapport aux bords du container (px) */
+  inset: 4,
+  /** Hauteur minimale du thumb (px) */
+  minThumbHeight: 36,
+};
+
 // === Animation Durations ===
 export const duration = {
   fast: 150,

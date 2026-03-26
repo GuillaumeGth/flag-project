@@ -98,25 +98,6 @@ export default StyleSheet.create({
     overflow: 'hidden',
     minHeight: 0,
   },
-  // ScrollView inside the card
-  personListScroll: {
-    flex: 1,
-  },
-  // Custom scrollbar
-  scrollTrack: {
-    position: 'absolute',
-    right: 4,
-    top: 4,
-    bottom: 4,
-    width: 3,
-    borderRadius: 2,
-    backgroundColor: 'rgba(255,255,255,0.06)',
-  },
-  scrollThumb: {
-    position: 'absolute',
-    width: 3,
-    borderRadius: 2,
-  },
   emptyHint: {
     color: colors.text.tertiary,
     fontSize: typography.sizes.sm,

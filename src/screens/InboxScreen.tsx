@@ -2,12 +2,12 @@ import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
-  FlatList,
   TouchableOpacity,
   StyleSheet,
   RefreshControl,
   Animated,
 } from 'react-native';
+import { FlatListWithScrollbar } from '@/components/ScrollableWithScrollbar';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CompositeNavigationProp } from '@react-navigation/native';
@@ -250,7 +250,7 @@ export default function InboxScreen({ navigation }: Props) {
           action={emptyAction}
         />
       ) : (
-        <FlatList
+        <FlatListWithScrollbar
           data={conversations}
           keyExtractor={(item) => item.id}
           renderItem={renderConversation}

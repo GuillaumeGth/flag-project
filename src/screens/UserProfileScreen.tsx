@@ -4,11 +4,11 @@ import {
   Text,
   TouchableOpacity,
   ActivityIndicator,
-  FlatList,
   RefreshControl,
   Modal,
   Switch,
 } from 'react-native';
+import { FlatListWithScrollbar } from '@/components/ScrollableWithScrollbar';
 import { Ionicons } from '@expo/vector-icons';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -249,7 +249,7 @@ export default function UserProfileScreen({ navigation, route }: Props) {
           <ActivityIndicator size="large" color={colors.primary.violet} style={{ marginTop: 32 }} />
         </>
       ) : (
-        <FlatList
+        <FlatListWithScrollbar
           data={messages}
           renderItem={renderCell}
           keyExtractor={item => item.id}

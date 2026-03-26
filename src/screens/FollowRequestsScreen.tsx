@@ -2,7 +2,6 @@ import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
-  FlatList,
   StyleSheet,
   TouchableOpacity,
   Image,
@@ -10,6 +9,7 @@ import {
   RefreshControl,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { FlatListWithScrollbar } from '@/components/ScrollableWithScrollbar';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
@@ -125,7 +125,7 @@ export default function FollowRequestsScreen({ navigation }: Props) {
           style={styles.fullLoader}
         />
       ) : (
-        <FlatList
+        <FlatListWithScrollbar
           data={requests}
           keyExtractor={(item) => item.id}
           renderItem={renderItem}

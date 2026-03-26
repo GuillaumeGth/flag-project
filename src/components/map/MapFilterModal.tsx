@@ -3,16 +3,14 @@ import {
   View,
   Text,
   TouchableOpacity,
-  ScrollView,
   Pressable,
   TextInput,
   Animated,
   StyleSheet,
   Dimensions,
   Image,
-  NativeSyntheticEvent,
-  NativeScrollEvent,
 } from 'react-native';
+import { ScrollViewWithScrollbar } from '@/components/ScrollableWithScrollbar';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -149,94 +147,56 @@ function PersonList({
   suggestions,
   selectedIds,
   onToggle,
-  query,
 }: {
   suggestions: FilterPerson[];
   selectedIds: string[];
   onToggle: (id: string) => void;
   query: string;
 }) {
-  const [listHeight, setListHeight] = useState(0);
-  const [contentHeight, setContentHeight] = useState(0);
-  const [scrollY, setScrollY] = useState(0);
-
-  const thumbHeight = listHeight > 0 && contentHeight > listHeight
-    ? Math.max(36, (listHeight / contentHeight) * listHeight)
-    : 0;
-
-  const maxThumbTop = listHeight - thumbHeight;
-  const maxScroll = contentHeight - listHeight;
-  const thumbTop = maxScroll > 0 ? (scrollY / maxScroll) * maxThumbTop : 0;
-
-  function handleScroll(e: NativeSyntheticEvent<NativeScrollEvent>) {
-    setScrollY(e.nativeEvent.contentOffset.y);
-  }
-
   return (
-    <View style={{ flex: 1 }} onLayout={e => setListHeight(e.nativeEvent.layout.height)}>
-      <ScrollView
-        style={styles.personListScroll}
-        showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
-        onScroll={handleScroll}
-        scrollEventThrottle={16}
-        onContentSizeChange={(_, h) => setContentHeight(h)}
-      >
-        {suggestions.map((person, index) => {
-          const sel = selectedIds.includes(person.id);
-          const isLast = index === suggestions.length - 1;
-          return (
-            <TouchableOpacity
-              key={person.id}
-              onPress={() => onToggle(person.id)}
-              activeOpacity={0.7}
-              style={[
-                styles.personRow,
-                !isLast && styles.personRowBorder,
-                sel && styles.personRowActive,
-              ]}
+    <ScrollViewWithScrollbar keyboardShouldPersistTaps="handled">
+      {suggestions.map((person, index) => {
+        const sel = selectedIds.includes(person.id);
+        const isLast = index === suggestions.length - 1;
+        return (
+          <TouchableOpacity
+            key={person.id}
+            onPress={() => onToggle(person.id)}
+            activeOpacity={0.7}
+            style={[
+              styles.personRow,
+              !isLast && styles.personRowBorder,
+              sel && styles.personRowActive,
+            ]}
+          >
+            <PersonAvatar person={person} size={34} active={sel} />
+            <Text
+              style={[styles.personName, sel && styles.personNameActive]}
+              numberOfLines={1}
             >
-              <PersonAvatar person={person} size={34} active={sel} />
-              <Text
-                style={[styles.personName, sel && styles.personNameActive]}
-                numberOfLines={1}
-              >
-                {person.display_name ?? 'Inconnu'}
-              </Text>
-              {person.messageCount !== undefined && (
-                <Text style={styles.personCount}>{person.messageCount}</Text>
+              {person.display_name ?? 'Inconnu'}
+            </Text>
+            {person.messageCount !== undefined && (
+              <Text style={styles.personCount}>{person.messageCount}</Text>
+            )}
+            <View style={styles.personCheck}>
+              {sel ? (
+                <LinearGradient
+                  colors={ACTIVE_GRADIENT}
+                  start={GRADIENT_START}
+                  end={GRADIENT_END}
+                  style={styles.personCheckFill}
+                >
+                  <Ionicons name="checkmark" size={12} color="#fff" />
+                </LinearGradient>
+              ) : (
+                <View style={styles.personCheckEmpty} />
               )}
-              <View style={styles.personCheck}>
-                {sel ? (
-                  <LinearGradient
-                    colors={ACTIVE_GRADIENT}
-                    start={GRADIENT_START}
-                    end={GRADIENT_END}
-                    style={styles.personCheckFill}
-                  >
-                    <Ionicons name="checkmark" size={12} color="#fff" />
-                  </LinearGradient>
-                ) : (
-                  <View style={styles.personCheckEmpty} />
-                )}
-              </View>
-            </TouchableOpacity>
-          );
-        })}
-      </ScrollView>
-
-      {/* Custom scrollbar */}
-      {thumbHeight > 0 && (
-        <View style={styles.scrollTrack} pointerEvents="none">
-          <LinearGradient
-            colors={ACTIVE_GRADIENT}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 0, y: 1 }}
-            style={[styles.scrollThumb, { height: thumbHeight, top: thumbTop }]}
-          />
-        </View>
-      )}
-    </View>
+            </View>
+          </TouchableOpacity>
+        );
+      })}
+    </ScrollViewWithScrollbar>
   );
 }
 

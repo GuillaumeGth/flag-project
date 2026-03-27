@@ -31,16 +31,18 @@ import {
 } from '@/services/followRequests';
 import { Message, User, RootStackParamList } from '@/types';
 import GridCell from '@/components/profile/GridCell';
-import ProfileStatsRow from '@/components/profile/ProfileStatsRow';
+import ProfileStatsRow, { useProfileSheets } from '@/components/profile/ProfileStatsRow';
 import PremiumAvatar from '@/components/redesign/PremiumAvatar';
 import EmptyState from '@/components/EmptyState';
 import { useProfileMessages } from '@/hooks/useProfileMessages';
 import { useCityCount } from '@/hooks/useCityCount';
+import { useTranslation } from 'react-i18next';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'UserProfile'>;
 
 export default function UserProfileScreen({ navigation, route }: Props) {
   const insets = useSafeAreaInsets();
+  const { t } = useTranslation();
   const { userId } = route.params;
 
   const [userProfile, setUserProfile] = useState<User | null>(null);
@@ -55,6 +57,12 @@ export default function UserProfileScreen({ navigation, route }: Props) {
   const { messages, commentCounts, discoveredIds, loading: messagesLoading, refreshing: messagesRefreshing, onRefresh: refreshMessages } = useProfileMessages(userId);
   const { cityCount, cityNames } = useCityCount(messages);
   const loading = messagesLoading || extraLoading;
+
+  const { openCities, openFollowers, renderOverlay } = useProfileSheets({
+    cityNames,
+    userId,
+    onPressFollower: (id) => navigation.navigate('UserProfile', { userId: id }),
+  });
 
   const loadProfile = useCallback(async () => {
     const { data } = await supabase
@@ -154,7 +162,7 @@ export default function UserProfileScreen({ navigation, route }: Props) {
     return (
       <EmptyState
         icon="albums-outline"
-        title="Aucun message public"
+        title={t('profile.noPublicMessages')}
       />
     );
   };
@@ -169,7 +177,7 @@ export default function UserProfileScreen({ navigation, route }: Props) {
           <View style={styles.profileTopRow}>
             <PremiumAvatar uri={userProfile?.avatar_url} name={userProfile?.display_name} size="large" withRing ringColor="violet" />
             <Text style={styles.displayName}>
-              {userProfile?.display_name || 'Utilisateur'}
+              {userProfile?.display_name || t('userProfile.user')}
             </Text>
           </View>
           <View style={styles.profileActions}>
@@ -230,9 +238,8 @@ export default function UserProfileScreen({ navigation, route }: Props) {
         messagesCount={messages.length}
         followerCount={followerCount}
         locationsCount={cityCount}
-        cityNames={cityNames}
-        userId={userId}
-        onPressFollower={(id) => navigation.navigate('UserProfile', { userId: id })}
+        onOpenCities={openCities}
+        onOpenFollowers={followerCount > 0 ? openFollowers : undefined}
       />
 
       <View style={styles.divider} />
@@ -275,7 +282,7 @@ export default function UserProfileScreen({ navigation, route }: Props) {
         >
           <TouchableOpacity activeOpacity={1} style={styles.notifModalCard}>
             <View style={styles.notifModalHeader}>
-              <Text style={styles.notifModalTitle}>Notifications</Text>
+              <Text style={styles.notifModalTitle}>{t('userProfile.notifications')}</Text>
               <TouchableOpacity onPress={() => setShowNotifModal(false)}>
                 <Ionicons name="close" size={22} color={colors.text.secondary} />
               </TouchableOpacity>
@@ -283,7 +290,7 @@ export default function UserProfileScreen({ navigation, route }: Props) {
 
             <View style={styles.notifRow}>
               <View style={styles.notifRowInfo}>
-                <Text style={styles.notifRowLabel}>Fläags privés</Text>
+                <Text style={styles.notifRowLabel}>{t('userProfile.privateFlags')}</Text>
               </View>
               <Switch
                 value={notifPrefs.notifyPrivateFlags}
@@ -301,7 +308,7 @@ export default function UserProfileScreen({ navigation, route }: Props) {
 
             <View style={styles.notifRow}>
               <View style={styles.notifRowInfo}>
-                <Text style={styles.notifRowLabel}>Fläags publics</Text>
+                <Text style={styles.notifRowLabel}>{t('userProfile.publicFlags')}</Text>
               </View>
               <Switch
                 value={notifPrefs.notifyPublicFlags}
@@ -317,7 +324,7 @@ export default function UserProfileScreen({ navigation, route }: Props) {
           </TouchableOpacity>
         </TouchableOpacity>
       </Modal>
-
+      {renderOverlay()}
     </View>
   );
 }

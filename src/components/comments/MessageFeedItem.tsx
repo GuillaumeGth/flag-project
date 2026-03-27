@@ -6,6 +6,7 @@ import { Message } from '@/types';
 import { CommentWithUser, CommentWithReplies } from '@/types/comments';
 import { colors, spacing, radius, typography } from '@/theme-redesign';
 import { useAuth } from '@/contexts/AuthContext';
+import { useTranslation } from 'react-i18next';
 import {
   fetchCommentsForMessage,
   fetchMessageLikes,
@@ -42,6 +43,7 @@ export default function MessageFeedItem({
   onDelete,
 }: MessageFeedItemProps) {
   const { user } = useAuth();
+  const { t } = useTranslation();
   const [comments, setComments] = useState<CommentWithReplies[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [replyingTo, setReplyingTo] = useState<{ id: string; userName: string } | null>(null);
@@ -178,8 +180,8 @@ export default function MessageFeedItem({
           <BlurView intensity={100} tint="dark" style={StyleSheet.absoluteFill} />
           <View style={styles.undiscoveredContent}>
             <Ionicons name="eye-off-outline" size={32} color="rgba(190,170,255,0.7)" />
-            <Text style={styles.undiscoveredTitle}>Fläag non découvert</Text>
-            <Text style={styles.undiscoveredHint}>Approche-toi pour le lire</Text>
+            <Text style={styles.undiscoveredTitle}>{t('messageFeed.undiscovered')}</Text>
+            <Text style={styles.undiscoveredHint}>{t('messageFeed.undiscoveredHint')}</Text>
           </View>
         </TouchableOpacity>
 

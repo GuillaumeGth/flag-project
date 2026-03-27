@@ -19,11 +19,13 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Coordinates, MessageContentType, RootStackParamList } from '@/types';
 import { colors, shadows, radius, spacing, typography } from '@/theme-redesign';
 import GlassInput from '@/components/redesign/GlassInput';
+import { useTranslation } from 'react-i18next';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'CreateMessage'>;
 
 export default function CreateMessageScreen({ navigation, route }: Props) {
   const insets = useSafeAreaInsets();
+  const { t } = useTranslation();
   const { user } = useAuth();
 
   const [adminLocation] = useState<Coordinates | null>(
@@ -198,7 +200,7 @@ export default function CreateMessageScreen({ navigation, route }: Props) {
     <View style={{ flex: 1, backgroundColor: colors.background.primary }}>
       <ConfirmDialog
         visible={discardDialogVisible}
-        title="Abandonner ce fläag ?"
+        title={t('createMessage.abandonTitle')}
         message="Le contenu que tu as créé sera perdu définitivement."
         confirmLabel="Abandonner"
         cancelLabel="Continuer"
@@ -219,7 +221,7 @@ export default function CreateMessageScreen({ navigation, route }: Props) {
           </TouchableOpacity>
           <View style={styles.titleRow}>
             <Ionicons name="location" size={18} color="#FFFFFF" />
-            <Text style={styles.title}>Nouveau Fläag</Text>
+            <Text style={styles.title}>{t('createMessage.title')}</Text>
           </View>
           <View style={{ width: 24 }} />
         </View>
@@ -227,7 +229,7 @@ export default function CreateMessageScreen({ navigation, route }: Props) {
         {/* Admin placement badge */}
         {adminLocation && (
           <View style={styles.adminBadge}>
-            <Text style={styles.adminBadgeText}>★ Position admin</Text>
+            <Text style={styles.adminBadgeText}>{t('createMessage.adminBadge')}</Text>
             <Text style={styles.adminBadgeCoords}>
               {adminLocation.latitude.toFixed(5)}, {adminLocation.longitude.toFixed(5)}
             </Text>
@@ -266,7 +268,7 @@ export default function CreateMessageScreen({ navigation, route }: Props) {
         {/* Text input */}
         <GlassInput
           style={styles.textInput}
-          placeholder="Ce message sera lié à votre position actuelle..."
+          placeholder={t('createMessage.placeholder')}
           multiline
           value={textContent}
           onChangeText={setTextContent}
@@ -276,12 +278,12 @@ export default function CreateMessageScreen({ navigation, route }: Props) {
         <View style={styles.mediaButtons}>
           <TouchableOpacity style={styles.mediaButton} onPress={pickImage}>
             <Ionicons name="image" size={24} color={colors.primary.cyan} />
-            <Text style={styles.mediaButtonText}>Galerie</Text>
+            <Text style={styles.mediaButtonText}>{t('createMessage.gallery')}</Text>
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.mediaButton} onPress={takePhoto}>
             <Ionicons name="camera" size={24} color={colors.primary.cyan} />
-            <Text style={styles.mediaButtonText}>Photo</Text>
+            <Text style={styles.mediaButtonText}>{t('createMessage.photo')}</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -311,7 +313,7 @@ export default function CreateMessageScreen({ navigation, route }: Props) {
             end={{ x: 1, y: 0 }}
             style={styles.nextButton}
           >
-            <Text style={styles.nextButtonText}>Suivant</Text>
+            <Text style={styles.nextButtonText}>{t('createMessage.next')}</Text>
             <Ionicons name="arrow-forward" size={20} color="#FFFFFF" />
           </LinearGradient>
         </TouchableOpacity>

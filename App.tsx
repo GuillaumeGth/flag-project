@@ -18,6 +18,7 @@ import { addNotificationResponseListener } from '@/services/notifications';
 import { checkForAppUpdate } from '@/services/appUpdater';
 import { setupGlobalErrorHandler } from '@/services/errorReporting';
 import { navigationRef } from '@/services/navigationRef';
+import initI18n from '@/i18n';
 
 // Catch unhandled JS errors and forward them to Crashlytics
 setupGlobalErrorHandler();
@@ -218,8 +219,10 @@ function AppNavigator() {
 }
 
 export default function App() {
+  const [i18nReady, setI18nReady] = useState(false);
 
   useEffect(() => {
+    initI18n().then(() => setI18nReady(true));
     checkForAppUpdate();
   }, []);
 
@@ -258,6 +261,8 @@ export default function App() {
 
     return () => subscription.remove();
   }, []);
+
+  if (!i18nReady) return null;
 
   return (
     <SafeAreaProvider>

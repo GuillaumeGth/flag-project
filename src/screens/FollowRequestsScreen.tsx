@@ -20,11 +20,13 @@ import {
 } from '@/services/followRequests';
 import { colors, radius, spacing, typography } from '@/theme-redesign';
 import { RootStackParamList } from '@/types';
+import { useTranslation } from 'react-i18next';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'FollowRequests'>;
 
 export default function FollowRequestsScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets();
+  const { t } = useTranslation();
   const [requests, setRequests] = useState<FollowRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -100,7 +102,7 @@ export default function FollowRequestsScreen({ navigation }: Props) {
               style={styles.acceptButton}
               onPress={() => handleAccept(item)}
             >
-              <Text style={styles.acceptText}>Accepter</Text>
+              <Text style={styles.acceptText}>{t('followRequests.accept')}</Text>
             </TouchableOpacity>
           </View>
         )}
@@ -114,7 +116,7 @@ export default function FollowRequestsScreen({ navigation }: Props) {
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
           <Ionicons name="arrow-back" size={24} color={colors.text.primary} />
         </TouchableOpacity>
-        <Text style={styles.title}>Demandes d'abonnement</Text>
+        <Text style={styles.title}>{t('followRequests.title')}</Text>
         <View style={styles.backButton} />
       </View>
 
@@ -139,7 +141,7 @@ export default function FollowRequestsScreen({ navigation }: Props) {
           ListEmptyComponent={
             <View style={styles.empty}>
               <Ionicons name="people-outline" size={48} color={colors.text.tertiary} />
-              <Text style={styles.emptyText}>Aucune demande en attente</Text>
+              <Text style={styles.emptyText}>{t('followRequests.noPending')}</Text>
             </View>
           }
           contentContainerStyle={requests.length === 0 && styles.emptyContainer}

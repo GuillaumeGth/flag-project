@@ -14,6 +14,7 @@ import { OwnFlagMapMeta, MessageContentType } from '@/types';
 import { colors, spacing, radius, typography } from '@/theme-redesign';
 import GlassCard from '@/components/redesign/GlassCard';
 import AudioPlayerButton from '@/components/AudioPlayerButton';
+import { useTranslation } from 'react-i18next';
 
 const CONTENT_ICON: Record<MessageContentType, React.ComponentProps<typeof Ionicons>['name']> = {
   text: 'chatbubble-outline',
@@ -38,6 +39,7 @@ export default function OwnFlagCard({
   onClose,
   onViewConversation,
 }: OwnFlagCardProps) {
+  const { t } = useTranslation();
   const animatedStyle = useMemo(() => ({
     opacity: cardOpacityAnim,
     transform: [{ translateY: cardSlideAnim }],
@@ -110,7 +112,7 @@ export default function OwnFlagCard({
           {flag.is_public && (
             <View style={styles.badge}>
               <Ionicons name="globe-outline" size={11} color={colors.primary.cyan} />
-              <Text style={styles.badgeText}>Public</Text>
+              <Text style={styles.badgeText}>{t('map.public')}</Text>
             </View>
           )}
         </View>

@@ -23,6 +23,7 @@ import PremiumAvatar from '@/components/redesign/PremiumAvatar';
 import EmptyState from '@/components/EmptyState';
 import { log } from '@/utils/debug';
 import { formatMessageDate } from '@/utils/date';
+import { useTranslation } from 'react-i18next';
 
 type InboxNavigationProp = CompositeNavigationProp<
   BottomTabNavigationProp<MainTabParamList, 'Inbox'>,
@@ -127,6 +128,7 @@ const getMessagePreview = (conversation: Conversation) => {
 
 export default function InboxScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets();
+  const { t } = useTranslation();
   const { user } = useAuth();
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [loading, setLoading] = useState(true);
@@ -231,7 +233,7 @@ export default function InboxScreen({ navigation }: Props) {
       <View style={styles.headerGradient} />
 
       <View style={styles.header}>
-        <Text style={styles.title}>Messages</Text>
+        <Text style={styles.title}>{t('inbox.title')}</Text>
         <TouchableOpacity
           style={styles.newMessageButton}
           onPress={navigateToSelectRecipient}
@@ -245,8 +247,8 @@ export default function InboxScreen({ navigation }: Props) {
       {conversations.length === 0 ? (
         <EmptyState
           icon="chatbubbles-outline"
-          title="Aucune conversation"
-          subtitle="Commencez une conversation en appuyant sur le bouton +"
+          title={t('inbox.empty')}
+          subtitle={t('inbox.emptySubtitle')}
           action={emptyAction}
         />
       ) : (

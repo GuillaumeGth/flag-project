@@ -1,22 +1,19 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
   TouchableOpacity,
-  Pressable,
   TextInput,
-  Animated,
-  StyleSheet,
-  Dimensions,
   Image,
 } from 'react-native';
 import { ScrollViewWithScrollbar } from '@/components/ScrollableWithScrollbar';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, spacing } from '@/theme-redesign';
 import type { MapMode } from './MapModePill';
+import { useTranslation } from 'react-i18next';
 import styles from './MapFilterModal.styles';
+import BottomSheet from '@/components/BottomSheet';
 
 export interface FilterPerson {
   id: string;
@@ -73,17 +70,6 @@ const GRADIENT_END = { x: 1, y: 0 } as const;
 const ACTIVE_GRADIENT = ['rgba(124, 92, 252, 0.85)', 'rgba(0, 200, 255, 0.7)'] as const;
 const MAX_VISIBLE_PILLS = 3;
 
-const READ_STATUS_OPTIONS: { label: string; value: MineFilters['readStatus'] }[] = [
-  { label: 'Tous', value: 'all' },
-  { label: 'Lus', value: 'read' },
-  { label: 'Non lus', value: 'unread' },
-];
-
-const VISIBILITY_OPTIONS: { label: string; value: 'all' | 'public' | 'private' }[] = [
-  { label: 'Tous', value: 'all' },
-  { label: 'Public', value: 'public' },
-  { label: 'Privé', value: 'private' },
-];
 
 function getInitials(person: FilterPerson): string {
   return (person.display_name ?? '?')
@@ -215,6 +201,7 @@ function PersonSearchPicker({
   onClearAll: () => void;
   emptyLabel?: string;
 }) {
+  const { t } = useTranslation();
   const [query, setQuery] = useState('');
   const q = query.trim().toLowerCase();
 
@@ -272,7 +259,7 @@ function PersonSearchPicker({
                 {selectedPeople.length} sélectionnés
               </Text>
               <TouchableOpacity onPress={onClearAll} activeOpacity={0.7} hitSlop={8}>
-                <Text style={styles.selectedClearLabel}>Effacer</Text>
+                <Text style={styles.selectedClearLabel}>{t('mapFilter.clear')}</Text>
               </TouchableOpacity>
             </View>
           )}
@@ -285,7 +272,7 @@ function PersonSearchPicker({
         <TextInput
           value={query}
           onChangeText={setQuery}
-          placeholder="Rechercher..."
+          placeholder={t('mapFilter.searchFilter')}
           placeholderTextColor={colors.text.disabled}
           style={styles.searchInput}
           returnKeyType="search"
@@ -369,8 +356,6 @@ function SegmentControl<T extends string>({
 
 // ─── Main modal ──────────────────────────────────────────────────────────────
 
-const SCREEN_HEIGHT = Dimensions.get('window').height;
-
 export default function MapFilterModal({
   visible,
   onClose,
@@ -383,29 +368,21 @@ export default function MapFilterModal({
   mineFilters,
   onMineFiltersChange,
 }: Props) {
-  const insets = useSafeAreaInsets();
-  const translateY = useRef(new Animated.Value(SCREEN_HEIGHT)).current;
-  const [rendered, setRendered] = useState(visible);
+  const { t } = useTranslation();
 
-  useEffect(() => {
-    if (visible) {
-      setRendered(true);
-      Animated.spring(translateY, {
-        toValue: 0,
-        useNativeDriver: true,
-        damping: 20,
-        stiffness: 200,
-      }).start();
-    } else {
-      Animated.timing(translateY, {
-        toValue: SCREEN_HEIGHT,
-        duration: 280,
-        useNativeDriver: true,
-      }).start(({ finished }) => {
-        if (finished) setRendered(false);
-      });
-    }
-  }, [visible]);
+  const READ_STATUS_OPTIONS: { label: string; value: MineFilters['readStatus'] }[] = [
+    { label: t('mapFilter.all'), value: 'all' },
+    { label: t('mapFilter.read'), value: 'read' },
+    { label: t('mapFilter.unread'), value: 'unread' },
+  ];
+
+  const VISIBILITY_OPTIONS: { label: string; value: 'all' | 'public' | 'private' }[] = [
+    { label: t('mapFilter.all'), value: 'all' },
+    { label: t('mapFilter.public'), value: 'public' },
+    { label: t('mapFilter.private'), value: 'private' },
+  ];
+
+  // Animation is handled by BottomSheet
 
   function toggleAuthor(id: string) {
     const next = exploreFilters.authorIds.includes(id)
@@ -440,27 +417,25 @@ export default function MapFilterModal({
 
   const hasPeople = mode === 'explore' ? authors.length > 0 : allRecipients.length > 0;
 
-  if (!rendered) return null;
-
   return (
-    <View style={[StyleSheet.absoluteFillObject, styles.overlay]} pointerEvents="box-none">
-      {/* Backdrop — tap to close */}
-      <Pressable style={StyleSheet.absoluteFillObject} onPress={onClose} />
+    <BottomSheet
+      visible={visible}
+      onClose={onClose}
+      height="80%"
+      hideHandle
+      sheetStyle={styles.sheet}
+    >
+      <View
+        style={[styles.sheetBlur, { paddingBottom: spacing.md }]}
+        onStartShouldSetResponder={() => true}
+      >
+        {/* Handle */}
+        <View style={styles.handle} />
 
-      {/* Sheet — aligné en bas, rendu après le backdrop donc au-dessus */}
-      <View style={[StyleSheet.absoluteFillObject, styles.kvContainer]} pointerEvents="box-none">
-        <Animated.View style={[styles.sheet, { transform: [{ translateY }] }]}>
-          <View
-            style={[styles.sheetBlur, { paddingBottom: spacing.md }]}
-            onStartShouldSetResponder={() => true}
-          >
-            {/* Handle */}
-            <View style={styles.handle} />
-
-            {/* Header */}
+        {/* Header */}
             <View style={styles.header}>
               <View style={styles.headerLeft}>
-                <Text style={styles.title}>Filtres</Text>
+                <Text style={styles.title}>{t('mapFilter.title')}</Text>
                 {isActive && (
                   <TouchableOpacity onPress={handleReset} activeOpacity={0.7} style={styles.resetIconBtn}>
                     <Ionicons name="refresh" size={15} color={colors.primary.violet} />
@@ -476,37 +451,37 @@ export default function MapFilterModal({
             <View style={styles.staticContent}>
               {mode === 'explore' && (
                 <>
-                  <Text style={styles.sectionLabel}>Visibilité</Text>
+                  <Text style={styles.sectionLabel}>{t('mapFilter.visibility')}</Text>
                   <SegmentControl
                     options={VISIBILITY_OPTIONS}
                     value={exploreFilters.visibility}
                     onChange={v => onExploreFiltersChange({ ...exploreFilters, visibility: v })}
                   />
                   {authors.length > 0 && (
-                    <Text style={styles.sectionLabelSpaced}>Auteur</Text>
+                    <Text style={styles.sectionLabelSpaced}>{t('mapFilter.author')}</Text>
                   )}
                   {authors.length === 0 && exploreFilters.visibility === 'all' && (
-                    <Text style={styles.emptyHint}>Aucun message à proximité</Text>
+                    <Text style={styles.emptyHint}>{t('mapFilter.noNearby')}</Text>
                   )}
                 </>
               )}
 
               {mode === 'mine' && (
                 <>
-                  <Text style={styles.sectionLabel}>Visibilité</Text>
+                  <Text style={styles.sectionLabel}>{t('mapFilter.visibility')}</Text>
                   <SegmentControl
                     options={VISIBILITY_OPTIONS}
                     value={mineFilters.visibility}
                     onChange={v => onMineFiltersChange({ ...mineFilters, visibility: v })}
                   />
-                  <Text style={styles.sectionLabelSpaced}>Statut</Text>
+                  <Text style={styles.sectionLabelSpaced}>{t('mapFilter.status')}</Text>
                   <SegmentControl
                     options={READ_STATUS_OPTIONS}
                     value={mineFilters.readStatus}
                     onChange={v => onMineFiltersChange({ ...mineFilters, readStatus: v })}
                   />
                   {allRecipients.length > 0 && (
-                    <Text style={styles.sectionLabelSpaced}>Destinataire</Text>
+                    <Text style={styles.sectionLabelSpaced}>{t('mapFilter.recipient')}</Text>
                   )}
                 </>
               )}
@@ -521,7 +496,7 @@ export default function MapFilterModal({
                     selectedIds={exploreFilters.authorIds}
                     onToggle={toggleAuthor}
                     onClearAll={() => onExploreFiltersChange({ ...exploreFilters, authorIds: [] })}
-                    emptyLabel="Aucun message à proximité"
+                    emptyLabel={t('mapFilter.noNearby')}
                   />
                 )}
                 {mode === 'mine' && (
@@ -535,9 +510,7 @@ export default function MapFilterModal({
               </View>
             )}
 
-          </View>
-        </Animated.View>
       </View>
-    </View>
+    </BottomSheet>
   );
 }

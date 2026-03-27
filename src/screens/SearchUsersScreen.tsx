@@ -18,6 +18,7 @@ import { supabase, getCachedUserId } from '@/services/supabase';
 import { fetchSuggestedUsers, SuggestedUser } from '@/services/subscriptions';
 import { colors } from '@/theme-redesign';
 import { User, MainTabParamList, RootStackParamList } from '@/types';
+import { useTranslation } from 'react-i18next';
 
 type SearchNavigationProp = CompositeNavigationProp<
   BottomTabNavigationProp<MainTabParamList, 'Search'>,
@@ -29,6 +30,7 @@ type Props = Omit<BottomTabScreenProps<MainTabParamList, 'Search'>, 'navigation'
 
 export default function SearchUsersScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets();
+  const { t } = useTranslation();
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<User[]>([]);
   const [topUsers, setTopUsers] = useState<User[]>([]);
@@ -135,7 +137,7 @@ export default function SearchUsersScreen({ navigation }: Props) {
         <>
           <View style={styles.sectionHeader}>
             <Ionicons name="people" size={14} color={colors.text.tertiary} />
-            <Text style={styles.sectionHeaderText}>Suggérés pour vous</Text>
+            <Text style={styles.sectionHeaderText}>{t('search.suggested')}</Text>
           </View>
           {suggestions.map(renderSuggestedUser)}
         </>
@@ -143,7 +145,7 @@ export default function SearchUsersScreen({ navigation }: Props) {
       {topUsers.length > 0 && (
         <View style={styles.sectionHeader}>
           <Ionicons name="trending-up" size={14} color={colors.text.tertiary} />
-          <Text style={styles.sectionHeaderText}>Populaires</Text>
+          <Text style={styles.sectionHeaderText}>{t('search.popular')}</Text>
         </View>
       )}
     </View>
@@ -156,7 +158,7 @@ export default function SearchUsersScreen({ navigation }: Props) {
           <Ionicons name="search" size={18} color={colors.text.tertiary} />
           <TextInput
             style={styles.searchInput}
-            placeholder="Rechercher un utilisateur..."
+            placeholder={t('search.placeholder')}
             placeholderTextColor={colors.text.tertiary}
             value={query}
             onChangeText={setQuery}
@@ -184,7 +186,7 @@ export default function SearchUsersScreen({ navigation }: Props) {
           isSearching && !loading ? (
             <View style={styles.emptyContainer}>
               <Ionicons name="search-outline" size={48} color={colors.text.tertiary} />
-              <Text style={styles.emptyText}>Aucun utilisateur trouvé</Text>
+              <Text style={styles.emptyText}>{t('search.notFound')}</Text>
             </View>
           ) : null
         }

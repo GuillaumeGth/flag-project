@@ -15,11 +15,13 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { markMessageAsRead, fetchMessageById, markPublicMessageDiscovered } from '@/services/messages';
 import { MessageWithSender, RootStackParamList } from '@/types';
 import { colors } from '@/theme-redesign';
+import { useTranslation } from 'react-i18next';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'ReadMessage'>;
 
 export default function ReadMessageScreen({ navigation, route }: Props) {
   const insets = useSafeAreaInsets();
+  const { t } = useTranslation();
   const [message, setMessage] = useState<MessageWithSender | null>(null);
   const [sound, setSound] = useState<Audio.Sound | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -109,9 +111,9 @@ export default function ReadMessageScreen({ navigation, route }: Props) {
     return (
       <View style={styles.loadingContainer}>
         <Ionicons name="alert-circle" size={64} color={colors.text.tertiary} />
-        <Text style={styles.errorText}>Message introuvable</Text>
+        <Text style={styles.errorText}>{t('readMessage.notFound')}</Text>
         <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-          <Text style={styles.backButtonText}>Retour</Text>
+          <Text style={styles.backButtonText}>{t('readMessage.back')}</Text>
         </TouchableOpacity>
       </View>
     );
@@ -177,7 +179,7 @@ export default function ReadMessageScreen({ navigation, route }: Props) {
           }
         >
           <Ionicons name="arrow-undo" size={20} color="#fff" />
-          <Text style={styles.replyButtonText}>Répondre ici</Text>
+          <Text style={styles.replyButtonText}>{t('readMessage.reply')}</Text>
         </TouchableOpacity>
       </View>
     </View>

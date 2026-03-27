@@ -7,24 +7,15 @@ const HANDLE_HEIGHT = 4;
 const HANDLE_MARGIN_TOP = 10;
 const SEGMENT_PADDING_V = 7;
 const SEGMENT_CONTAINER_PADDING = 3;
-const SHEET_HEIGHT = '80%' as const;
-
 export default StyleSheet.create({
-  overlay: {
-    zIndex: 100,
-    elevation: 20,
-  },
-  kvContainer: {
-    justifyContent: 'flex-end',
-  },
   sheet: {
-    borderTopLeftRadius: radius.xl,
-    borderTopRightRadius: radius.xl,
     overflow: 'hidden',
-    height: SHEET_HEIGHT,
     borderWidth: 1,
     borderColor: colors.border.default,
     borderBottomWidth: 0,
+    paddingTop: 0,
+    paddingHorizontal: 0,
+    paddingBottom: 0,
   },
   sheetBlur: {
     flex: 1,

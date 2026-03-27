@@ -13,6 +13,7 @@ import { UndiscoveredMessageMapMeta } from '@/types';
 import { colors, spacing, radius, typography } from '@/theme-redesign';
 import GlassCard from '@/components/redesign/GlassCard';
 import PremiumAvatar from '@/components/redesign/PremiumAvatar';
+import { useTranslation } from 'react-i18next';
 
 const READ_GRADIENT_COLORS = ['rgba(124, 92, 252, 0.4)', 'rgba(167, 139, 250, 0.35)'] as const;
 const NAV_GRADIENT_COLORS = ['rgba(0, 229, 255, 0.18)', 'rgba(124, 92, 252, 0.35)'] as const;
@@ -46,6 +47,7 @@ export default function SelectedMessageCard({
   onNavigate,
   onClose,
 }: SelectedMessageCardProps) {
+  const { t } = useTranslation();
   const animatedStyle = useMemo(() => ({
     opacity: cardOpacityAnim,
     transform: [{ translateY: cardSlideAnim }],
@@ -95,7 +97,7 @@ export default function SelectedMessageCard({
               style={[styles.navButton, styles.navButtonReadable]}
             >
               <Ionicons name="eye" size={16} color={colors.primary.violet} />
-              <Text style={styles.navButtonText}>Découvrir le message</Text>
+              <Text style={styles.navButtonText}>{t('map.discoverMessage')}</Text>
             </LinearGradient>
           </TouchableOpacity>
         ) : (

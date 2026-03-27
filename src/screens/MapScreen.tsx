@@ -47,6 +47,7 @@ import { useMyFlags } from '@/hooks/useMyFlags';
 import { useClusteredMarkers, MessageCluster } from '@/hooks/useClusteredMarkers';
 import { getMessageLocation, colorForUserId, initialsForName } from '@/utils/mapUtils';
 import { log } from '@/utils/debug';
+import { useTranslation } from 'react-i18next';
 
 type MapNavigationProp = CompositeNavigationProp<
   BottomTabNavigationProp<MainTabParamList, 'Map'>,
@@ -78,6 +79,7 @@ const ADMIN_FAB_GRADIENT_IDLE = ['#3D2B00', '#7A5700', '#4A3500'] as const;
 
 export default function MapScreen({ navigation, route }: Props) {
   const insets = useSafeAreaInsets();
+  const { t } = useTranslation();
   const { user } = useAuth();
   const { current: userLocation, loading: locationLoading, refreshLocation, requestPermission, permission } = useLocation();
   const mapRef = useRef<MapView>(null);
@@ -649,7 +651,7 @@ export default function MapScreen({ navigation, route }: Props) {
               end={PERMISSION_GRADIENT_END}
               style={styles.permissionButton}
             >
-              <Text style={styles.permissionButtonText}>Autoriser la localisation</Text>
+              <Text style={styles.permissionButtonText}>{t('map.allowLocation')}</Text>
             </LinearGradient>
           </TouchableOpacity>
         )}
@@ -873,7 +875,7 @@ export default function MapScreen({ navigation, route }: Props) {
       </View>
 
       {routeCoordinates && (
-        <View style={[styles.floatingButtonsContainer, { top: insets.top + 16 }]}>
+        <View style={[styles.floatingButtonsContainer, { top: insets.top + 66 }]}>
           <TouchableOpacity onPress={openInMaps} activeOpacity={0.9} style={[styles.floatingButton, styles.floatingButtonMaps]}>
             <Ionicons name="walk-outline" size={22} color={colors.primary.cyan} />
           </TouchableOpacity>

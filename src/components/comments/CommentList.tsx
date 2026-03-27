@@ -3,6 +3,7 @@ import { View, Text, StyleSheet } from 'react-native';
 import { CommentWithUser, CommentWithReplies } from '@/types/comments';
 import { colors, spacing, typography } from '@/theme-redesign';
 import CommentItem from './CommentItem';
+import { useTranslation } from 'react-i18next';
 
 interface CommentListProps {
   comments: CommentWithReplies[];
@@ -21,10 +22,11 @@ export default function CommentList({
   onDelete,
   onUserPress,
 }: CommentListProps) {
+  const { t } = useTranslation();
   if (comments.length === 0) {
     return (
       <View style={styles.empty}>
-        <Text style={styles.emptyText}>Aucun commentaire</Text>
+        <Text style={styles.emptyText}>{t('comments.noComments')}</Text>
       </View>
     );
   }

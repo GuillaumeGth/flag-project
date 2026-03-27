@@ -16,6 +16,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors } from '@/theme-redesign';
 import PremiumButton from '@/components/redesign/PremiumButton';
+import { useTranslation } from 'react-i18next';
 
 interface PermissionItem {
   key: string;
@@ -31,39 +32,40 @@ interface PermissionsScreenProps {
 
 export default function PermissionsScreen({ onComplete }: PermissionsScreenProps) {
   const insets = useSafeAreaInsets();
+  const { t } = useTranslation();
   const [permissions, setPermissions] = useState<PermissionItem[]>([
     {
       key: 'location',
-      label: 'Localisation',
-      description: 'Pour afficher les messages autour de vous',
+      label: t('permissions.location'),
+      description: t('permissions.locationDescription'),
       icon: 'location-outline',
       status: 'undetermined',
     },
     {
       key: 'locationBackground',
-      label: 'Localisation en arrière-plan',
-      description: 'Pour vous notifier quand vous êtes proche d\'un message',
+      label: t('permissions.locationBackground'),
+      description: t('permissions.locationBackgroundDescription'),
       icon: 'navigate-outline',
       status: 'undetermined',
     },
     {
       key: 'camera',
-      label: 'Caméra',
-      description: 'Pour prendre des photos à joindre aux messages',
+      label: t('permissions.camera'),
+      description: t('permissions.cameraDescription'),
       icon: 'camera-outline',
       status: 'undetermined',
     },
     {
       key: 'microphone',
-      label: 'Microphone',
-      description: 'Pour enregistrer des messages audio',
+      label: t('permissions.microphone'),
+      description: t('permissions.microphoneDescription'),
       icon: 'mic-outline',
       status: 'undetermined',
     },
     {
       key: 'notifications',
-      label: 'Notifications',
-      description: 'Pour être alerté des nouveaux messages',
+      label: t('permissions.notifications'),
+      description: t('permissions.notificationsDescription'),
       icon: 'notifications-outline',
       status: 'undetermined',
     },
@@ -217,7 +219,7 @@ export default function PermissionsScreen({ onComplete }: PermissionsScreenProps
         <Text style={styles.description}>{current.description}</Text>
 
         <PremiumButton
-          title="Autoriser"
+          title={t('permissions.allow')}
           onPress={() => requestPermission(current.key)}
           variant="gradient"
           size="large"
@@ -231,7 +233,7 @@ export default function PermissionsScreen({ onComplete }: PermissionsScreenProps
           onPress={skipPermission}
           disabled={requesting}
         >
-          <Text style={styles.skipButtonText}>Plus tard</Text>
+          <Text style={styles.skipButtonText}>{t('permissions.later')}</Text>
         </TouchableOpacity>
       </View>
 

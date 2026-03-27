@@ -116,6 +116,15 @@ Points importants :
 - Messages privés nécessitent un abonnement mutuel (vérifié par RLS)
 - Tokens stockés dans `expo-secure-store`
 
+### Internationalisation (i18n)
+- **Zéro texte statique** — toute string visible par l'utilisateur passe obligatoirement par `t()` de `react-i18next`
+- Source de vérité : `src/i18n/locales/fr.ts` — toujours ajouter la clé en `fr` en premier, puis dans `en`, `es`, `pt`, `de`
+- Les constantes avec des `label:` traduits doivent être déclarées **dans le composant**, pas au niveau du module
+- Langues supportées : `fr`, `en`, `es`, `pt`, `de` — fallback `en`
+- Détection automatique de la langue du device via `expo-localization`, persistance dans `AsyncStorage`
+- Sélecteur de langue dans `SettingsScreen`
+- Doc complète : `docs/spec/13-i18n.md`
+
 ### Design
 - Glassmorphism avec `GlassCard` + `BlurView`
 - Boutons gradient avec `PremiumButton`

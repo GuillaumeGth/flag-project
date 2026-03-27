@@ -17,16 +17,23 @@ import { RootStackParamList } from '@/types';
 import GlassCard from '@/components/redesign/GlassCard';
 import GlassInput from '@/components/redesign/GlassInput';
 import PremiumButton from '@/components/redesign/PremiumButton';
+import { useTranslation } from 'react-i18next';
+import { i18next, SUPPORTED_LANGUAGES, LANGUAGE_LABELS, SupportedLanguage, saveLanguage } from '@/i18n';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Settings'>;
 
 export default function SettingsScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets();
   const { user, signOut, updateDisplayName } = useAuth();
+  const { t } = useTranslation();
   const [editNameVisible, setEditNameVisible] = useState(false);
   const [newName, setNewName] = useState('');
   const [savingName, setSavingName] = useState(false);
   const [signOutDialogVisible, setSignOutDialogVisible] = useState(false);
+  const [langModalVisible, setLangModalVisible] = useState(false);
+  const [currentLang, setCurrentLang] = useState<SupportedLanguage>(
+    (i18next.language as SupportedLanguage) ?? 'fr'
+  );
 
   const handleSaveName = async () => {
     if (!newName.trim()) return;
@@ -38,14 +45,21 @@ export default function SettingsScreen({ navigation }: Props) {
 
   const handleSignOut = () => setSignOutDialogVisible(true);
 
+  const handleSelectLanguage = async (lang: SupportedLanguage) => {
+    await i18next.changeLanguage(lang);
+    await saveLanguage(lang);
+    setCurrentLang(lang);
+    setLangModalVisible(false);
+  };
+
   return (
     <View style={styles.container}>
       <ConfirmDialog
         visible={signOutDialogVisible}
-        title="Se déconnecter ?"
-        message="Tu devras te reconnecter pour accéder à tes fläags."
-        confirmLabel="Déconnexion"
-        cancelLabel="Annuler"
+        title={t('settings.signOutTitle')}
+        message={t('settings.signOutMessage')}
+        confirmLabel={t('settings.signOutConfirm')}
+        cancelLabel={t('settings.cancel')}
         destructive
         onConfirm={signOut}
         onCancel={() => setSignOutDialogVisible(false)}
@@ -54,64 +68,99 @@ export default function SettingsScreen({ navigation }: Props) {
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
           <Ionicons name="arrow-back" size={24} color={colors.text.primary} />
         </TouchableOpacity>
-        <Text style={styles.title}>Paramètres</Text>
+        <Text style={styles.title}>{t('settings.title')}</Text>
         <View style={styles.backButton} />
       </View>
 
       <View style={styles.menuSection}>
         <TouchableOpacity style={styles.menuItem} onPress={() => { setNewName(user?.display_name || ''); setEditNameVisible(true); }}>
           <Ionicons name="person-outline" size={24} color={colors.text.primary} />
-          <Text style={styles.menuText}>Modifier le nom</Text>
+          <Text style={styles.menuText}>{t('settings.editName')}</Text>
           <Ionicons name="chevron-forward" size={20} color={colors.text.tertiary} />
         </TouchableOpacity>
 
         <TouchableOpacity style={styles.menuItem}>
           <Ionicons name="notifications-outline" size={24} color={colors.text.primary} />
-          <Text style={styles.menuText}>Notifications</Text>
+          <Text style={styles.menuText}>{t('settings.notificationsMenu')}</Text>
           <Ionicons name="chevron-forward" size={20} color={colors.text.tertiary} />
         </TouchableOpacity>
 
         <TouchableOpacity style={styles.menuItem} onPress={() => navigation.navigate('Privacy')}>
           <Ionicons name="shield-outline" size={24} color={colors.text.primary} />
-          <Text style={styles.menuText}>Confidentialité</Text>
+          <Text style={styles.menuText}>{t('settings.privacy')}</Text>
           <Ionicons name="chevron-forward" size={20} color={colors.text.tertiary} />
         </TouchableOpacity>
 
         <TouchableOpacity style={styles.menuItem} onPress={() => navigation.navigate('Contact')}>
           <Ionicons name="mail-outline" size={24} color={colors.text.primary} />
-          <Text style={styles.menuText}>Nous contacter</Text>
+          <Text style={styles.menuText}>{t('settings.contact')}</Text>
+          <Ionicons name="chevron-forward" size={20} color={colors.text.tertiary} />
+        </TouchableOpacity>
+
+        <TouchableOpacity style={styles.menuItem} onPress={() => setLangModalVisible(true)}>
+          <Ionicons name="language-outline" size={24} color={colors.text.primary} />
+          <Text style={styles.menuText}>{t('settings.language')}</Text>
+          <Text style={styles.langCurrent}>{LANGUAGE_LABELS[currentLang]}</Text>
           <Ionicons name="chevron-forward" size={20} color={colors.text.tertiary} />
         </TouchableOpacity>
       </View>
 
       <TouchableOpacity style={styles.signOutButton} onPress={handleSignOut}>
         <Ionicons name="log-out-outline" size={24} color={colors.error} />
-        <Text style={styles.signOutText}>Se déconnecter</Text>
+        <Text style={styles.signOutText}>{t('settings.signOut')}</Text>
       </TouchableOpacity>
 
       <Text style={[styles.version, { paddingBottom: Math.max(insets.bottom, 16) }]}>
         Fläag v{Application.nativeApplicationVersion ?? '—'}
       </Text>
 
+      {/* Edit name modal */}
       <Modal visible={editNameVisible} transparent animationType="fade" onRequestClose={() => setEditNameVisible(false)}>
         <View style={styles.modalOverlay}>
           <View style={styles.modalBlur} />
           <GlassCard style={styles.modalCard} withBorder withGlow glowColor="cyan">
-            <Text style={styles.modalTitle}>Modifier le nom</Text>
+            <Text style={styles.modalTitle}>{t('settings.editNameTitle')}</Text>
             <View style={styles.inputContainer}>
               <GlassInput
                 style={styles.modalInput}
                 value={newName}
                 onChangeText={setNewName}
-                placeholder="Votre nom"
+                placeholder={t('settings.namePlaceholder')}
                 borderVariant="accent"
                 autoFocus
                 maxLength={50}
               />
             </View>
             <View style={styles.modalButtons}>
-              <PremiumButton title="Annuler" variant="ghost" onPress={() => setEditNameVisible(false)} disabled={savingName} style={styles.modalButton} />
-              <PremiumButton title="Enregistrer" variant="gradient" onPress={handleSaveName} loading={savingName} disabled={savingName} style={styles.modalButton} withGlow />
+              <PremiumButton title={t('settings.cancel')} variant="ghost" onPress={() => setEditNameVisible(false)} disabled={savingName} style={styles.modalButton} />
+              <PremiumButton title={t('settings.save')} variant="gradient" onPress={handleSaveName} loading={savingName} disabled={savingName} style={styles.modalButton} withGlow />
+            </View>
+          </GlassCard>
+        </View>
+      </Modal>
+
+      {/* Language picker modal */}
+      <Modal visible={langModalVisible} transparent animationType="fade" onRequestClose={() => setLangModalVisible(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalBlur} />
+          <GlassCard style={styles.modalCard} withBorder withGlow glowColor="cyan">
+            <Text style={styles.modalTitle}>{t('settings.language')}</Text>
+            {SUPPORTED_LANGUAGES.map((lang) => (
+              <TouchableOpacity
+                key={lang}
+                style={[styles.langOption, currentLang === lang && styles.langOptionActive]}
+                onPress={() => handleSelectLanguage(lang)}
+              >
+                <Text style={[styles.langOptionText, currentLang === lang && styles.langOptionTextActive]}>
+                  {LANGUAGE_LABELS[lang]}
+                </Text>
+                {currentLang === lang && (
+                  <Ionicons name="checkmark" size={20} color={colors.primary.cyan} />
+                )}
+              </TouchableOpacity>
+            ))}
+            <View style={styles.modalButtons}>
+              <PremiumButton title={t('settings.cancel')} variant="ghost" onPress={() => setLangModalVisible(false)} style={styles.modalButton} />
             </View>
           </GlassCard>
         </View>
@@ -158,6 +207,11 @@ const styles = StyleSheet.create({
     marginLeft: 16,
     fontSize: 16,
     color: colors.text.primary,
+  },
+  langCurrent: {
+    fontSize: 14,
+    color: colors.text.tertiary,
+    marginRight: 8,
   },
   signOutButton: {
     flexDirection: 'row',
@@ -210,8 +264,29 @@ const styles = StyleSheet.create({
   modalButtons: {
     flexDirection: 'row',
     gap: spacing.md,
+    marginTop: spacing.md,
   },
   modalButton: {
     flex: 1,
+  },
+  langOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.sm,
+    borderRadius: radius.md,
+    marginBottom: spacing.xs,
+  },
+  langOptionActive: {
+    backgroundColor: colors.surface.glassDark,
+  },
+  langOptionText: {
+    fontSize: 16,
+    color: colors.text.secondary,
+  },
+  langOptionTextActive: {
+    color: colors.text.primary,
+    fontWeight: '600',
   },
 });

@@ -16,6 +16,7 @@ import { colors, spacing, radius, shadows } from '@/theme-redesign';
 import ReplyPreview from './ReplyPreview';
 import GlassCard from '@/components/redesign/GlassCard';
 import { reportError } from '@/services/errorReporting';
+import { useTranslation } from 'react-i18next';
 
 interface MessageInputProps {
   sending: boolean;
@@ -44,6 +45,7 @@ export default function MessageInput({
   onPickImage,
   onTakePhoto,
 }: MessageInputProps) {
+  const { t } = useTranslation();
   const [inputText, setInputText] = useState('');
   const [mediaUri, setMediaUri] = useState<string | null>(null);
   const [contentType, setContentType] = useState<MessageContentType>('text');
@@ -152,7 +154,7 @@ export default function MessageInput({
                   color={colors.primary.cyan}
                 />
               </TouchableOpacity>
-              <Text style={styles.audioPreviewText}>Audio enregistré</Text>
+              <Text style={styles.audioPreviewText}>{t('conversation.audioRecorded')}</Text>
               <TouchableOpacity onPress={handleClearMedia}>
                 <Ionicons name="close" size={20} color={colors.text.secondary} />
               </TouchableOpacity>
@@ -178,7 +180,7 @@ export default function MessageInput({
 
             <TextInput
               style={styles.textInput}
-              placeholder="Message non géolocalisé"
+              placeholder={t('conversation.messagePlaceholder')}
               placeholderTextColor={colors.text.tertiary}
               value={inputText}
               onChangeText={setInputText}

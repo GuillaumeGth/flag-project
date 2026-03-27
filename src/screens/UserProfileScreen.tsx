@@ -36,11 +36,13 @@ import PremiumAvatar from '@/components/redesign/PremiumAvatar';
 import EmptyState from '@/components/EmptyState';
 import { useProfileMessages } from '@/hooks/useProfileMessages';
 import { useCityCount } from '@/hooks/useCityCount';
+import { useTranslation } from 'react-i18next';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'UserProfile'>;
 
 export default function UserProfileScreen({ navigation, route }: Props) {
   const insets = useSafeAreaInsets();
+  const { t } = useTranslation();
   const { userId } = route.params;
 
   const [userProfile, setUserProfile] = useState<User | null>(null);
@@ -160,7 +162,7 @@ export default function UserProfileScreen({ navigation, route }: Props) {
     return (
       <EmptyState
         icon="albums-outline"
-        title="Aucun message public"
+        title={t('profile.noPublicMessages')}
       />
     );
   };
@@ -175,7 +177,7 @@ export default function UserProfileScreen({ navigation, route }: Props) {
           <View style={styles.profileTopRow}>
             <PremiumAvatar uri={userProfile?.avatar_url} name={userProfile?.display_name} size="large" withRing ringColor="violet" />
             <Text style={styles.displayName}>
-              {userProfile?.display_name || 'Utilisateur'}
+              {userProfile?.display_name || t('userProfile.user')}
             </Text>
           </View>
           <View style={styles.profileActions}>
@@ -280,7 +282,7 @@ export default function UserProfileScreen({ navigation, route }: Props) {
         >
           <TouchableOpacity activeOpacity={1} style={styles.notifModalCard}>
             <View style={styles.notifModalHeader}>
-              <Text style={styles.notifModalTitle}>Notifications</Text>
+              <Text style={styles.notifModalTitle}>{t('userProfile.notifications')}</Text>
               <TouchableOpacity onPress={() => setShowNotifModal(false)}>
                 <Ionicons name="close" size={22} color={colors.text.secondary} />
               </TouchableOpacity>
@@ -288,7 +290,7 @@ export default function UserProfileScreen({ navigation, route }: Props) {
 
             <View style={styles.notifRow}>
               <View style={styles.notifRowInfo}>
-                <Text style={styles.notifRowLabel}>Fläags privés</Text>
+                <Text style={styles.notifRowLabel}>{t('userProfile.privateFlags')}</Text>
               </View>
               <Switch
                 value={notifPrefs.notifyPrivateFlags}
@@ -306,7 +308,7 @@ export default function UserProfileScreen({ navigation, route }: Props) {
 
             <View style={styles.notifRow}>
               <View style={styles.notifRowInfo}>
-                <Text style={styles.notifRowLabel}>Fläags publics</Text>
+                <Text style={styles.notifRowLabel}>{t('userProfile.publicFlags')}</Text>
               </View>
               <Switch
                 value={notifPrefs.notifyPublicFlags}

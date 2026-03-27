@@ -16,6 +16,7 @@
 | 10 | [spec/10-screens.md](./10-screens.md) | Flux utilisateur par écran (vue d'ensemble) |
 | 11 | [spec/11-types.md](./11-types.md) | Interfaces TypeScript |
 | 12 | [spec/12-error-reporting.md](./12-error-reporting.md) | Logs production, throttling |
+| 13 | [spec/13-i18n.md](./13-i18n.md) | Internationalisation — i18next, locales, règles |
 
 ## Specs de features
 

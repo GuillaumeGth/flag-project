@@ -16,6 +16,7 @@ import { colors, spacing, radius, shadows, typography } from '@/theme-redesign';
 import { formatTime, formatDateSeparator } from '@/utils/date';
 import GlassCard from '@/components/redesign/GlassCard';
 import ReactionBadge from './ReactionBadge';
+import { useTranslation } from 'react-i18next';
 
 // Module-level interpolation config — never declared inside render
 const ANIM_INPUT_RANGE: number[] = [0, 1];
@@ -62,6 +63,7 @@ export default function MessageBubble({
   showSenderNameInReply = true,
   isAdminUser = false,
 }: MessageBubbleProps) {
+  const { t } = useTranslation();
   const isUndiscovered = !isFromMe && !message.is_read && message.location;
   const showAdminBorder = isAdminUser && !!message.is_admin_placed;
   const isDeleted = isFromMe ? !!message.deleted_by_sender : !!message.deleted_by_recipient;
@@ -102,7 +104,7 @@ export default function MessageBubble({
             <GlassCard style={styles.undiscoveredBubble}>
               <View style={styles.blurredContent}>
                 <Ionicons name="lock-closed" size={20} color={colors.primary.magenta} />
-                <Text style={styles.undiscoveredText}>Message géolocalisé</Text>
+                <Text style={styles.undiscoveredText}>{t('conversation.geolocated')}</Text>
               </View>
               <Text style={styles.messageTime}>{formatTime(message.created_at)}</Text>
             </GlassCard>
@@ -123,7 +125,7 @@ export default function MessageBubble({
               ]}
             >
               {isDeleted ? (
-                <Text style={styles.deletedText}>Message supprimé</Text>
+                <Text style={styles.deletedText}>{t('conversation.deleted')}</Text>
               ) : (
                 <>
                   {message.reply_to?.id && (
@@ -212,7 +214,7 @@ export default function MessageBubble({
       </View>
 
       {isUndiscovered && (
-        <Text style={styles.undiscoveredHint}>Tap to view on map</Text>
+        <Text style={styles.undiscoveredHint}>{t('conversation.tapToViewOnMap')}</Text>
       )}
     </Animated.View>
   );

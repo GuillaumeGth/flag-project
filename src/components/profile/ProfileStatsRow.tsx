@@ -12,6 +12,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing, radius, typography } from '@/theme-redesign';
 import { fetchFollowers, FollowerUser } from '@/services/subscriptions';
 import BottomSheet from '@/components/BottomSheet';
+import { useTranslation } from 'react-i18next';
 
 /**
  * Hook that manages the sheets state. Returns:
@@ -27,6 +28,7 @@ export function useProfileSheets({
   userId?: string;
   onPressFollower?: (followerId: string) => void;
 }) {
+  const { t } = useTranslation();
   const [showCities, setShowCities] = useState(false);
   const [showFollowers, setShowFollowers] = useState(false);
   const [followers, setFollowers] = useState<FollowerUser[]>([]);
@@ -48,7 +50,7 @@ export function useProfileSheets({
   const renderOverlay = () => (
     <>
       <BottomSheet visible={showFollowers} onClose={() => setShowFollowers(false)}>
-        <Text style={styles.sheetTitle}>Connexions</Text>
+        <Text style={styles.sheetTitle}>{t('userProfile.connections')}</Text>
         {loadingFollowers ? (
           <ActivityIndicator color={colors.primary.cyan} style={{ marginVertical: spacing.xl }} />
         ) : (
@@ -71,19 +73,19 @@ export function useProfileSheets({
                     <Ionicons name="person" size={18} color={colors.text.secondary} />
                   </View>
                 )}
-                <Text style={styles.userName}>{item.display_name || 'Utilisateur'}</Text>
+                <Text style={styles.userName}>{item.display_name || t('userProfile.user')}</Text>
               </TouchableOpacity>
             )}
             ItemSeparatorComponent={() => <View style={styles.separator} />}
             ListEmptyComponent={
-              <Text style={styles.emptyText}>Aucune connexion pour le moment</Text>
+              <Text style={styles.emptyText}>{t('userProfile.noConnections')}</Text>
             }
           />
         )}
       </BottomSheet>
 
       <BottomSheet visible={showCities} onClose={() => setShowCities(false)}>
-        <Text style={styles.sheetTitle}>Villes visitées</Text>
+        <Text style={styles.sheetTitle}>{t('userProfile.citiesVisited')}</Text>
         <FlatList
           data={cityNames}
           keyExtractor={(item) => item}

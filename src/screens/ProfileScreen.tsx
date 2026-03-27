@@ -26,6 +26,7 @@ import ProfileStatsRow, { useProfileSheets } from '@/components/profile/ProfileS
 import EmptyState from '@/components/EmptyState';
 import { useProfileMessages } from '@/hooks/useProfileMessages';
 import { useCityCount } from '@/hooks/useCityCount';
+import { useTranslation } from 'react-i18next';
 
 type ProfileNavigationProp = CompositeNavigationProp<
   BottomTabNavigationProp<MainTabParamList, 'Profile'>,
@@ -37,6 +38,7 @@ type Props = Omit<BottomTabScreenProps<MainTabParamList, 'Profile'>, 'navigation
 
 export default function ProfileScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets();
+  const { t } = useTranslation();
   const { user, updateAvatar } = useAuth();
   const [uploading, setUploading] = useState(false);
 
@@ -118,8 +120,8 @@ export default function ProfileScreen({ navigation }: Props) {
     return (
       <EmptyState
         icon="albums-outline"
-        title="Aucun message public"
-        subtitle="Partagez votre premier message avec le monde"
+        title={t('profile.noPublicMessages')}
+        subtitle={t('profile.noPublicMessagesSubtitle')}
       />
     );
   };

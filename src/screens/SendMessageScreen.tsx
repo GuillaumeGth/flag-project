@@ -19,6 +19,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { sendMessage, uploadMedia } from '@/services/messages';
 import { Coordinates, RootStackParamList } from '@/types';
 import { colors, shadows, radius, spacing, typography } from '@/theme-redesign';
+import { useTranslation } from 'react-i18next';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'SendMessage'>;
 
@@ -26,6 +27,7 @@ type Recipient = { id: string; name: string };
 
 export default function SendMessageScreen({ navigation, route }: Props) {
   const insets = useSafeAreaInsets();
+  const { t } = useTranslation();
   const { user } = useAuth();
   const { current: userLocation } = useLocation();
 
@@ -179,7 +181,7 @@ export default function SendMessageScreen({ navigation, route }: Props) {
           </TouchableOpacity>
           <View style={styles.titleRow}>
             <Ionicons name="send" size={16} color="#FFFFFF" />
-            <Text style={styles.title}>Envoyer le Fläag</Text>
+            <Text style={styles.title}>{t('sendMessage.title')}</Text>
           </View>
           <View style={{ width: 24 }} />
         </View>
@@ -187,7 +189,7 @@ export default function SendMessageScreen({ navigation, route }: Props) {
         {/* Admin placement badge */}
         {adminLocation && (
           <View style={styles.adminBadge}>
-            <Text style={styles.adminBadgeText}>★ Position admin</Text>
+            <Text style={styles.adminBadgeText}>{t('sendMessage.adminBadge')}</Text>
             <Text style={styles.adminBadgeCoords}>
               {adminLocation.latitude.toFixed(5)}, {adminLocation.longitude.toFixed(5)}
             </Text>
@@ -196,7 +198,7 @@ export default function SendMessageScreen({ navigation, route }: Props) {
 
         {/* Content preview */}
         <View style={styles.previewSection}>
-          <Text style={styles.previewLabel}>Aperçu</Text>
+          <Text style={styles.previewLabel}>{t('sendMessage.preview')}</Text>
 
           {contentType === 'photo' && mediaUri ? (
             <View style={styles.mediaPreview}>
@@ -215,7 +217,7 @@ export default function SendMessageScreen({ navigation, route }: Props) {
                 <Ionicons name="mic" size={22} color={colors.primary.cyan} />
               </View>
               <View style={styles.audioInfo}>
-                <Text style={styles.audioTitle}>Message audio</Text>
+                <Text style={styles.audioTitle}>{t('sendMessage.audioTitle')}</Text>
                 {textContent ? (
                   <Text style={styles.audioSubtitle} numberOfLines={1}>
                     {textContent}
@@ -270,7 +272,7 @@ export default function SendMessageScreen({ navigation, route }: Props) {
             onPress={() => navigation.navigate('SelectRecipient', { mode: 'flag' })}
           >
             <Ionicons name="people-outline" size={18} color={colors.text.secondary} />
-            <Text style={styles.recipientLabel}>À :</Text>
+            <Text style={styles.recipientLabel}>{t('sendMessage.to')}</Text>
             <Text style={styles.recipientName} numberOfLines={1}>
               {recipients.length > 0
                 ? recipients.map((r) => r.name).join(', ')
@@ -298,7 +300,7 @@ export default function SendMessageScreen({ navigation, route }: Props) {
             ) : (
               <>
                 <Ionicons name="send" size={20} color="#FFFFFF" />
-                <Text style={styles.sendButtonText}>Envoyer</Text>
+                <Text style={styles.sendButtonText}>{t('sendMessage.send')}</Text>
               </>
             )}
           </LinearGradient>

@@ -5,6 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { CommentWithUser, CommentWithReplies } from '@/types/comments';
 import { colors, spacing, radius, typography } from '@/theme-redesign';
 import PremiumAvatar from '@/components/redesign/PremiumAvatar';
+import { useTranslation } from 'react-i18next';
 
 interface CommentItemProps {
   comment: CommentWithUser & Partial<CommentWithReplies>;
@@ -37,6 +38,7 @@ export default function CommentItem({
   onDelete,
   onUserPress,
 }: CommentItemProps) {
+  const { t } = useTranslation();
   const [expanded, setExpanded] = useState(false);
   const [textTruncated, setTextTruncated] = useState(false);
   const [deleteDialogVisible, setDeleteDialogVisible] = useState(false);
@@ -59,7 +61,7 @@ export default function CommentItem({
     <>
     <ConfirmDialog
       visible={deleteDialogVisible}
-      title="Supprimer ce commentaire ?"
+      title={t('comments.deleteTitle')}
       message="Cette action est irréversible."
       confirmLabel="Supprimer"
       cancelLabel="Annuler"
@@ -103,14 +105,14 @@ export default function CommentItem({
 
         {textTruncated && !expanded && (
           <TouchableOpacity onPress={() => setExpanded(true)}>
-            <Text style={styles.seeMore}>Voir plus</Text>
+            <Text style={styles.seeMore}>{t('comments.seeMore')}</Text>
           </TouchableOpacity>
         )}
 
         <View style={styles.actions}>
           {!isReply && onReply && (
             <TouchableOpacity onPress={() => onReply(comment)} style={styles.actionButton}>
-              <Text style={styles.actionText}>Répondre</Text>
+              <Text style={styles.actionText}>{t('comments.reply')}</Text>
             </TouchableOpacity>
           )}
         </View>

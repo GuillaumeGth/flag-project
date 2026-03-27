@@ -14,11 +14,13 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { fetchFollowedUsers, FLAG_BOT_ID } from '@/services/messages';
 import { User, RootStackParamList } from '@/types';
 import { colors } from '@/theme-redesign';
+import { useTranslation } from 'react-i18next';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'SelectRecipient'>;
 
 export default function SelectRecipientScreen({ navigation, route }: Props) {
   const insets = useSafeAreaInsets();
+  const { t } = useTranslation();
   const mode = route.params.mode;
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
@@ -92,7 +94,7 @@ export default function SelectRecipientScreen({ navigation, route }: Props) {
         )}
         <View style={styles.userInfo}>
           <Text style={styles.userName}>{displayName}</Text>
-          {isBot && <Text style={styles.botLabel}>Bot officiel Fläag</Text>}
+          {isBot && <Text style={styles.botLabel}>{t('selectRecipient.officialBot')}</Text>}
         </View>
       </TouchableOpacity>
     );
@@ -104,7 +106,7 @@ export default function SelectRecipientScreen({ navigation, route }: Props) {
         <TouchableOpacity onPress={() => navigation.goBack()}>
           <Ionicons name="arrow-back" size={24} color={colors.text.primary} />
         </TouchableOpacity>
-        <Text style={styles.title}>{mode === 'flag' ? 'Choisir les destinataires' : 'Nouvelle conversation'}</Text>
+        <Text style={styles.title}>{mode === 'flag' ? t('selectRecipient.chooseRecipients') : t('selectRecipient.newConversation')}</Text>
         {mode === 'flag' ? (
           <TouchableOpacity onPress={confirmSelection} disabled={selectedUsers.length === 0}>
             <Text style={[styles.confirmButton, selectedUsers.length === 0 && styles.confirmButtonDisabled]}>
@@ -123,7 +125,7 @@ export default function SelectRecipientScreen({ navigation, route }: Props) {
       ) : users.length === 0 ? (
         <View style={styles.emptyContainer}>
           <Ionicons name="people-outline" size={64} color={colors.text.tertiary} />
-          <Text style={styles.emptyTitle}>Aucun abonnement</Text>
+          <Text style={styles.emptyTitle}>{t('selectRecipient.noSubscriptions')}</Text>
           <Text style={styles.emptyText}>
             Vous ne suivez personne pour le moment.{'\n'}
             Abonnez-vous à des utilisateurs pour leur envoyer des messages !

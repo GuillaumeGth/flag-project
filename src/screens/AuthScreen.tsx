@@ -11,10 +11,12 @@ import Svg, { Path, G } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '@/contexts/AuthContext';
 import { colors } from '@/theme-redesign';
+import { useTranslation } from 'react-i18next';
 
 export default function AuthScreen() {
   const insets = useSafeAreaInsets();
   const { signInWithGoogle } = useAuth();
+  const { t } = useTranslation();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -49,7 +51,7 @@ export default function AuthScreen() {
             <>
               <GoogleIcon />
               <Text style={styles.googleButtonText}>
-                Continuer avec Google
+                {t('auth.continueWithGoogle')}
               </Text>
             </>
           )}

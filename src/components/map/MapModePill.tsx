@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import { colors, radius, spacing, typography } from '@/theme-redesign';
+import { useTranslation } from 'react-i18next';
 
 export type MapMode = 'explore' | 'mine';
 
@@ -18,6 +19,7 @@ const GRADIENT_START = { x: 0, y: 0 } as const;
 const GRADIENT_END = { x: 1, y: 0 } as const;
 
 export default function MapModePill({ mode, onChange, style }: MapModePillProps) {
+  const { t } = useTranslation();
   return (
     <View style={[styles.wrapper, style]}>
       <BlurView intensity={40} tint="dark" style={styles.pill}>
@@ -35,12 +37,12 @@ export default function MapModePill({ mode, onChange, style }: MapModePillProps)
                 style={styles.segmentActive}
               >
                 <Ionicons name="compass" size={18} color="#fff" />
-                <Text style={styles.labelActive}>Explorer</Text>
+                <Text style={styles.labelActive}>{t('map.explore')}</Text>
               </LinearGradient>
             ) : (
               <View style={styles.segmentInactive}>
                 <Ionicons name="compass-outline" size={18} color="#fff" />
-                <Text style={styles.labelInactive}>Explorer</Text>
+                <Text style={styles.labelInactive}>{t('map.explore')}</Text>
               </View>
             )}
           </TouchableOpacity>
@@ -58,12 +60,12 @@ export default function MapModePill({ mode, onChange, style }: MapModePillProps)
                 style={styles.segmentActive}
               >
                 <Ionicons name="flag" size={14} color="#fff" />
-                <Text style={styles.labelActive}>Mes Flaags</Text>
+                <Text style={styles.labelActive}>{t('map.myFlags')}</Text>
               </LinearGradient>
             ) : (
               <View style={styles.segmentInactive}>
                 <Ionicons name="flag-outline" size={14} color="#fff" />
-                <Text style={styles.labelInactive}>Mes Flaags</Text>
+                <Text style={styles.labelInactive}>{t('map.myFlags')}</Text>
               </View>
             )}
           </TouchableOpacity>

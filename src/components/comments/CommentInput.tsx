@@ -3,6 +3,7 @@ import { View, TouchableOpacity, Text, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing, radius, typography } from '@/theme-redesign';
 import GlassInput from '@/components/redesign/GlassInput';
+import { useTranslation } from 'react-i18next';
 
 interface CommentInputProps {
   onSubmit: (text: string) => void;
@@ -12,6 +13,7 @@ interface CommentInputProps {
 }
 
 export default function CommentInput({ onSubmit, replyingTo, onCancelReply, onFocus }: CommentInputProps) {
+  const { t } = useTranslation();
   const [text, setText] = useState('');
   const inputRef = useRef<React.ElementRef<typeof GlassInput>>(null);
 
@@ -40,7 +42,7 @@ export default function CommentInput({ onSubmit, replyingTo, onCancelReply, onFo
           style={styles.input}
           value={text}
           onChangeText={setText}
-          placeholder="Écrire un commentaire..."
+          placeholder={t('comments.placeholder')}
           multiline
           maxLength={2000}
           onFocus={onFocus}

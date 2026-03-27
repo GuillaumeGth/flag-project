@@ -18,6 +18,7 @@ import { colors, spacing, typography, radius, shadows } from '@/theme-redesign';
 import { RootStackParamList } from '@/types';
 import GlassInput from '@/components/redesign/GlassInput';
 import PremiumButton from '@/components/redesign/PremiumButton';
+import { useTranslation } from 'react-i18next';
 
 const CONTACT_EMAIL = 'contact@flaag.app';
 
@@ -25,6 +26,7 @@ type Props = NativeStackScreenProps<RootStackParamList, 'Contact'>;
 
 export default function ContactScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets();
+  const { t } = useTranslation();
   const { user } = useAuth();
 
   const [subject, setSubject] = useState('');
@@ -89,7 +91,7 @@ export default function ContactScreen({ navigation }: Props) {
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
           <Ionicons name="arrow-back" size={24} color={colors.text.primary} />
         </TouchableOpacity>
-        <Text style={styles.title}>Nous contacter</Text>
+        <Text style={styles.title}>{t('contact.title')}</Text>
         <View style={styles.backButton} />
       </View>
 
@@ -108,22 +110,22 @@ export default function ContactScreen({ navigation }: Props) {
             Une question, un bug ou une suggestion ?{'\n'}Écrivez-nous !
           </Text>
 
-          <Text style={styles.label}>Sujet (optionnel)</Text>
+          <Text style={styles.label}>{t('contact.subjectLabel')}</Text>
           <GlassInput
             style={styles.input}
             value={subject}
             onChangeText={setSubject}
-            placeholder="Ex : Bug, Suggestion, Question..."
+            placeholder={t('contact.subjectPlaceholder')}
             borderVariant="default"
             maxLength={100}
           />
 
-          <Text style={styles.label}>Message</Text>
+          <Text style={styles.label}>{t('contact.messageLabel')}</Text>
           <GlassInput
             style={[styles.input, styles.messageInput]}
             value={message}
             onChangeText={setMessage}
-            placeholder="Décrivez votre demande..."
+            placeholder={t('contact.messagePlaceholder')}
             borderVariant="accent"
             multiline
             textAlignVertical="top"
@@ -131,7 +133,7 @@ export default function ContactScreen({ navigation }: Props) {
           />
 
           <PremiumButton
-            title="Envoyer"
+            title={t('contact.send')}
             variant="gradient"
             onPress={handleSend}
             loading={sending}

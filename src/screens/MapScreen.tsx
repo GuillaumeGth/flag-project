@@ -47,6 +47,7 @@ import { useMyFlags } from '@/hooks/useMyFlags';
 import { useClusteredMarkers, MessageCluster } from '@/hooks/useClusteredMarkers';
 import { getMessageLocation, colorForUserId, initialsForName } from '@/utils/mapUtils';
 import { log } from '@/utils/debug';
+import { useTranslation } from 'react-i18next';
 
 type MapNavigationProp = CompositeNavigationProp<
   BottomTabNavigationProp<MainTabParamList, 'Map'>,
@@ -78,6 +79,7 @@ const ADMIN_FAB_GRADIENT_IDLE = ['#3D2B00', '#7A5700', '#4A3500'] as const;
 
 export default function MapScreen({ navigation, route }: Props) {
   const insets = useSafeAreaInsets();
+  const { t } = useTranslation();
   const { user } = useAuth();
   const { current: userLocation, loading: locationLoading, refreshLocation, requestPermission, permission } = useLocation();
   const mapRef = useRef<MapView>(null);
@@ -648,7 +650,7 @@ export default function MapScreen({ navigation, route }: Props) {
               end={PERMISSION_GRADIENT_END}
               style={styles.permissionButton}
             >
-              <Text style={styles.permissionButtonText}>Autoriser la localisation</Text>
+              <Text style={styles.permissionButtonText}>{t('map.allowLocation')}</Text>
             </LinearGradient>
           </TouchableOpacity>
         )}

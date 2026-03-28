@@ -713,11 +713,15 @@ export default function MapScreen({ navigation, route }: Props) {
         {/* Explore mode markers */}
         {mapMode === 'explore' && clusters.map((cluster) => {
           const captureKey = `${cluster.id}:${cluster.messages.length}`;
-          const capturedImage = avatarImages[captureKey];
+          // Use cluster.id (stable) as React key to prevent Marker remount on messages.length change.
+          // Remounting <Marker> inside MapView crashes Fabric interop (AIRMap insertReactSubview:atIndex:).
+          // Fall back to any cached image for this cluster id if the exact key isn't ready yet.
+          const capturedImage = avatarImages[captureKey]
+            ?? Object.entries(avatarImages).find(([k]) => k.startsWith(`${cluster.id}:`))?.[1];
           if (!capturedImage) return null;
           return (
             <MessageMarker
-              key={captureKey}
+              key={cluster.id}
               markerId={cluster.id}
               location={cluster.location}
               avatarUri={capturedImage}
@@ -735,11 +739,12 @@ export default function MapScreen({ navigation, route }: Props) {
         {/* Mine mode markers */}
         {mapMode === 'mine' && ownClusters.map((cluster) => {
           const captureKey = `${cluster.id}:${cluster.messages.length}`;
-          const capturedImage = avatarImages[captureKey];
+          const capturedImage = avatarImages[captureKey]
+            ?? Object.entries(avatarImages).find(([k]) => k.startsWith(`${cluster.id}:`))?.[1];
           if (!capturedImage) return null;
           return (
             <MessageMarker
-              key={captureKey}
+              key={cluster.id}
               markerId={cluster.id}
               location={cluster.location}
               avatarUri={capturedImage}
@@ -754,11 +759,11 @@ export default function MapScreen({ navigation, route }: Props) {
           );
         })}
 
-        {routeCoordinates && (
-          <>
-            <Polyline coordinates={routeCoordinates} strokeColor="rgba(255,255,255,0.9)" strokeWidth={10} />
-            <Polyline coordinates={routeCoordinates} strokeColor={colors.primary.cyan} strokeWidth={5} />
-          </>
+        {!!routeCoordinates && (
+          <Polyline coordinates={routeCoordinates} strokeColor="rgba(255,255,255,0.9)" strokeWidth={10} />
+        )}
+        {!!routeCoordinates && (
+          <Polyline coordinates={routeCoordinates} strokeColor={colors.primary.cyan} strokeWidth={5} />
         )}
 
       </MapView>

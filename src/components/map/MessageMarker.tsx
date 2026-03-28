@@ -30,6 +30,7 @@ export default function MessageMarker({
       anchor={{ x: 0.5, y: 0.9 }}
       onPress={onPress}
       opacity={opacity}
+      tracksViewChanges={false}
     />
   );
 }
